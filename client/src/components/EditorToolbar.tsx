@@ -1,4 +1,4 @@
-import { EditorTool } from "../lib/types";
+import { EditorTool, UnitSystem } from "../lib/types";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Separator } from "@/components/ui/separator";
@@ -7,6 +7,7 @@ import {
   Pencil,
   Type,
   Eraser,
+  Hand,
   Undo2,
   Redo2,
   ZoomIn,
@@ -15,7 +16,7 @@ import {
   Trash2,
   Download,
   Trash,
-  Save,
+  Image,
   FolderOpen,
 } from "lucide-react";
 
@@ -37,10 +38,13 @@ interface EditorToolbarProps {
   onLoadPlan: () => void;
   onClearAll: () => void;
   zoom: number;
+  units: UnitSystem;
+  onToggleUnits: () => void;
 }
 
 const tools: { tool: EditorTool; icon: typeof MousePointer2; label: string; shortcut: string }[] = [
   { tool: "select", icon: MousePointer2, label: "Select & Move", shortcut: "V" },
+  { tool: "pan", icon: Hand, label: "Pan / Drag", shortcut: "H" },
   { tool: "wall", icon: Pencil, label: "Draw Walls", shortcut: "W" },
   { tool: "label", icon: Type, label: "Add Label", shortcut: "L" },
   { tool: "eraser", icon: Eraser, label: "Eraser", shortcut: "E" },
@@ -64,6 +68,8 @@ export default function EditorToolbar({
   onLoadPlan,
   onClearAll,
   zoom,
+  units,
+  onToggleUnits,
 }: EditorToolbarProps) {
   return (
     <div className="flex items-center gap-1 px-3 py-2 border-b border-border bg-card" data-testid="editor-toolbar">
@@ -179,11 +185,25 @@ export default function EditorToolbar({
         <Tooltip>
           <TooltipTrigger asChild>
             <Button size="sm" variant="ghost" onClick={onSavePlan} data-testid="btn-save-plan">
-              <Save className="h-4 w-4 mr-1" />
-              Save
+              <Image className="h-4 w-4 mr-1" />
+              Save Image
             </Button>
           </TooltipTrigger>
-          <TooltipContent><p>Save Plan (JSON)</p></TooltipContent>
+          <TooltipContent><p>Save as PNG image</p></TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={onToggleUnits}
+              data-testid="btn-toggle-units"
+              className="text-xs font-mono px-2"
+            >
+              {units === "metric" ? "m" : "ft"}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent><p>{units === "metric" ? "Switch to feet / sq ft" : "Switch to metres / m²"}</p></TooltipContent>
         </Tooltip>
         <Tooltip>
           <TooltipTrigger asChild>

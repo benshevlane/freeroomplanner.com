@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from "react";
-import { EditorState, Wall, FurnitureItem, RoomLabel, Point, EditorTool, FurnitureTemplate } from "../lib/types";
+import { EditorState, Wall, FurnitureItem, RoomLabel, Point, EditorTool, FurnitureTemplate, UnitSystem } from "../lib/types";
 
 function generateId(): string {
   return Math.random().toString(36).slice(2, 10);
@@ -15,7 +15,9 @@ const INITIAL_STATE: EditorState = {
   selectedTool: "wall",
   selectedItemId: null,
   wallDrawing: null,
+  wallChainStart: null,
   roomName: "My Room",
+  units: "metric" as UnitSystem,
 };
 
 export function useEditor() {
@@ -44,7 +46,7 @@ export function useEditor() {
   }, [state]);
 
   const setTool = useCallback((tool: EditorTool) => {
-    setState((s) => ({ ...s, selectedTool: tool, selectedItemId: null, wallDrawing: null }));
+    setState((s) => ({ ...s, selectedTool: tool, selectedItemId: null, wallDrawing: null, wallChainStart: null }));
   }, []);
 
   const setSelectedItem = useCallback((id: string | null) => {
@@ -150,7 +152,16 @@ export function useEditor() {
   }, []);
 
   const setWallDrawing = useCallback((drawing: { start: Point } | null) => {
-    setState((s) => ({ ...s, wallDrawing: drawing }));
+    setState((s) => ({
+      ...s,
+      wallDrawing: drawing,
+      // Track the first point of the chain
+      wallChainStart: drawing === null ? null : (s.wallChainStart ?? drawing.start),
+    }));
+  }, []);
+
+  const setUnits = useCallback((units: UnitSystem) => {
+    setState((s) => ({ ...s, units }));
   }, []);
 
   const setRoomName = useCallback((name: string) => {
@@ -234,6 +245,7 @@ export function useEditor() {
     pushUndo,
     updateFurniture,
     updateLabel,
+    setUnits,
     exportState,
     importState,
   };

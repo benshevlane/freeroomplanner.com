@@ -1,5 +1,5 @@
 import { useRef, useEffect, useCallback, useState } from "react";
-import { EditorState, Point, FurnitureTemplate, FurnitureItem, RoomLabel } from "../lib/types";
+import { EditorState, Point, FurnitureTemplate, FurnitureItem, RoomLabel, UnitSystem } from "../lib/types";
 import {
   drawGrid,
   drawWalls,
@@ -124,11 +124,11 @@ export default function FloorPlanCanvas({
     // Room areas
     const rooms = detectRooms(state.walls);
     if (rooms.length > 0) {
-      drawRoomAreas(ctx, rooms, state.gridSize, state.zoom, state.panOffset, isDark);
+      drawRoomAreas(ctx, rooms, state.gridSize, state.zoom, state.panOffset, isDark, state.units);
     }
 
     // Walls
-    drawWalls(ctx, state.walls, state.gridSize, state.zoom, state.panOffset, isDark, state.selectedItemId);
+    drawWalls(ctx, state.walls, state.gridSize, state.zoom, state.panOffset, isDark, state.selectedItemId, state.units);
 
     // Wall preview with snapping, angle snap, alignment guides
     if (state.wallDrawing && state.selectedTool === "wall") {
@@ -154,7 +154,7 @@ export default function FloorPlanCanvas({
         angleDeg = computeWallAngle(state.wallDrawing.start, finalPoint);
       }
 
-      drawWallPreview(ctx, state.wallDrawing.start, finalPoint, state.gridSize, state.zoom, state.panOffset, isDark, angleDeg);
+      drawWallPreview(ctx, state.wallDrawing.start, finalPoint, state.gridSize, state.zoom, state.panOffset, isDark, angleDeg, state.units);
       if (didSnap) {
         drawSnapIndicator(ctx, wallSnapped, state.gridSize, state.zoom, state.panOffset);
       }
@@ -188,7 +188,7 @@ export default function FloorPlanCanvas({
     }
 
     // Scale indicator
-    drawScaleIndicator(ctx, w, h, state.gridSize, state.zoom, isDark);
+    drawScaleIndicator(ctx, w, h, state.gridSize, state.zoom, isDark, state.units);
   });
 
   function drawScaleIndicator(
@@ -197,28 +197,37 @@ export default function FloorPlanCanvas({
     h: number,
     gridSize: number,
     zoom: number,
-    isDark: boolean
+    isDark: boolean,
+    units: UnitSystem
   ) {
     const meterPx = gridSize * zoom;
     const x = 16;
     const y = h - 24;
 
+    // In imperial, show 1ft (0.3048m) instead of 1m
+    const barPx = units === "imperial" ? meterPx * 0.3048 : meterPx;
+    const barLabel = units === "imperial" ? "1 ft" : "1m";
+
+    // For imperial, use 3ft bar for better visibility
+    const displayPx = units === "imperial" ? meterPx * 0.9144 : meterPx;
+    const displayLabel = units === "imperial" ? "3 ft" : "1m";
+
     ctx.strokeStyle = isDark ? "#797876" : "#7a7974";
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.moveTo(x, y);
-    ctx.lineTo(x + meterPx, y);
+    ctx.lineTo(x + displayPx, y);
     ctx.moveTo(x, y - 4);
     ctx.lineTo(x, y + 4);
-    ctx.moveTo(x + meterPx, y - 4);
-    ctx.lineTo(x + meterPx, y + 4);
+    ctx.moveTo(x + displayPx, y - 4);
+    ctx.lineTo(x + displayPx, y + 4);
     ctx.stroke();
 
     ctx.font = `500 12px 'General Sans', 'DM Sans', sans-serif`;
     ctx.fillStyle = isDark ? "#797876" : "#7a7974";
     ctx.textAlign = "center";
     ctx.textBaseline = "bottom";
-    ctx.fillText("1m", x + meterPx / 2, y - 6);
+    ctx.fillText(displayLabel, x + displayPx / 2, y - 6);
   }
 
   const getCanvasPos = useCallback((e: React.PointerEvent | PointerEvent): Point => {
@@ -256,8 +265,16 @@ export default function FloorPlanCanvas({
         return;
       }
 
-      // Middle mouse or alt+click for panning
-      if (e.button === 1 || (e.button === 0 && e.altKey)) {
+      // Middle mouse or alt+click or pan tool for panning
+      if (e.button === 1 || (e.button === 0 && e.altKey) || (e.button === 0 && state.selectedTool === "pan")) {
+        setIsPanning(true);
+        setDragStart({ x: pos.x - state.panOffset.x, y: pos.y - state.panOffset.y });
+        return;
+      }
+
+      // Right-click to pan while drawing walls
+      if (e.button === 2) {
+        e.preventDefault();
         setIsPanning(true);
         setDragStart({ x: pos.x - state.panOffset.x, y: pos.y - state.panOffset.y });
         return;
@@ -339,7 +356,19 @@ export default function FloorPlanCanvas({
 
         if (state.wallDrawing) {
           onAddWall(state.wallDrawing.start, finalPoint);
-          onSetWallDrawing({ start: finalPoint });
+
+          // Auto-close: if the new endpoint snaps to the chain start, exit drawing
+          if (didSnap && state.wallChainStart) {
+            const dx = finalPoint.x - state.wallChainStart.x;
+            const dy = finalPoint.y - state.wallChainStart.y;
+            if (Math.sqrt(dx * dx + dy * dy) < 1) {
+              onSetWallDrawing(null);
+            } else {
+              onSetWallDrawing({ start: finalPoint });
+            }
+          } else {
+            onSetWallDrawing({ start: finalPoint });
+          }
         } else {
           onSetWallDrawing({ start: finalPoint });
         }
@@ -506,6 +535,17 @@ export default function FloorPlanCanvas({
   const handleWheel = useCallback(
     (e: React.WheelEvent) => {
       e.preventDefault();
+      e.stopPropagation();
+
+      // If Shift is held or actively drawing walls, pan instead of zoom
+      if (e.shiftKey || (state.selectedTool === "wall" && state.wallDrawing)) {
+        onSetPan({
+          x: state.panOffset.x - e.deltaX - (e.shiftKey ? 0 : e.deltaY),
+          y: state.panOffset.y - e.deltaY,
+        });
+        return;
+      }
+
       const delta = e.deltaY > 0 ? 0.9 : 1.1;
       const newZoom = Math.max(0.3, Math.min(3, state.zoom * delta));
 
@@ -518,7 +558,7 @@ export default function FloorPlanCanvas({
       onSetZoom(newZoom);
       onSetPan({ x: newPanX, y: newPanY });
     },
-    [state.zoom, state.panOffset, getCanvasPosMouse, onSetZoom, onSetPan]
+    [state.zoom, state.panOffset, state.selectedTool, state.wallDrawing, getCanvasPosMouse, onSetZoom, onSetPan]
   );
 
   const handleDoubleClick = useCallback(
@@ -624,9 +664,15 @@ export default function FloorPlanCanvas({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [state.selectedItemId, state.furniture, state.walls, state.labels, onRemoveFurniture, onRemoveWall, onRemoveLabel, onSetWallDrawing, onSelectItem]);
 
+  // Prevent native context menu so right-click can pan
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+  }, []);
+
   const cursorStyle = (() => {
     if (isPanning) return "grabbing";
     if (isResizing) return "nwse-resize";
+    if (state.selectedTool === "pan") return "grab";
     if (state.selectedTool === "wall") return "crosshair";
     if (state.selectedTool === "eraser") return "crosshair";
     if (state.selectedTool === "label") return "text";
@@ -654,6 +700,7 @@ export default function FloorPlanCanvas({
         onDoubleClick={handleDoubleClick}
         onDragOver={handleDragOver}
         onDrop={handleDrop}
+        onContextMenu={handleContextMenu}
         data-testid="floor-plan-canvas"
       />
       {/* Inline label editing overlay */}

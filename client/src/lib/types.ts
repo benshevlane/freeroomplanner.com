@@ -30,7 +30,9 @@ export interface RoomLabel {
   fontSize: number;
 }
 
-export type EditorTool = "select" | "wall" | "furniture" | "label" | "eraser";
+export type EditorTool = "select" | "wall" | "furniture" | "label" | "eraser" | "pan";
+
+export type UnitSystem = "metric" | "imperial";
 
 export interface EditorState {
   walls: Wall[];
@@ -42,7 +44,9 @@ export interface EditorState {
   selectedTool: EditorTool;
   selectedItemId: string | null;
   wallDrawing: { start: Point } | null;
+  wallChainStart: Point | null; // first click of current wall chain (for auto-close)
   roomName: string;
+  units: UnitSystem;
 }
 
 export interface FurnitureTemplate {

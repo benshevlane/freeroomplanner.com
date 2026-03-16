@@ -1,4 +1,26 @@
-import { Wall, FurnitureItem, RoomLabel, Point } from "./types";
+import { Wall, FurnitureItem, RoomLabel, Point, UnitSystem } from "./types";
+
+/** Convert cm to display string based on unit system */
+function formatLength(cm: number, units: UnitSystem): string {
+  if (units === "imperial") {
+    const totalInches = cm / 2.54;
+    const feet = Math.floor(totalInches / 12);
+    const inches = Math.round(totalInches % 12);
+    if (inches === 12) return `${feet + 1}'0"`;
+    if (feet === 0) return `${inches}"`;
+    return `${feet}'${inches}"`;
+  }
+  return `${(cm / 100).toFixed(2)}m`;
+}
+
+/** Convert m² to display string based on unit system */
+function formatArea(sqM: number, units: UnitSystem): string {
+  if (units === "imperial") {
+    const sqFt = sqM * 10.7639;
+    return `${sqFt.toFixed(1)} sq ft`;
+  }
+  return `${sqM.toFixed(1)} m\u00B2`;
+}
 
 const GRID_COLOR_LIGHT = "#e8e5e0";
 const GRID_COLOR_DARK = "#2a2928";
@@ -164,7 +186,8 @@ export function drawWalls(
   zoom: number,
   panOffset: Point,
   isDark: boolean,
-  selectedId: string | null
+  selectedId: string | null,
+  units: UnitSystem = "metric"
 ) {
   const pxPerCm = (gridSize * zoom) / 100;
 
@@ -207,7 +230,7 @@ export function drawWalls(
     const dy = wall.end.y - wall.start.y;
     const lengthCm = Math.sqrt(dx * dx + dy * dy);
     if (lengthCm > 10) {
-      drawWallDimensionLabel(ctx, sx, sy, ex, ey, lengthCm, wall.thickness * pxPerCm, zoom, isDark);
+      drawWallDimensionLabel(ctx, sx, sy, ex, ey, lengthCm, wall.thickness * pxPerCm, zoom, isDark, units);
     }
   });
 
@@ -218,7 +241,7 @@ export function drawWalls(
     const ex = group.maxP.x * pxPerCm + panOffset.x;
     const ey = group.maxP.y * pxPerCm + panOffset.y;
     const thickness = walls[0]?.thickness ?? 15;
-    drawWallDimensionLabel(ctx, sx, sy, ex, ey, group.totalLengthCm, thickness * pxPerCm, zoom, isDark);
+    drawWallDimensionLabel(ctx, sx, sy, ex, ey, group.totalLengthCm, thickness * pxPerCm, zoom, isDark, units);
   }
 }
 
@@ -227,16 +250,16 @@ function drawWallDimensionLabel(
   ctx: CanvasRenderingContext2D,
   sx: number, sy: number, ex: number, ey: number,
   lengthCm: number, wallThicknessPx: number,
-  zoom: number, isDark: boolean
+  zoom: number, isDark: boolean,
+  units: UnitSystem = "metric"
 ) {
-  const lengthM = (lengthCm / 100).toFixed(2);
   const mx = (sx + ex) / 2;
   const my = (sy + ey) / 2;
   const angle = Math.atan2(ey - sy, ex - sx);
   const wallLengthPx = Math.sqrt((ex - sx) ** 2 + (ey - sy) ** 2);
 
   const baseFontSize = Math.max(11, 12 * zoom);
-  const text = `${lengthM}m`;
+  const text = formatLength(lengthCm, units);
   ctx.font = `500 ${baseFontSize}px 'General Sans', 'DM Sans', sans-serif`;
   const textWidth = ctx.measureText(text).width;
   const pad = 4;
@@ -498,7 +521,8 @@ export function drawRoomAreas(
   gridSize: number,
   zoom: number,
   panOffset: Point,
-  isDark: boolean
+  isDark: boolean,
+  units: UnitSystem = "metric"
 ) {
   const pxPerCm = (gridSize * zoom) / 100;
 
@@ -524,7 +548,7 @@ export function drawRoomAreas(
     const cx = room.centroid.x * pxPerCm + panOffset.x;
     const cy = room.centroid.y * pxPerCm + panOffset.y;
 
-    const text = `${room.area.toFixed(1)} m²`;
+    const text = formatArea(room.area, units);
     const fontSize = Math.max(11, 13 * zoom);
     ctx.font = `500 ${fontSize}px 'General Sans', 'DM Sans', sans-serif`;
     ctx.fillStyle = isDark ? "rgba(79, 152, 163, 0.6)" : "rgba(1, 105, 111, 0.5)";
@@ -542,7 +566,8 @@ export function drawWallPreview(
   zoom: number,
   panOffset: Point,
   isDark: boolean,
-  angleDeg?: number
+  angleDeg?: number,
+  units: UnitSystem = "metric"
 ) {
   const pxPerCm = (gridSize * zoom) / 100;
   const sx = start.x * pxPerCm + panOffset.x;
@@ -565,7 +590,7 @@ export function drawWallPreview(
   const dy = end.y - start.y;
   const lengthCm = Math.sqrt(dx * dx + dy * dy);
   if (lengthCm > 5) {
-    const lengthM = (lengthCm / 100).toFixed(2);
+    const lengthText = formatLength(lengthCm, units);
     const mx = (sx + ex) / 2;
     const my = (sy + ey) / 2;
 
@@ -573,7 +598,7 @@ export function drawWallPreview(
     ctx.fillStyle = isDark ? DIMENSION_COLOR_DARK : DIMENSION_COLOR_LIGHT;
     ctx.textAlign = "center";
     ctx.textBaseline = "bottom";
-    ctx.fillText(`${lengthM}m`, mx, my - 10);
+    ctx.fillText(lengthText, mx, my - 10);
   }
 
   // Angle indicator near cursor

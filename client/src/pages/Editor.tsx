@@ -6,8 +6,9 @@ import FurniturePanel from "../components/FurniturePanel";
 import PropertiesPanel from "../components/PropertiesPanel";
 import RoomSketchLogo from "../components/RoomSketchLogo";
 import { PerplexityAttribution } from "../components/PerplexityAttribution";
-import { FurnitureTemplate, FurnitureItem, RoomLabel, Point } from "../lib/types";
+import { FurnitureTemplate, FurnitureItem, RoomLabel, Point, UnitSystem } from "../lib/types";
 import { exportToPdf } from "../lib/pdf-export";
+import html2canvas from "html2canvas";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -150,6 +151,9 @@ export default function Editor() {
       if (e.key === "e" || e.key === "E") {
         if (!e.ctrlKey && !e.metaKey) editor.setTool("eraser");
       }
+      if (e.key === "h" || e.key === "H") {
+        if (!e.ctrlKey && !e.metaKey) editor.setTool("pan");
+      }
 
       if ((e.ctrlKey || e.metaKey) && e.key === "z") {
         e.preventDefault();
@@ -195,18 +199,30 @@ export default function Editor() {
     showToast("PDF exported successfully");
   }, [state, showToast]);
 
-  const handleSavePlan = useCallback(() => {
-    const plan = editor.exportState();
-    const json = JSON.stringify(plan, null, 2);
-    const blob = new Blob([json], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${state.roomName.replace(/[^a-zA-Z0-9]/g, "_")}_plan.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    showToast("Plan saved as JSON");
-  }, [editor, state.roomName, showToast]);
+  const handleSavePlan = useCallback(async () => {
+    try {
+      // Find the canvas container and capture it as a PNG
+      const canvasContainer = document.querySelector('[data-testid="canvas-container"]') as HTMLElement;
+      if (!canvasContainer) return;
+      const capture = await html2canvas(canvasContainer, {
+        backgroundColor: null,
+        scale: 2,
+        useCORS: true,
+      });
+      capture.toBlob((blob) => {
+        if (!blob) return;
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${state.roomName.replace(/[^a-zA-Z0-9]/g, "_")}_plan.png`;
+        a.click();
+        URL.revokeObjectURL(url);
+        showToast("Plan saved as PNG image");
+      }, "image/png");
+    } catch {
+      showToast("Failed to save image");
+    }
+  }, [state.roomName, showToast]);
 
   const handleLoadPlan = useCallback(() => {
     const input = document.createElement("input");
@@ -296,6 +312,7 @@ export default function Editor() {
               <ShortcutRow keys="Del" action="Delete selected" />
               <ShortcutRow keys="Esc" action="Cancel / Deselect" />
               <ShortcutRow keys="Scroll" action="Zoom in/out" />
+              <ShortcutRow keys="H" action="Pan tool" />
               <ShortcutRow keys="Alt+Drag" action="Pan canvas" />
               <ShortcutRow keys="Dbl-click" action="Finish wall chain / Edit label" />
             </div>
@@ -306,9 +323,9 @@ export default function Editor() {
                 <li>Drag items from the library onto the canvas.</li>
                 <li>Drag corner handles to resize selected furniture.</li>
                 <li>Walls that form closed loops automatically show room area.</li>
-                <li>All measurements are in metres and centimetres.</li>
+                <li>Toggle between metres and feet using the unit button in the toolbar.</li>
                 <li>Export as PDF to share with builders or contractors.</li>
-                <li>Save/Load plans as JSON to preserve your work.</li>
+                <li>Save your plan as a PNG image to share.</li>
               </ul>
             </div>
           </DialogContent>
@@ -343,6 +360,8 @@ export default function Editor() {
         onLoadPlan={handleLoadPlan}
         onClearAll={() => setShowClearDialog(true)}
         zoom={state.zoom}
+        units={state.units}
+        onToggleUnits={() => editor.setUnits(state.units === "metric" ? "imperial" : "metric")}
       />
 
       {/* Main area */}
