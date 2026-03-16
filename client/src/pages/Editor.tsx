@@ -17,10 +17,13 @@ import {
   Moon,
   HelpCircle,
   Keyboard,
+  Check,
 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -37,6 +40,9 @@ export default function Editor() {
     window.matchMedia("(prefers-color-scheme: dark)").matches
   );
   const [droppingFurniture, setDroppingFurniture] = useState<FurnitureTemplate | null>(null);
+  const [showClearDialog, setShowClearDialog] = useState(false);
+  const [toast, setToast] = useState<{ message: string; visible: boolean }>({ message: "", visible: false });
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Clipboard for copy/paste
   const clipboardRef = useRef<{ type: "furniture"; data: FurnitureItem } | { type: "label"; data: RoomLabel } | null>(null);
@@ -44,6 +50,14 @@ export default function Editor() {
   useEffect(() => {
     document.documentElement.classList.toggle("dark", isDark);
   }, [isDark]);
+
+  const showToast = useCallback((message: string) => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToast({ message, visible: true });
+    toastTimerRef.current = setTimeout(() => {
+      setToast((prev) => ({ ...prev, visible: false }));
+    }, 2500);
+  }, []);
 
   const selectedWall = state.walls.find((w) => w.id === state.selectedItemId) || null;
   const selectedFurniture = state.furniture.find((f) => f.id === state.selectedItemId) || null;
@@ -178,7 +192,8 @@ export default function Editor() {
 
   const handleExportPdf = useCallback(() => {
     exportToPdf(state, state.roomName);
-  }, [state]);
+    showToast("PDF exported successfully");
+  }, [state, showToast]);
 
   const handleSavePlan = useCallback(() => {
     const plan = editor.exportState();
@@ -190,7 +205,8 @@ export default function Editor() {
     a.download = `${state.roomName.replace(/[^a-zA-Z0-9]/g, "_")}_plan.json`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [editor, state.roomName]);
+    showToast("Plan saved as JSON");
+  }, [editor, state.roomName, showToast]);
 
   const handleLoadPlan = useCallback(() => {
     const input = document.createElement("input");
@@ -325,14 +341,14 @@ export default function Editor() {
         onExportPdf={handleExportPdf}
         onSavePlan={handleSavePlan}
         onLoadPlan={handleLoadPlan}
-        onClearAll={editor.clearAll}
+        onClearAll={() => setShowClearDialog(true)}
         zoom={state.zoom}
       />
 
       {/* Main area */}
       <div className="flex flex-1 overflow-hidden">
         {/* Furniture panel */}
-        <FurniturePanel onSelectFurniture={handleSelectFurniture} />
+        <FurniturePanel onSelectFurniture={handleSelectFurniture} onSwitchToSelect={() => editor.setTool("select")} />
 
         {/* Canvas */}
         <FloorPlanCanvas
@@ -392,6 +408,29 @@ export default function Editor() {
           </div>
         </div>
       </div>
+      {/* Clear confirmation dialog */}
+      <Dialog open={showClearDialog} onOpenChange={setShowClearDialog}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Clear canvas?</DialogTitle>
+            <DialogDescription>
+              This will remove all walls, furniture, and labels. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setShowClearDialog(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={() => { editor.clearAll(); setShowClearDialog(false); }}>Clear All</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Toast notification */}
+      {toast.visible && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2.5 bg-foreground text-background rounded-lg shadow-lg text-sm font-medium animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <Check className="h-4 w-4" />
+          {toast.message}
+        </div>
+      )}
     </div>
   );
 }

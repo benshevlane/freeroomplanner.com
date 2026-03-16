@@ -27,14 +27,16 @@ const CATEGORY_ICONS: Record<string, typeof Sofa> = {
 
 interface FurniturePanelProps {
   onSelectFurniture: (template: FurnitureTemplate) => void;
+  onSwitchToSelect?: () => void;
 }
 
-export default function FurniturePanel({ onSelectFurniture }: FurniturePanelProps) {
+export default function FurniturePanel({ onSelectFurniture, onSwitchToSelect }: FurniturePanelProps) {
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [search, setSearch] = useState("");
 
   const filtered = FURNITURE_LIBRARY.filter((item) => {
-    if (selectedCategory !== "All" && item.category !== selectedCategory) return false;
+    // When searching, ignore category filter so results span all categories
+    if (!search && selectedCategory !== "All" && item.category !== selectedCategory) return false;
     if (search && !item.label.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   });
@@ -42,6 +44,8 @@ export default function FurniturePanel({ onSelectFurniture }: FurniturePanelProp
   const handleDragStart = (e: React.DragEvent, template: FurnitureTemplate) => {
     e.dataTransfer.setData("application/json", JSON.stringify(template));
     e.dataTransfer.effectAllowed = "copy";
+    // Switch to select mode so canvas doesn't interpret the drop as a wall draw
+    onSwitchToSelect?.();
   };
 
   return (

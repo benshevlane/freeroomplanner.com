@@ -96,11 +96,19 @@ export function drawWalls(
     const dx = wall.end.x - wall.start.x;
     const dy = wall.end.y - wall.start.y;
     const lengthCm = Math.sqrt(dx * dx + dy * dy);
-    if (lengthCm > 20) {
+    if (lengthCm > 10) {
       const lengthM = (lengthCm / 100).toFixed(2);
       const mx = (sx + ex) / 2;
       const my = (sy + ey) / 2;
       const angle = Math.atan2(ey - sy, ex - sx);
+      const wallLengthPx = Math.sqrt((ex - sx) ** 2 + (ey - sy) ** 2);
+
+      // Measure text width to decide placement strategy
+      const baseFontSize = Math.max(11, 12 * zoom);
+      const text = `${lengthM}m`;
+      ctx.font = `500 ${baseFontSize}px 'General Sans', 'DM Sans', sans-serif`;
+      const textWidth = ctx.measureText(text).width;
+      const pad = 4;
 
       ctx.save();
       ctx.translate(mx, my);
@@ -110,23 +118,36 @@ export function drawWalls(
       }
       ctx.rotate(textAngle);
 
-      const text = `${lengthM}m`;
-      ctx.font = `500 ${Math.max(11, 12 * zoom)}px 'General Sans', 'DM Sans', sans-serif`;
-      const metrics = ctx.measureText(text);
-      const pad = 4;
+      if (textWidth + pad * 2 < wallLengthPx - 4) {
+        // Label fits inside the wall — draw centered on wall
+        ctx.fillStyle = isDark ? "#1c1b19" : "#f9f8f5";
+        ctx.fillRect(
+          -textWidth / 2 - pad,
+          -8 * zoom - pad,
+          textWidth + pad * 2,
+          16 * zoom + pad
+        );
+        ctx.fillStyle = isDark ? DIMENSION_COLOR_DARK : DIMENSION_COLOR_LIGHT;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(text, 0, 0);
+      } else if (wallLengthPx > 15) {
+        // Label doesn't fit — draw offset above/outside the wall
+        const offsetY = -(wall.thickness * pxPerCm / 2) - baseFontSize - 2;
+        ctx.fillStyle = isDark ? "#1c1b19" : "#f9f8f5";
+        ctx.fillRect(
+          -textWidth / 2 - pad,
+          offsetY - baseFontSize * 0.4 - pad,
+          textWidth + pad * 2,
+          baseFontSize + pad * 2
+        );
+        ctx.fillStyle = isDark ? DIMENSION_COLOR_DARK : DIMENSION_COLOR_LIGHT;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(text, 0, offsetY);
+      }
+      // else: wall too tiny to label at all
 
-      ctx.fillStyle = isDark ? "#1c1b19" : "#f9f8f5";
-      ctx.fillRect(
-        -metrics.width / 2 - pad,
-        -8 * zoom - pad,
-        metrics.width + pad * 2,
-        16 * zoom + pad
-      );
-
-      ctx.fillStyle = isDark ? DIMENSION_COLOR_DARK : DIMENSION_COLOR_LIGHT;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(text, 0, 0);
       ctx.restore();
     }
   });
