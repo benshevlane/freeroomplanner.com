@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://roomsketch.io/</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>
+  <url><loc>https://roomsketch.io/room-planner</loc><changefreq>monthly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://roomsketch.io/kitchen-planner</loc><changefreq>monthly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://roomsketch.io/bathroom-planner</loc><changefreq>monthly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://roomsketch.io/bedroom-planner</loc><changefreq>monthly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://roomsketch.io/how-it-works</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://roomsketch.io/blog</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://roomsketch.io/blog/kitchen-layout-guide</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://roomsketch.io/blog/bathroom-planning-mistakes</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://roomsketch.io/blog/brief-your-builder</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://roomsketch.io/blog/small-bedroom-layouts</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://roomsketch.io/blog/open-plan-living</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://roomsketch.io/blog/extension-planning</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+</urlset>

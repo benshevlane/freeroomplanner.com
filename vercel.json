@@ -3,6 +3,17 @@
   "outputDirectory": "dist/public",
   "framework": null,
   "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/app", "destination": "/index.html" },
+    { "source": "/app/(.*)", "destination": "/index.html" }
+  ],
+  "routes": [
+    { "src": "/room-planner", "dest": "/room-planner.html" },
+    { "src": "/kitchen-planner", "dest": "/kitchen-planner.html" },
+    { "src": "/bathroom-planner", "dest": "/bathroom-planner.html" },
+    { "src": "/bedroom-planner", "dest": "/bedroom-planner.html" },
+    { "src": "/how-it-works", "dest": "/how-it-works.html" },
+    { "src": "/blog", "dest": "/blog/index.html" },
+    { "src": "/blog/(.*)", "dest": "/blog/$1.html" },
+    { "src": "/(.*)", "dest": "/index.html" }
   ]
 }
