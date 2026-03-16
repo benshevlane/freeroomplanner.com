@@ -201,14 +201,69 @@ export default function Editor() {
 
   const handleSavePlan = useCallback(async () => {
     try {
-      // Find the canvas container and capture it as a PNG
+      // Find the canvas container and the actual canvas element
       const canvasContainer = document.querySelector('[data-testid="canvas-container"]') as HTMLElement;
       if (!canvasContainer) return;
+
+      // Draw branding watermark directly on the floor plan canvas before capture
+      const mainCanvas = canvasContainer.querySelector('canvas') as HTMLCanvasElement | null;
+      let savedImageData: ImageData | null = null;
+      if (mainCanvas) {
+        const ctx = mainCanvas.getContext('2d');
+        if (ctx) {
+          // Save the current canvas state so we can restore after capture
+          savedImageData = ctx.getImageData(0, 0, mainCanvas.width, mainCanvas.height);
+
+          const w = mainCanvas.width;
+          const h = mainCanvas.height;
+          const text = "Made with roomsketch.io";
+          const fontSize = Math.max(12, Math.round(h * 0.016));
+          ctx.save();
+          ctx.font = `500 ${fontSize}px 'General Sans', 'DM Sans', sans-serif`;
+          const metrics = ctx.measureText(text);
+          const textW = metrics.width;
+          const padX = fontSize * 0.7;
+          const padY = fontSize * 0.4;
+          const boxW = textW + padX * 2;
+          const boxH = fontSize + padY * 2;
+          const bx = w - boxW - 12;
+          const by = h - boxH - 12;
+
+          // Semi-transparent background pill
+          ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+          const radius = boxH / 2;
+          ctx.beginPath();
+          ctx.moveTo(bx + radius, by);
+          ctx.lineTo(bx + boxW - radius, by);
+          ctx.arcTo(bx + boxW, by, bx + boxW, by + radius, radius);
+          ctx.arcTo(bx + boxW, by + boxH, bx + boxW - radius, by + boxH, radius);
+          ctx.lineTo(bx + radius, by + boxH);
+          ctx.arcTo(bx, by + boxH, bx, by + boxH - radius, radius);
+          ctx.arcTo(bx, by, bx + radius, by, radius);
+          ctx.closePath();
+          ctx.fill();
+
+          // White text
+          ctx.fillStyle = "#ffffff";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(text, bx + boxW / 2, by + boxH / 2);
+          ctx.restore();
+        }
+      }
+
       const capture = await html2canvas(canvasContainer, {
         backgroundColor: null,
         scale: 2,
         useCORS: true,
       });
+
+      // Restore the original canvas (remove the watermark from the live view)
+      if (mainCanvas && savedImageData) {
+        const ctx = mainCanvas.getContext('2d');
+        if (ctx) ctx.putImageData(savedImageData, 0, 0);
+      }
+
       capture.toBlob((blob) => {
         if (!blob) return;
         const url = URL.createObjectURL(blob);
