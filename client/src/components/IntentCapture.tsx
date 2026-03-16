@@ -79,6 +79,7 @@ export default function IntentCapture({ onComplete }: IntentCaptureProps) {
                   className={`
                     flex items-center gap-4 px-5 py-4 rounded-xl border-2 text-left
                     transition-all duration-200 cursor-pointer
+                    appearance-none focus:outline-none focus-visible:outline-none active:outline-none
                     ${
                       selected === option.value
                         ? "border-[#3d8a7c] bg-[#3d8a7c]/10 scale-[1.02] shadow-md"

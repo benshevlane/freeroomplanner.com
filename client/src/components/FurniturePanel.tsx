@@ -33,7 +33,20 @@ interface FurniturePanelProps {
 }
 
 export default function FurniturePanel({ onSelectFurniture, onSwitchToSelect, className }: FurniturePanelProps) {
-  const [selectedCategory, setSelectedCategory] = useState("All");
+  const [selectedCategory, setSelectedCategory] = useState(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem("roomsketch-intent") || "{}");
+      const map: Record<string, string> = {
+        kitchen_renovation: "Kitchen",
+        bathroom_renovation: "Bathroom",
+        living_room_refresh: "Living",
+        bedroom_refresh: "Bedroom",
+      };
+      return map[stored.intent] || "All";
+    } catch {
+      return "All";
+    }
+  });
   const [search, setSearch] = useState("");
 
   const filtered = FURNITURE_LIBRARY.filter((item) => {
