@@ -59,20 +59,25 @@ export default function PropertiesPanel({
   }
 
   if (selectedFurniture) {
+    const isStructural = selectedFurniture.type === "door" || selectedFurniture.type === "window";
+    const widthLabel = isStructural ? "Length:" : "Width:";
+    const heightLabel = isStructural ? "Thickness:" : "Height:";
+    const minWidth = 20;
+    const minHeight = isStructural ? 5 : 20;
+
     return (
       <div className="p-4 space-y-3" data-testid="properties-furniture">
         <p className="text-sm font-semibold">{selectedFurniture.label}</p>
         <div className="space-y-2 text-sm">
           <div className="flex items-center gap-2">
-            <span className="text-muted-foreground">Width:</span>
+            <span className="text-muted-foreground">{widthLabel}</span>
             <Input
               type="number"
-              min={20}
+              min={minWidth}
               value={selectedFurniture.width}
               onChange={(e) => {
-                const val = Math.max(20, parseInt(e.target.value) || 20);
+                const val = Math.max(minWidth, parseInt(e.target.value) || minWidth);
                 const delta = val - selectedFurniture.width;
-                // Adjust position so item resizes from center, not top-left
                 onUpdateFurniture(selectedFurniture.id, {
                   width: val,
                   x: selectedFurniture.x - delta / 2,
@@ -84,15 +89,14 @@ export default function PropertiesPanel({
             <span className="text-muted-foreground text-xs">cm</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-muted-foreground">Height:</span>
+            <span className="text-muted-foreground">{heightLabel}</span>
             <Input
               type="number"
-              min={20}
+              min={minHeight}
               value={selectedFurniture.height}
               onChange={(e) => {
-                const val = Math.max(20, parseInt(e.target.value) || 20);
+                const val = Math.max(minHeight, parseInt(e.target.value) || minHeight);
                 const delta = val - selectedFurniture.height;
-                // Adjust position so item resizes from center, not top-left
                 onUpdateFurniture(selectedFurniture.id, {
                   height: val,
                   y: selectedFurniture.y - delta / 2,

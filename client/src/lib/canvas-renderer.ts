@@ -1,4 +1,4 @@
-import { Wall, FurnitureItem, RoomLabel, Point, UnitSystem } from "./types";
+import { Wall, FurnitureItem, RoomLabel, Point, UnitSystem, MeasureMode } from "./types";
 
 /** Convert cm to display string based on unit system */
 function formatLength(cm: number, units: UnitSystem): string {
@@ -187,7 +187,9 @@ export function drawWalls(
   panOffset: Point,
   isDark: boolean,
   selectedId: string | null,
-  units: UnitSystem = "metric"
+  units: UnitSystem = "metric",
+  measureMode: MeasureMode = "full",
+  furniture: FurnitureItem[] = []
 ) {
   const pxPerCm = (gridSize * zoom) / 100;
 
@@ -229,8 +231,11 @@ export function drawWalls(
     const dx = wall.end.x - wall.start.x;
     const dy = wall.end.y - wall.start.y;
     const lengthCm = Math.sqrt(dx * dx + dy * dy);
+    const displayLengthCm = measureMode === "inside"
+      ? Math.max(0, lengthCm - 2 * (wall.thickness || 15))
+      : lengthCm;
     if (lengthCm > 10) {
-      drawWallDimensionLabel(ctx, sx, sy, ex, ey, lengthCm, wall.thickness * pxPerCm, zoom, isDark, units);
+      drawWallDimensionLabel(ctx, sx, sy, ex, ey, displayLengthCm, wall.thickness * pxPerCm, zoom, isDark, units, wall, furniture, gridSize, panOffset);
     }
   });
 
@@ -241,8 +246,123 @@ export function drawWalls(
     const ex = group.maxP.x * pxPerCm + panOffset.x;
     const ey = group.maxP.y * pxPerCm + panOffset.y;
     const thickness = walls[0]?.thickness ?? 15;
-    drawWallDimensionLabel(ctx, sx, sy, ex, ey, group.totalLengthCm, thickness * pxPerCm, zoom, isDark, units);
+    const displayLengthCm = measureMode === "inside"
+      ? Math.max(0, group.totalLengthCm - 2 * thickness)
+      : group.totalLengthCm;
+    // Find the actual wall for collision detection
+    const groupWallIds = group.wallIds;
+    const representativeWall = walls.find((w) => groupWallIds.has(w.id)) || walls[0];
+    drawWallDimensionLabel(ctx, sx, sy, ex, ey, displayLengthCm, thickness * pxPerCm, zoom, isDark, units, representativeWall, furniture, gridSize, panOffset);
   }
+}
+
+/**
+ * Find doors/windows on a wall and return their positions as fractions [0..1]
+ * along the wall length, so we can avoid placing the label on top of them.
+ */
+function findComponentsOnWall(
+  wall: Wall,
+  furniture: FurnitureItem[],
+  gridSize: number,
+  zoom: number,
+  panOffset: Point
+): { start: number; end: number }[] {
+  const pxPerCm = (gridSize * zoom) / 100;
+  const wdx = wall.end.x - wall.start.x;
+  const wdy = wall.end.y - wall.start.y;
+  const wallLen = Math.sqrt(wdx * wdx + wdy * wdy);
+  if (wallLen < 1) return [];
+
+  const wallDirX = wdx / wallLen;
+  const wallDirY = wdy / wallLen;
+  const wallNormX = -wallDirY;
+  const wallNormY = wallDirX;
+
+  const occupants: { start: number; end: number }[] = [];
+
+  for (const item of furniture) {
+    if (item.type !== "door" && item.type !== "window") continue;
+
+    // Get item center in world coords
+    const cx = item.x + item.width / 2;
+    const cy = item.y + item.height / 2;
+
+    // Project center onto wall line
+    const relX = cx - wall.start.x;
+    const relY = cy - wall.start.y;
+    const along = relX * wallDirX + relY * wallDirY;
+    const perp = Math.abs(relX * wallNormX + relY * wallNormY);
+
+    // Check if close enough to wall (within wall thickness + item size)
+    const threshold = (wall.thickness || 15) + Math.max(item.width, item.height);
+    if (perp > threshold) continue;
+
+    // Calculate item extent along wall direction
+    const halfExtent = Math.max(item.width, item.height) / 2;
+    const fracStart = Math.max(0, (along - halfExtent) / wallLen);
+    const fracEnd = Math.min(1, (along + halfExtent) / wallLen);
+
+    if (fracEnd > 0 && fracStart < 1) {
+      occupants.push({ start: fracStart, end: fracEnd });
+    }
+  }
+
+  // Sort by start position
+  occupants.sort((a, b) => a.start - b.start);
+  return occupants;
+}
+
+/**
+ * Find the optimal label position along a wall, avoiding door/window overlap.
+ * Returns a fraction [0..1] along the wall where the label center should go,
+ * and whether to offset perpendicular if no clear gap exists.
+ */
+function findOptimalLabelPosition(
+  occupants: { start: number; end: number }[],
+  textWidthFrac: number
+): { position: number; offsetPerp: boolean } {
+  if (occupants.length === 0) {
+    return { position: 0.5, offsetPerp: false };
+  }
+
+  // Build list of gaps
+  const gaps: { start: number; end: number; size: number }[] = [];
+  let prev = 0;
+  for (const occ of occupants) {
+    if (occ.start > prev) {
+      gaps.push({ start: prev, end: occ.start, size: occ.start - prev });
+    }
+    prev = Math.max(prev, occ.end);
+  }
+  if (prev < 1) {
+    gaps.push({ start: prev, end: 1, size: 1 - prev });
+  }
+
+  // Find the largest gap that can fit the text
+  const neededFrac = textWidthFrac * 1.2; // 20% margin
+  let bestGap: { start: number; end: number; size: number } | null = null;
+  for (const gap of gaps) {
+    if (gap.size >= neededFrac && (!bestGap || gap.size > bestGap.size)) {
+      bestGap = gap;
+    }
+  }
+
+  if (bestGap) {
+    return { position: (bestGap.start + bestGap.end) / 2, offsetPerp: false };
+  }
+
+  // No gap large enough — find largest gap anyway and offset perpendicular
+  let largest: { start: number; end: number; size: number } | null = null;
+  for (const gap of gaps) {
+    if (!largest || gap.size > largest.size) largest = gap;
+  }
+
+  if (largest && largest.size > 0.05) {
+    return { position: (largest.start + largest.end) / 2, offsetPerp: true };
+  }
+
+  // Fallback: midpoint with perpendicular offset
+  return { position: 0.5, offsetPerp: true };
 }
 
 /** Shared helper to draw a wall dimension label */
@@ -251,10 +371,12 @@ function drawWallDimensionLabel(
   sx: number, sy: number, ex: number, ey: number,
   lengthCm: number, wallThicknessPx: number,
   zoom: number, isDark: boolean,
-  units: UnitSystem = "metric"
+  units: UnitSystem = "metric",
+  wall?: Wall,
+  furniture?: FurnitureItem[],
+  gridSize?: number,
+  panOffset?: Point
 ) {
-  const mx = (sx + ex) / 2;
-  const my = (sy + ey) / 2;
   const angle = Math.atan2(ey - sy, ex - sx);
   const wallLengthPx = Math.sqrt((ex - sx) ** 2 + (ey - sy) ** 2);
 
@@ -264,8 +386,32 @@ function drawWallDimensionLabel(
   const textWidth = ctx.measureText(text).width;
   const pad = 4;
 
+  // Collision avoidance: find optimal position along wall
+  let labelFrac = 0.5;
+  let offsetPerp = false;
+  if (wall && furniture && gridSize && panOffset) {
+    const occupants = findComponentsOnWall(wall, furniture, gridSize, zoom, panOffset);
+    if (occupants.length > 0) {
+      const textFrac = wallLengthPx > 0 ? (textWidth + pad * 2) / wallLengthPx : 1;
+      const result = findOptimalLabelPosition(occupants, textFrac);
+      labelFrac = result.position;
+      offsetPerp = result.offsetPerp;
+    }
+  }
+
+  // Compute label center position along wall
+  const mx = sx + (ex - sx) * labelFrac;
+  const my = sy + (ey - sy) * labelFrac;
+
+  // Perpendicular offset for collision avoidance
+  const perpOffsetPx = offsetPerp ? -(wallThicknessPx / 2 + baseFontSize + 8) : 0;
+  const normX = -Math.sin(angle);
+  const normY = Math.cos(angle);
+  const finalX = mx + normX * perpOffsetPx;
+  const finalY = my + normY * perpOffsetPx;
+
   ctx.save();
-  ctx.translate(mx, my);
+  ctx.translate(finalX, finalY);
   let textAngle = angle;
   if (textAngle > Math.PI / 2 || textAngle < -Math.PI / 2) {
     textAngle += Math.PI;

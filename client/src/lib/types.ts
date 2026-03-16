@@ -34,6 +34,8 @@ export type EditorTool = "select" | "wall" | "furniture" | "label" | "eraser" | 
 
 export type UnitSystem = "metric" | "imperial";
 
+export type MeasureMode = "full" | "inside";
+
 export interface EditorState {
   walls: Wall[];
   furniture: FurnitureItem[];

@@ -6,7 +6,7 @@ import FurniturePanel from "../components/FurniturePanel";
 import PropertiesPanel from "../components/PropertiesPanel";
 import RoomSketchLogo from "../components/RoomSketchLogo";
 import { PerplexityAttribution } from "../components/PerplexityAttribution";
-import { FurnitureTemplate, FurnitureItem, RoomLabel, Point, UnitSystem } from "../lib/types";
+import { FurnitureTemplate, FurnitureItem, RoomLabel, Point, UnitSystem, MeasureMode } from "../lib/types";
 import html2canvas from "html2canvas";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -39,6 +39,18 @@ export default function Editor() {
   const [isDark, setIsDark] = useState(() =>
     window.matchMedia("(prefers-color-scheme: dark)").matches
   );
+  const [measureMode, setMeasureMode] = useState<MeasureMode>(() => {
+    const stored = localStorage.getItem("roomsketch-measure-mode");
+    return (stored === "inside" || stored === "full") ? stored : "full";
+  });
+
+  const toggleMeasureMode = useCallback(() => {
+    setMeasureMode((prev) => {
+      const next = prev === "full" ? "inside" : "full";
+      localStorage.setItem("roomsketch-measure-mode", next);
+      return next;
+    });
+  }, []);
   const [droppingFurniture, setDroppingFurniture] = useState<FurnitureTemplate | null>(null);
   const [showClearDialog, setShowClearDialog] = useState(false);
   const [toast, setToast] = useState<{ message: string; visible: boolean }>({ message: "", visible: false });
@@ -402,6 +414,8 @@ export default function Editor() {
         zoom={state.zoom}
         units={state.units}
         onToggleUnits={() => editor.setUnits(state.units === "metric" ? "imperial" : "metric")}
+        measureMode={measureMode}
+        onToggleMeasureMode={toggleMeasureMode}
       />
 
       {/* Main area */}
@@ -413,6 +427,7 @@ export default function Editor() {
         <FloorPlanCanvas
           state={state}
           isDark={isDark}
+          measureMode={measureMode}
           onAddWall={editor.addWall}
           onSelectItem={editor.setSelectedItem}
           onMoveFurniture={editor.moveFurniture}

@@ -1,5 +1,5 @@
 import { useRef, useEffect, useCallback, useState } from "react";
-import { EditorState, Point, FurnitureTemplate, FurnitureItem, RoomLabel, UnitSystem } from "../lib/types";
+import { EditorState, Point, FurnitureTemplate, FurnitureItem, RoomLabel, UnitSystem, MeasureMode } from "../lib/types";
 import {
   drawGrid,
   drawWalls,
@@ -30,6 +30,7 @@ import { detectRooms } from "../lib/room-detection";
 interface FloorPlanCanvasProps {
   state: EditorState;
   isDark: boolean;
+  measureMode: MeasureMode;
   onAddWall: (start: Point, end: Point) => void;
   onSelectItem: (id: string | null) => void;
   onMoveFurniture: (id: string, x: number, y: number) => void;
@@ -51,6 +52,7 @@ interface FloorPlanCanvasProps {
 export default function FloorPlanCanvas({
   state,
   isDark,
+  measureMode,
   onAddWall,
   onSelectItem,
   onMoveFurniture,
@@ -136,7 +138,7 @@ export default function FloorPlanCanvas({
     }
 
     // Walls
-    drawWalls(ctx, state.walls, state.gridSize, state.zoom, state.panOffset, isDark, state.selectedItemId, state.units);
+    drawWalls(ctx, state.walls, state.gridSize, state.zoom, state.panOffset, isDark, state.selectedItemId, state.units, measureMode, state.furniture);
 
     // Wall preview with snapping, angle snap, alignment guides
     if (state.wallDrawing && state.selectedTool === "wall") {
@@ -497,25 +499,31 @@ export default function FloorPlanCanvas({
         const dxCm = dxPx / pxPerCm;
         const dyCm = dyPx / pxPerCm;
 
+        // Doors/windows allow smaller height (thickness) than regular furniture
+        const resizingItem = state.furniture.find((f) => f.id === state.selectedItemId);
+        const isStructural = resizingItem && (resizingItem.type === "door" || resizingItem.type === "window");
+        const minW = 20;
+        const minH = isStructural ? 5 : 20;
+
         let newW = resizeStart.itemW;
         let newH = resizeStart.itemH;
         let newX = resizeStart.itemX;
         let newY = resizeStart.itemY;
 
         if (resizeCorner === "br") {
-          newW = Math.max(20, resizeStart.itemW + dxCm);
-          newH = Math.max(20, resizeStart.itemH + dyCm);
+          newW = Math.max(minW, resizeStart.itemW + dxCm);
+          newH = Math.max(minH, resizeStart.itemH + dyCm);
         } else if (resizeCorner === "bl") {
-          newW = Math.max(20, resizeStart.itemW - dxCm);
-          newH = Math.max(20, resizeStart.itemH + dyCm);
+          newW = Math.max(minW, resizeStart.itemW - dxCm);
+          newH = Math.max(minH, resizeStart.itemH + dyCm);
           newX = resizeStart.itemX + resizeStart.itemW - newW;
         } else if (resizeCorner === "tr") {
-          newW = Math.max(20, resizeStart.itemW + dxCm);
-          newH = Math.max(20, resizeStart.itemH - dyCm);
+          newW = Math.max(minW, resizeStart.itemW + dxCm);
+          newH = Math.max(minH, resizeStart.itemH - dyCm);
           newY = resizeStart.itemY + resizeStart.itemH - newH;
         } else if (resizeCorner === "tl") {
-          newW = Math.max(20, resizeStart.itemW - dxCm);
-          newH = Math.max(20, resizeStart.itemH - dyCm);
+          newW = Math.max(minW, resizeStart.itemW - dxCm);
+          newH = Math.max(minH, resizeStart.itemH - dyCm);
           newX = resizeStart.itemX + resizeStart.itemW - newW;
           newY = resizeStart.itemY + resizeStart.itemH - newH;
         }

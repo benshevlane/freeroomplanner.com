@@ -1,4 +1,4 @@
-import { EditorTool, UnitSystem } from "../lib/types";
+import { EditorTool, UnitSystem, MeasureMode } from "../lib/types";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Separator } from "@/components/ui/separator";
@@ -38,6 +38,8 @@ interface EditorToolbarProps {
   zoom: number;
   units: UnitSystem;
   onToggleUnits: () => void;
+  measureMode: MeasureMode;
+  onToggleMeasureMode: () => void;
 }
 
 const tools: { tool: EditorTool; icon: typeof MousePointer2; label: string; shortcut: string }[] = [
@@ -67,6 +69,8 @@ export default function EditorToolbar({
   zoom,
   units,
   onToggleUnits,
+  measureMode,
+  onToggleMeasureMode,
 }: EditorToolbarProps) {
   return (
     <div className="flex items-center gap-1 px-3 py-2 border-b border-border bg-card" data-testid="editor-toolbar">
@@ -187,6 +191,22 @@ export default function EditorToolbar({
             </Button>
           </TooltipTrigger>
           <TooltipContent><p>Save as PNG image</p></TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={onToggleMeasureMode}
+              data-testid="btn-toggle-measure"
+              className="text-xs px-2"
+            >
+              {measureMode === "full" ? "Full Wall" : "Inside"}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>{measureMode === "full" ? "Showing full wall length — click for inside measurement" : "Showing inside measurement — click for full wall length"}</p>
+          </TooltipContent>
         </Tooltip>
         <Tooltip>
           <TooltipTrigger asChild>
