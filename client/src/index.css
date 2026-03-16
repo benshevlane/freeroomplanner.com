@@ -2,6 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Prevent iOS long-press callout and text selection on the drawing canvas */
+[data-testid="canvas-container"] {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+}
+
 /* LIGHT MODE — Warm, approachable palette for a home planning tool */
 :root {
   --button-outline: rgba(0,0,0, .10);

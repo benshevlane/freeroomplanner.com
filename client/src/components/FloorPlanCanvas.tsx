@@ -306,6 +306,9 @@ export default function FloorPlanCanvas({
 
   const handlePointerDown = useCallback(
     (e: React.PointerEvent) => {
+      // Prevent browser text selection / iOS callout while interacting with canvas
+      e.preventDefault();
+
       const pos = getCanvasPos(e);
       setMousePos(pos);
 
@@ -885,13 +888,13 @@ export default function FloorPlanCanvas({
   return (
     <div
       ref={containerRef}
-      className="flex-1 relative overflow-hidden"
+      className="flex-1 relative overflow-hidden select-none"
       data-testid="canvas-container"
     >
       <canvas
         ref={canvasRef}
         className="absolute inset-0"
-        style={{ cursor: cursorStyle, touchAction: "none" }}
+        style={{ cursor: cursorStyle, touchAction: "none", userSelect: "none", WebkitUserSelect: "none" }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
