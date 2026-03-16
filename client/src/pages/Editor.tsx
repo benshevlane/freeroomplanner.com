@@ -8,6 +8,7 @@ import PropertiesPanel from "../components/PropertiesPanel";
 import RoomSketchLogo from "../components/RoomSketchLogo";
 import MobileWizard from "../components/MobileWizard";
 import { PerplexityAttribution } from "../components/PerplexityAttribution";
+import IntentCapture from "../components/IntentCapture";
 import { FurnitureTemplate, FurnitureItem, RoomLabel, Point, UnitSystem, MeasureMode } from "../lib/types";
 import html2canvas from "html2canvas";
 import { Input } from "@/components/ui/input";
@@ -40,6 +41,9 @@ export default function Editor() {
   const editor = useEditor();
   const { state } = editor;
   const isMobile = useIsMobile();
+  const [showIntentCapture, setShowIntentCapture] = useState(() => {
+    return !localStorage.getItem("roomsketch-intent");
+  });
   const [isDark, setIsDark] = useState(() =>
     window.matchMedia("(prefers-color-scheme: dark)").matches
   );
@@ -347,6 +351,14 @@ export default function Editor() {
     },
     [editor]
   );
+
+  if (showIntentCapture) {
+    return (
+      <IntentCapture
+        onComplete={() => setShowIntentCapture(false)}
+      />
+    );
+  }
 
   return (
     <div className="h-screen flex flex-col bg-background" data-testid="editor-page">
