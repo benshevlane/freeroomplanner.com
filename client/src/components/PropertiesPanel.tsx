@@ -71,7 +71,12 @@ export default function PropertiesPanel({
               value={selectedFurniture.width}
               onChange={(e) => {
                 const val = Math.max(20, parseInt(e.target.value) || 20);
-                onUpdateFurniture(selectedFurniture.id, { width: val });
+                const delta = val - selectedFurniture.width;
+                // Adjust position so item resizes from center, not top-left
+                onUpdateFurniture(selectedFurniture.id, {
+                  width: val,
+                  x: selectedFurniture.x - delta / 2,
+                });
               }}
               className="h-7 w-20 text-sm"
               data-testid="input-furniture-width"
@@ -86,7 +91,12 @@ export default function PropertiesPanel({
               value={selectedFurniture.height}
               onChange={(e) => {
                 const val = Math.max(20, parseInt(e.target.value) || 20);
-                onUpdateFurniture(selectedFurniture.id, { height: val });
+                const delta = val - selectedFurniture.height;
+                // Adjust position so item resizes from center, not top-left
+                onUpdateFurniture(selectedFurniture.id, {
+                  height: val,
+                  y: selectedFurniture.y - delta / 2,
+                });
               }}
               className="h-7 w-20 text-sm"
               data-testid="input-furniture-height"
