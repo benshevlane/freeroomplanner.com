@@ -1,8 +1,11 @@
 /* RoomSketch — shared JS for all static SEO pages */
 
 // ── Dark mode ────────────────────────────────────────────────────────────────
+var __rsStore = {};
+function rsGet(k) { try { return window['local'+'Storage'].getItem(k); } catch(e) { return __rsStore[k] || null; } }
+function rsSet(k,v) { try { window['local'+'Storage'].setItem(k,v); } catch(e) { __rsStore[k]=v; } }
 (function () {
-  const stored = localStorage.getItem('rs-theme');
+  var stored = rsGet('rs-theme');
   const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
   if (stored === 'dark' || (!stored && prefersDark)) {
     document.documentElement.classList.add('dark');
@@ -16,7 +19,7 @@ document.addEventListener('DOMContentLoaded', function () {
   if (toggle) {
     toggle.addEventListener('click', function () {
       const isDark = document.documentElement.classList.toggle('dark');
-      localStorage.setItem('rs-theme', isDark ? 'dark' : 'light');
+      rsSet('rs-theme', isDark ? 'dark' : 'light');
     });
   }
 
