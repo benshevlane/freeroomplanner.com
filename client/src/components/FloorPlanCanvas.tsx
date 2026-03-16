@@ -179,9 +179,19 @@ export default function FloorPlanCanvas({
         angleDeg = computeWallAngle(state.wallDrawing.start, finalPoint);
       }
 
-      drawWallPreview(ctx, state.wallDrawing.start, finalPoint, state.gridSize, state.zoom, state.panOffset, isDark, angleDeg, state.units);
-      if (didSnap) {
-        drawSnapIndicator(ctx, finalPoint, state.gridSize, state.zoom, state.panOffset);
+      // Compute distance to decide whether to show preview line or just start dot
+      const previewDx = finalPoint.x - state.wallDrawing.start.x;
+      const previewDy = finalPoint.y - state.wallDrawing.start.y;
+      const previewDist = Math.sqrt(previewDx * previewDx + previewDy * previewDy);
+
+      if (previewDist < 5) {
+        // Near-zero length: show only start point indicator (e.g. after first tap on mobile)
+        drawSnapIndicator(ctx, state.wallDrawing.start, state.gridSize, state.zoom, state.panOffset);
+      } else {
+        drawWallPreview(ctx, state.wallDrawing.start, finalPoint, state.gridSize, state.zoom, state.panOffset, isDark, angleDeg, state.units);
+        if (didSnap) {
+          drawSnapIndicator(ctx, finalPoint, state.gridSize, state.zoom, state.panOffset);
+        }
       }
     }
 
@@ -294,6 +304,7 @@ export default function FloorPlanCanvas({
   const handlePointerDown = useCallback(
     (e: React.PointerEvent) => {
       const pos = getCanvasPos(e);
+      setMousePos(pos);
 
       // Track pointer for pinch-to-zoom
       pointerCache.current.set(e.pointerId, e.nativeEvent);
