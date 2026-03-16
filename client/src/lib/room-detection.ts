@@ -1,6 +1,6 @@
 import { Point, Wall } from "./types";
 
-interface DetectedRoom {
+export interface DetectedRoom {
   vertices: Point[];
   area: number;
   centroid: Point;

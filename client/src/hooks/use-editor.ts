@@ -179,6 +179,21 @@ export function useEditor() {
     }));
   }, [pushUndo]);
 
+  const splitWallAndConnect = useCallback((wallId: string, splitPoint: Point, newWallStart: Point) => {
+    pushUndo();
+    setState((s) => {
+      const wall = s.walls.find(w => w.id === wallId);
+      if (!wall) return s;
+      const newWalls = s.walls.filter(w => w.id !== wallId);
+      // Split the existing wall at the split point
+      newWalls.push({ id: generateId(), start: wall.start, end: splitPoint, thickness: wall.thickness });
+      newWalls.push({ id: generateId(), start: splitPoint, end: wall.end, thickness: wall.thickness });
+      // Add the connecting wall from the drawing start to the split point
+      newWalls.push({ id: generateId(), start: newWallStart, end: splitPoint, thickness: 15 });
+      return { ...s, walls: newWalls };
+    });
+  }, [pushUndo]);
+
   const updateFurniture = useCallback((id: string, updates: Partial<FurnitureItem>) => {
     setState((s) => ({
       ...s,
@@ -248,5 +263,6 @@ export function useEditor() {
     setUnits,
     exportState,
     importState,
+    splitWallAndConnect,
   };
 }

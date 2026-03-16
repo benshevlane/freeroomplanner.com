@@ -444,6 +444,7 @@ export default function Editor() {
           droppingFurniture={droppingFurniture}
           onDropFurniture={handleDropFurniture}
           onUpdateFurniture={handleUpdateFurniture}
+          onSplitWallAndConnect={editor.splitWallAndConnect}
         />
 
         {/* Properties sidebar */}

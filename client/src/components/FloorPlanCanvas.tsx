@@ -3,6 +3,7 @@ import { EditorState, Point, FurnitureTemplate, FurnitureItem, RoomLabel, UnitSy
 import {
   drawGrid,
   drawWalls,
+  drawMeasurementIndicatorLines,
   drawFurniture,
   drawLabels,
   drawWallPreview,
@@ -18,6 +19,7 @@ import {
   screenToWorld,
   snapToGrid,
   snapToWallEndpoints,
+  snapToWallBody,
   snapFurnitureToWalls,
   hitTestWall,
   hitTestFurniture,
@@ -47,6 +49,7 @@ interface FloorPlanCanvasProps {
   droppingFurniture: FurnitureTemplate | null;
   onDropFurniture: (template: FurnitureTemplate, position: Point) => void;
   onUpdateFurniture: (id: string, updates: Partial<FurnitureItem>) => void;
+  onSplitWallAndConnect: (wallId: string, splitPoint: Point, newWallStart: Point) => void;
 }
 
 export default function FloorPlanCanvas({
@@ -69,6 +72,7 @@ export default function FloorPlanCanvas({
   droppingFurniture,
   onDropFurniture,
   onUpdateFurniture,
+  onSplitWallAndConnect,
 }: FloorPlanCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -140,12 +144,18 @@ export default function FloorPlanCanvas({
     // Walls
     drawWalls(ctx, state.walls, state.gridSize, state.zoom, state.panOffset, isDark, state.selectedItemId, state.units, measureMode, state.furniture);
 
+    // Measurement indicator lines (on top of walls, below labels/furniture)
+    drawMeasurementIndicatorLines(ctx, state.walls, rooms, state.gridSize, state.zoom, state.panOffset, measureMode);
+
     // Wall preview with snapping, angle snap, alignment guides
     if (state.wallDrawing && state.selectedTool === "wall") {
       const worldMouse = screenToWorld(mousePos.x, mousePos.y, state.gridSize, state.zoom, state.panOffset);
       const gridSnapped = snapToGrid(worldMouse, 10);
-      const { snapped: wallSnapped, didSnap } = snapToWallEndpoints(gridSnapped, state.walls, 15);
-      let finalPoint = didSnap ? wallSnapped : gridSnapped;
+      // Check snap against raw world position for accurate distance
+      const { snapped: wallSnapped, didSnap: epSnap } = snapToWallEndpoints(worldMouse, state.walls, 15);
+      const { snapped: bodySnapped, didSnap: bodySnap } = snapToWallBody(worldMouse, state.walls, 15);
+      const didSnap = epSnap || bodySnap;
+      let finalPoint = epSnap ? wallSnapped : (bodySnap ? bodySnapped : gridSnapped);
 
       // Angle snapping (15° increments, strong snap) — skip if already snapped to endpoint
       let angleDeg: number | undefined;
@@ -166,7 +176,7 @@ export default function FloorPlanCanvas({
 
       drawWallPreview(ctx, state.wallDrawing.start, finalPoint, state.gridSize, state.zoom, state.panOffset, isDark, angleDeg, state.units);
       if (didSnap) {
-        drawSnapIndicator(ctx, wallSnapped, state.gridSize, state.zoom, state.panOffset);
+        drawSnapIndicator(ctx, finalPoint, state.gridSize, state.zoom, state.panOffset);
       }
     }
 
@@ -192,10 +202,15 @@ export default function FloorPlanCanvas({
     if (state.selectedTool === "wall" && !state.wallDrawing) {
       const worldMouse = screenToWorld(mousePos.x, mousePos.y, state.gridSize, state.zoom, state.panOffset);
       const gridSnapped = snapToGrid(worldMouse, 10);
-      const { didSnap } = snapToWallEndpoints(gridSnapped, state.walls, 15);
-      if (didSnap) {
-        const { snapped } = snapToWallEndpoints(gridSnapped, state.walls, 15);
-        drawSnapIndicator(ctx, snapped, state.gridSize, state.zoom, state.panOffset);
+      // Check snap against raw world position for accurate distance
+      const { snapped: epSnapped, didSnap: epSnapIdle } = snapToWallEndpoints(worldMouse, state.walls, 15);
+      if (epSnapIdle) {
+        drawSnapIndicator(ctx, epSnapped, state.gridSize, state.zoom, state.panOffset);
+      } else {
+        const { snapped: bodySnapIdle, didSnap: bodySnapIdleHit } = snapToWallBody(worldMouse, state.walls, 15);
+        if (bodySnapIdleHit) {
+          drawSnapIndicator(ctx, bodySnapIdle, state.gridSize, state.zoom, state.panOffset);
+        }
       }
       // Show alignment guides even before drawing starts
       if (state.walls.length > 0) {
@@ -375,10 +390,16 @@ export default function FloorPlanCanvas({
       } else if (state.selectedTool === "wall") {
         const world = screenToWorld(pos.x, pos.y, state.gridSize, state.zoom, state.panOffset);
         const gridSnapped = snapToGrid(world, 10);
-        const { snapped: wallSnapped, didSnap } = snapToWallEndpoints(gridSnapped, state.walls, 15);
-        let finalPoint = didSnap ? wallSnapped : gridSnapped;
+        // Check endpoint snap against RAW world position (not grid-snapped)
+        // so that the threshold accurately reflects cursor distance
+        const { snapped: wallSnapped, didSnap: endpointSnap } = snapToWallEndpoints(world, state.walls, 15);
+        // Also check wall body snap (for mid-wall connections)
+        const { snapped: bodySnapped, didSnap: bodySnap, wallId: bodyWallId } = snapToWallBody(world, state.walls, 15);
 
-        // Apply angle snapping when actively drawing
+        const didSnap = endpointSnap || bodySnap;
+        let finalPoint = endpointSnap ? wallSnapped : (bodySnap ? bodySnapped : gridSnapped);
+
+        // Apply angle snapping when actively drawing (skip if snapped)
         if (state.wallDrawing && !didSnap) {
           const angleResult = snapAngle(state.wallDrawing.start, finalPoint, 15, 5);
           finalPoint = angleResult.snapped;
@@ -387,14 +408,20 @@ export default function FloorPlanCanvas({
         }
 
         if (state.wallDrawing) {
-          onAddWall(state.wallDrawing.start, finalPoint);
-
-          // Auto-exit: if the new endpoint snaps to ANY existing wall endpoint,
-          // the user has connected to something — exit drawing mode
-          if (didSnap) {
+          if (bodySnap && !endpointSnap && bodyWallId) {
+            // Snap to wall body: split the existing wall and connect
+            onSplitWallAndConnect(bodyWallId, finalPoint, state.wallDrawing.start);
             onSetWallDrawing(null);
           } else {
-            onSetWallDrawing({ start: finalPoint });
+            onAddWall(state.wallDrawing.start, finalPoint);
+
+            // Auto-exit: if the new endpoint snaps to ANY existing wall endpoint,
+            // the user has connected to something — exit drawing mode
+            if (endpointSnap) {
+              onSetWallDrawing(null);
+            } else {
+              onSetWallDrawing({ start: finalPoint });
+            }
           }
         } else {
           onSetWallDrawing({ start: finalPoint });
@@ -421,7 +448,7 @@ export default function FloorPlanCanvas({
         setTimeout(() => labelInputRef.current?.focus(), 0);
       }
     },
-    [state, getCanvasPos, onSelectItem, onAddWall, onSetWallDrawing, onRemoveWall, onRemoveFurniture, onRemoveLabel, onPushUndo, onUpdateFurniture]
+    [state, getCanvasPos, onSelectItem, onAddWall, onSetWallDrawing, onRemoveWall, onRemoveFurniture, onRemoveLabel, onPushUndo, onUpdateFurniture, onSplitWallAndConnect]
   );
 
   // Store world position for new labels
@@ -559,12 +586,16 @@ export default function FloorPlanCanvas({
         }
       }
 
-      // Update wall snap indicator
+      // Update wall snap indicator (check raw world position for accurate snap distance)
       if (state.selectedTool === "wall") {
         const world = screenToWorld(pos.x, pos.y, state.gridSize, state.zoom, state.panOffset);
-        const gridSnapped = snapToGrid(world, 10);
-        const { snapped, didSnap } = snapToWallEndpoints(gridSnapped, state.walls, 15);
-        setWallSnapPoint(didSnap ? snapped : null);
+        const { snapped: epSnapped, didSnap: epSnap } = snapToWallEndpoints(world, state.walls, 15);
+        if (epSnap) {
+          setWallSnapPoint(epSnapped);
+        } else {
+          const { snapped: bodySnapped, didSnap: bodySnap } = snapToWallBody(world, state.walls, 15);
+          setWallSnapPoint(bodySnap ? bodySnapped : null);
+        }
       }
 
       // Eraser hover detection

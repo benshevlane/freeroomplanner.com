@@ -1,4 +1,5 @@
 import { Wall, FurnitureItem, RoomLabel, Point, UnitSystem, MeasureMode } from "./types";
+import { DetectedRoom } from "./room-detection";
 
 /** Convert cm to display string based on unit system */
 function formatLength(cm: number, units: UnitSystem): string {
@@ -253,6 +254,108 @@ export function drawWalls(
     const groupWallIds = group.wallIds;
     const representativeWall = walls.find((w) => groupWallIds.has(w.id)) || walls[0];
     drawWallDimensionLabel(ctx, sx, sy, ex, ey, displayLengthCm, thickness * pxPerCm, zoom, isDark, units, representativeWall, furniture, gridSize, panOffset);
+  }
+}
+
+/** Draw thin green indicator lines showing which wall face is being measured */
+export function drawMeasurementIndicatorLines(
+  ctx: CanvasRenderingContext2D,
+  walls: Wall[],
+  rooms: DetectedRoom[],
+  gridSize: number,
+  zoom: number,
+  panOffset: Point,
+  measureMode: MeasureMode
+) {
+  if (walls.length === 0) return;
+  const pxPerCm = (gridSize * zoom) / 100;
+  const INDICATOR_COLOR = "#2ecc71";
+
+  // Compute a fallback "center" from all wall endpoints for walls not in any room
+  let fallbackCenter = { x: 0, y: 0 };
+  let pointCount = 0;
+  for (const wall of walls) {
+    fallbackCenter.x += wall.start.x + wall.end.x;
+    fallbackCenter.y += wall.start.y + wall.end.y;
+    pointCount += 2;
+  }
+  if (pointCount > 0) {
+    fallbackCenter.x /= pointCount;
+    fallbackCenter.y /= pointCount;
+  }
+
+  for (const wall of walls) {
+    const dx = wall.end.x - wall.start.x;
+    const dy = wall.end.y - wall.start.y;
+    const len = Math.sqrt(dx * dx + dy * dy);
+    if (len < 10) continue; // skip very short walls that have no measurement label
+
+    // Normal vector (left-hand perpendicular to wall direction)
+    const nx = -dy / len;
+    const ny = dx / len;
+
+    // Determine which normal direction is "inside" (toward room interior)
+    let insideNx = nx;
+    let insideNy = ny;
+
+    const wallMid = { x: (wall.start.x + wall.end.x) / 2, y: (wall.start.y + wall.end.y) / 2 };
+
+    let foundRoom = false;
+    for (const room of rooms) {
+      // Check if both endpoints of this wall are vertices of this room
+      const hasStart = room.vertices.some(v =>
+        Math.sqrt((v.x - wall.start.x) ** 2 + (v.y - wall.start.y) ** 2) < 15
+      );
+      const hasEnd = room.vertices.some(v =>
+        Math.sqrt((v.x - wall.end.x) ** 2 + (v.y - wall.end.y) ** 2) < 15
+      );
+
+      if (hasStart && hasEnd) {
+        const toCentroid = { x: room.centroid.x - wallMid.x, y: room.centroid.y - wallMid.y };
+        const dot = toCentroid.x * nx + toCentroid.y * ny;
+        if (dot < 0) {
+          insideNx = -nx;
+          insideNy = -ny;
+        }
+        foundRoom = true;
+        break;
+      }
+    }
+
+    if (!foundRoom) {
+      // Fall back to center of all wall endpoints
+      const toCentroid = { x: fallbackCenter.x - wallMid.x, y: fallbackCenter.y - wallMid.y };
+      const dot = toCentroid.x * nx + toCentroid.y * ny;
+      if (dot < 0) {
+        insideNx = -nx;
+        insideNy = -ny;
+      }
+    }
+
+    // Offset: half wall thickness, direction depends on measure mode
+    const halfThickness = wall.thickness / 2;
+    let offsetX: number, offsetY: number;
+    if (measureMode === "inside") {
+      offsetX = insideNx * halfThickness;
+      offsetY = insideNy * halfThickness;
+    } else {
+      offsetX = -insideNx * halfThickness;
+      offsetY = -insideNy * halfThickness;
+    }
+
+    const sx = wall.start.x * pxPerCm + panOffset.x + offsetX * pxPerCm;
+    const sy = wall.start.y * pxPerCm + panOffset.y + offsetY * pxPerCm;
+    const ex = wall.end.x * pxPerCm + panOffset.x + offsetX * pxPerCm;
+    const ey = wall.end.y * pxPerCm + panOffset.y + offsetY * pxPerCm;
+
+    ctx.strokeStyle = INDICATOR_COLOR;
+    ctx.lineWidth = 1.5;
+    ctx.lineCap = "butt";
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.moveTo(sx, sy);
+    ctx.lineTo(ex, ey);
+    ctx.stroke();
   }
 }
 
@@ -922,6 +1025,54 @@ export function snapToWallEndpoints(
     return { snapped: { x: closest.x, y: closest.y }, didSnap: true };
   }
   return { snapped: point, didSnap: false };
+}
+
+/** Snap to the body (not just endpoints) of existing walls */
+export function snapToWallBody(
+  point: Point,
+  walls: Wall[],
+  threshold: number = 15
+): { snapped: Point; didSnap: boolean; wallId: string | null } {
+  let closest: Point | null = null;
+  let closestDist = threshold;
+  let closestWallId: string | null = null;
+
+  for (const wall of walls) {
+    const dx = wall.end.x - wall.start.x;
+    const dy = wall.end.y - wall.start.y;
+    const lenSq = dx * dx + dy * dy;
+    if (lenSq < 1) continue;
+
+    // Project point onto wall segment, clamp t to [0, 1]
+    const t = Math.max(0, Math.min(1,
+      ((point.x - wall.start.x) * dx + (point.y - wall.start.y) * dy) / lenSq
+    ));
+
+    const closestOnWall = {
+      x: wall.start.x + t * dx,
+      y: wall.start.y + t * dy,
+    };
+
+    // Skip points very close to endpoints — those are handled by endpoint snap
+    const distToStart = Math.sqrt((closestOnWall.x - wall.start.x) ** 2 + (closestOnWall.y - wall.start.y) ** 2);
+    const distToEnd = Math.sqrt((closestOnWall.x - wall.end.x) ** 2 + (closestOnWall.y - wall.end.y) ** 2);
+    if (distToStart < 5 || distToEnd < 5) continue;
+
+    const dist = Math.sqrt(
+      (point.x - closestOnWall.x) ** 2 + (point.y - closestOnWall.y) ** 2
+    );
+
+    if (dist < closestDist) {
+      closestDist = dist;
+      closest = closestOnWall;
+      closestWallId = wall.id;
+    }
+  }
+
+  if (closest && closestWallId) {
+    return { snapped: { x: closest.x, y: closest.y }, didSnap: true, wallId: closestWallId };
+  }
+  return { snapped: point, didSnap: false, wallId: null };
 }
 
 export function drawSnapIndicator(
