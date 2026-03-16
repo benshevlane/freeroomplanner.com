@@ -144,7 +144,7 @@ export default function Landing() {
       <section className="max-w-5xl mx-auto px-5 pt-20 pb-16 text-center">
         <div className="rs-fade opacity-0 translate-y-4 transition-all duration-700">
           <div className={`inline-flex items-center gap-2 text-xs font-medium px-3 py-1.5 rounded-full mb-6 ${isDark ? "bg-[#2e2e2a] text-[#5ba89a]" : "bg-[#e8f4f1] text-[#3d8a7c]"}`}>
-            Free · No account · No download
+            No sign-up needed — start planning for free
           </div>
           <h1 className="text-4xl sm:text-5xl font-bold tracking-tight leading-[1.1] mb-5">
             Draw your room.<br />Share your plan.
