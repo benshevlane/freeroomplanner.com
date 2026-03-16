@@ -189,7 +189,7 @@ export function drawWalls(
   isDark: boolean,
   selectedId: string | null,
   units: UnitSystem = "metric",
-  measureMode: MeasureMode = "full",
+  measureMode: MeasureMode = "inside",
   furniture: FurnitureItem[] = []
 ) {
   const pxPerCm = (gridSize * zoom) / 100;

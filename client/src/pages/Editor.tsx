@@ -49,7 +49,7 @@ export default function Editor() {
   );
   const [measureMode, setMeasureMode] = useState<MeasureMode>(() => {
     const stored = localStorage.getItem("roomsketch-measure-mode");
-    return (stored === "inside" || stored === "full") ? stored : "full";
+    return (stored === "inside" || stored === "full") ? stored : "inside";
   });
 
   const toggleMeasureMode = useCallback(() => {
