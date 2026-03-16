@@ -98,6 +98,9 @@ export default function FloorPlanCanvas({
   const wallDrawingRef = useRef(state.wallDrawing);
   wallDrawingRef.current = state.wallDrawing;
 
+  // Track pending wall commit for touch (defer to pointerUp so user can drag to adjust)
+  const wallPendingCommitRef = useRef(false);
+
   // Pinch-to-zoom and two-finger pan state
   const pointerCache = useRef<Map<number, PointerEvent>>(new Map());
   const prevPinchDist = useRef<number | null>(null);
@@ -309,6 +312,8 @@ export default function FloorPlanCanvas({
       // Track pointer for pinch-to-zoom
       pointerCache.current.set(e.pointerId, e.nativeEvent);
       if (pointerCache.current.size === 2) {
+        // Cancel any pending wall commit — user is pinching, not placing
+        wallPendingCommitRef.current = false;
         // Start pinch — compute initial distance and center
         const pointers = Array.from(pointerCache.current.values());
         const dx = pointers[0].clientX - pointers[1].clientX;
@@ -429,22 +434,25 @@ export default function FloorPlanCanvas({
         }
 
         if (currentWallDrawing) {
-          if (bodySnap && !endpointSnap && bodyWallId) {
-            // Snap to wall body: split the existing wall and connect
-            onSplitWallAndConnect(bodyWallId, finalPoint, currentWallDrawing.start);
-            onSetWallDrawing(null);
-            wallDrawingRef.current = null;
+          if (e.pointerType === "touch") {
+            // Touch: defer wall commit to pointerUp so user can drag to adjust
+            wallPendingCommitRef.current = true;
           } else {
-            onAddWall(currentWallDrawing.start, finalPoint);
-
-            // Auto-exit: if the new endpoint snaps to ANY existing wall endpoint,
-            // the user has connected to something — exit drawing mode
-            if (endpointSnap) {
+            // Mouse: commit immediately (unchanged desktop behavior)
+            if (bodySnap && !endpointSnap && bodyWallId) {
+              onSplitWallAndConnect(bodyWallId, finalPoint, currentWallDrawing.start);
               onSetWallDrawing(null);
               wallDrawingRef.current = null;
             } else {
-              onSetWallDrawing({ start: finalPoint });
-              wallDrawingRef.current = { start: finalPoint };
+              onAddWall(currentWallDrawing.start, finalPoint);
+
+              if (endpointSnap) {
+                onSetWallDrawing(null);
+                wallDrawingRef.current = null;
+              } else {
+                onSetWallDrawing({ start: finalPoint });
+                wallDrawingRef.current = { start: finalPoint };
+              }
             }
           }
         } else {
@@ -662,6 +670,50 @@ export default function FloorPlanCanvas({
         prevPinchCenter.current = null;
       }
 
+      // Commit pending wall on touch release (mobile drag-to-adjust)
+      if (wallPendingCommitRef.current && state.selectedTool === "wall") {
+        wallPendingCommitRef.current = false;
+        const currentWallDrawing = wallDrawingRef.current;
+        if (currentWallDrawing) {
+          const pos = getCanvasPos(e);
+          const world = screenToWorld(pos.x, pos.y, state.gridSize, state.zoom, state.panOffset);
+          const gridSnapped = snapToGrid(world, 10);
+          const { snapped: wallSnapped, didSnap: endpointSnap } = snapToWallEndpoints(world, state.walls, 15);
+          const { snapped: bodySnapped, didSnap: bodySnap, wallId: bodyWallId } = snapToWallBody(world, state.walls, 15);
+          const didSnap = endpointSnap || bodySnap;
+          let finalPoint = endpointSnap ? wallSnapped : (bodySnap ? bodySnapped : gridSnapped);
+
+          if (!didSnap) {
+            const angleResult = snapAngle(currentWallDrawing.start, finalPoint, 15, 5);
+            finalPoint = angleResult.snapped;
+            finalPoint = snapToGrid(finalPoint, 10);
+          }
+
+          // Skip near-zero-length walls (accidental double-tap)
+          const dx = finalPoint.x - currentWallDrawing.start.x;
+          const dy = finalPoint.y - currentWallDrawing.start.y;
+          if (Math.sqrt(dx * dx + dy * dy) < 2) {
+            return;
+          }
+
+          if (bodySnap && !endpointSnap && bodyWallId) {
+            onSplitWallAndConnect(bodyWallId, finalPoint, currentWallDrawing.start);
+            onSetWallDrawing(null);
+            wallDrawingRef.current = null;
+          } else {
+            onAddWall(currentWallDrawing.start, finalPoint);
+            if (endpointSnap) {
+              onSetWallDrawing(null);
+              wallDrawingRef.current = null;
+            } else {
+              onSetWallDrawing({ start: finalPoint });
+              wallDrawingRef.current = { start: finalPoint };
+            }
+          }
+        }
+        return;
+      }
+
       if (isDragging) {
         onPushUndo();
       }
@@ -672,7 +724,7 @@ export default function FloorPlanCanvas({
       setResizeCorner(null);
       setResizeStart(null);
     },
-    [isDragging, onPushUndo]
+    [isDragging, onPushUndo, state.selectedTool, state.gridSize, state.zoom, state.panOffset, state.walls, getCanvasPos, onAddWall, onSetWallDrawing, onSplitWallAndConnect]
   );
 
   const handleWheel = useCallback(
@@ -709,6 +761,7 @@ export default function FloorPlanCanvas({
       if (state.selectedTool === "wall" && wallDrawingRef.current) {
         onSetWallDrawing(null);
         wallDrawingRef.current = null;
+        wallPendingCommitRef.current = false;
         return;
       }
 
@@ -791,6 +844,8 @@ export default function FloorPlanCanvas({
 
       if (e.key === "Escape") {
         onSetWallDrawing(null);
+        wallDrawingRef.current = null;
+        wallPendingCommitRef.current = false;
         onSelectItem(null);
       }
       if (e.key === "Delete" || e.key === "Backspace") {
