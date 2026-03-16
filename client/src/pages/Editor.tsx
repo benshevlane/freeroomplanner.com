@@ -6,6 +6,7 @@ import EditorToolbar from "../components/EditorToolbar";
 import FurniturePanel from "../components/FurniturePanel";
 import PropertiesPanel from "../components/PropertiesPanel";
 import RoomSketchLogo from "../components/RoomSketchLogo";
+import MobileWizard from "../components/MobileWizard";
 import { PerplexityAttribution } from "../components/PerplexityAttribution";
 import { FurnitureTemplate, FurnitureItem, RoomLabel, Point, UnitSystem, MeasureMode } from "../lib/types";
 import html2canvas from "html2canvas";
@@ -54,6 +55,14 @@ export default function Editor() {
       return next;
     });
   }, []);
+  // Mobile onboarding wizard
+  const [showMobileWizard, setShowMobileWizard] = useState(false);
+  useEffect(() => {
+    if (isMobile && !localStorage.getItem("roomsketch-mobile-wizard-shown")) {
+      setShowMobileWizard(true);
+    }
+  }, [isMobile]);
+
   const [droppingFurniture, setDroppingFurniture] = useState<FurnitureTemplate | null>(null);
   const [showClearDialog, setShowClearDialog] = useState(false);
   const [furniturePanelOpen, setFurniturePanelOpen] = useState(false);
@@ -587,6 +596,9 @@ export default function Editor() {
           {toast.message}
         </div>
       )}
+
+      {/* Mobile onboarding wizard */}
+      <MobileWizard open={showMobileWizard} onClose={() => setShowMobileWizard(false)} />
     </div>
   );
 }
