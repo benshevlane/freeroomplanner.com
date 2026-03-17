@@ -10,9 +10,11 @@ export function serveStatic(app: Express) {
     );
   }
 
-  app.use(express.static(distPath));
+  // Serve static files with .html extension resolution so clean URLs
+  // like /room-planner resolve to room-planner.html automatically
+  app.use(express.static(distPath, { extensions: ["html"] }));
 
-  // fall through to index.html if the file doesn't exist
+  // fall through to index.html if the file doesn't exist (SPA routing)
   app.use("/{*path}", (_req, res) => {
     res.sendFile(path.resolve(distPath, "index.html"));
   });
