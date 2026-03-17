@@ -9,6 +9,7 @@ import PropertiesPanel from "../components/PropertiesPanel";
 import FreeRoomPlannerLogo from "../components/FreeRoomPlannerLogo";
 import MobileWizard from "../components/MobileWizard";
 import DesktopWizard from "../components/DesktopWizard";
+import RoomGeneratorWizard from "../components/RoomGeneratorWizard";
 import { PerplexityAttribution } from "../components/PerplexityAttribution";
 import IntentCapture from "../components/IntentCapture";
 import { FurnitureTemplate, FurnitureItem, RoomLabel, Point, UnitSystem, MeasureMode } from "../lib/types";
@@ -25,6 +26,7 @@ import {
   HelpCircle,
   Keyboard,
   Check,
+  Wand2,
 } from "lucide-react";
 import {
   Dialog,
@@ -84,6 +86,7 @@ export default function Editor() {
 
   const [droppingFurniture, setDroppingFurniture] = useState<FurnitureTemplate | null>(null);
   const [showClearDialog, setShowClearDialog] = useState(false);
+  const [showRoomGenerator, setShowRoomGenerator] = useState(false);
   const [furniturePanelOpen, setFurniturePanelOpen] = useState(false);
   const [propertiesPanelOpen, setPropertiesPanelOpen] = useState(false);
   const [toast, setToast] = useState<{ message: string; visible: boolean }>({ message: "", visible: false });
@@ -346,6 +349,24 @@ export default function Editor() {
     input.click();
   }, [editor]);
 
+  const handleGenerateRoom = useCallback(
+    (plan: { walls: import("@/lib/types").Wall[]; furniture: FurnitureItem[] }) => {
+      editor.pushUndo();
+      editor.importState({
+        version: 1,
+        roomName: state.roomName,
+        walls: plan.walls,
+        furniture: plan.furniture,
+        labels: [],
+        roomNames: {},
+        componentLabelsVisible: true,
+      });
+      editor.setTool("select");
+      showToast("Room generated — edit walls and features as needed");
+    },
+    [editor, state.roomName, showToast]
+  );
+
   const handleSelectFurniture = useCallback(
     (template: FurnitureTemplate) => {
       // Place at center of visible area
@@ -396,6 +417,17 @@ export default function Editor() {
           data-testid="room-name-input"
         />
         <div className="flex-1" />
+
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-7 text-xs gap-1.5"
+          onClick={() => setShowRoomGenerator(true)}
+          data-testid="btn-quick-room"
+        >
+          <Wand2 className="h-3.5 w-3.5" />
+          <span className="hidden sm:inline">Quick Room</span>
+        </Button>
 
         <Dialog>
           <DialogTrigger asChild>
@@ -643,6 +675,13 @@ export default function Editor() {
 
       {/* Desktop onboarding wizard */}
       {!isMobile && <DesktopWizard open={showDesktopWizard} onClose={() => setShowDesktopWizard(false)} />}
+
+      {/* Room generator wizard */}
+      <RoomGeneratorWizard
+        open={showRoomGenerator}
+        onClose={() => setShowRoomGenerator(false)}
+        onGenerate={handleGenerateRoom}
+      />
     </div>
   );
 }
