@@ -232,9 +232,19 @@ export function drawWalls(
     const dx = wall.end.x - wall.start.x;
     const dy = wall.end.y - wall.start.y;
     const lengthCm = Math.sqrt(dx * dx + dy * dy);
+    const wallThick = wall.thickness || 15;
     const displayLengthCm = measureMode === "inside"
-      ? Math.max(0, lengthCm - 2 * (wall.thickness || 15))
+      ? Math.max(0, lengthCm - wallThick)
       : lengthCm;
+    // Debug: verify inside measurement calculation
+    if (measureMode === "inside" && lengthCm > 10) {
+      console.log(
+        `[Wall ${wall.id}] full outer length: ${lengthCm.toFixed(1)}cm, ` +
+        `wall thickness: ${wallThick}cm, ` +
+        `calculated inside length: ${displayLengthCm.toFixed(1)}cm, ` +
+        `displayed value: ${formatLength(displayLengthCm, units)}`
+      );
+    }
     if (lengthCm > 10) {
       drawWallDimensionLabel(ctx, sx, sy, ex, ey, displayLengthCm, wall.thickness * pxPerCm, zoom, isDark, units, wall, furniture, gridSize, panOffset);
     }
@@ -248,7 +258,7 @@ export function drawWalls(
     const ey = group.maxP.y * pxPerCm + panOffset.y;
     const thickness = walls[0]?.thickness ?? 15;
     const displayLengthCm = measureMode === "inside"
-      ? Math.max(0, group.totalLengthCm - 2 * thickness)
+      ? Math.max(0, group.totalLengthCm - thickness)
       : group.totalLengthCm;
     // Find the actual wall for collision detection
     const groupWallIds = group.wallIds;
@@ -343,10 +353,17 @@ export function drawMeasurementIndicatorLines(
       offsetY = -insideNy * halfThickness;
     }
 
-    const sx = wall.start.x * pxPerCm + panOffset.x + offsetX * pxPerCm;
-    const sy = wall.start.y * pxPerCm + panOffset.y + offsetY * pxPerCm;
-    const ex = wall.end.x * pxPerCm + panOffset.x + offsetX * pxPerCm;
-    const ey = wall.end.y * pxPerCm + panOffset.y + offsetY * pxPerCm;
+    // Unit direction along the wall
+    const udx = dx / len;
+    const udy = dy / len;
+
+    // In inside mode, shorten the green line by halfThickness at each end
+    // so its span matches the inside measurement value
+    const inset = measureMode === "inside" ? halfThickness : 0;
+    const sx = (wall.start.x + udx * inset) * pxPerCm + panOffset.x + offsetX * pxPerCm;
+    const sy = (wall.start.y + udy * inset) * pxPerCm + panOffset.y + offsetY * pxPerCm;
+    const ex = (wall.end.x - udx * inset) * pxPerCm + panOffset.x + offsetX * pxPerCm;
+    const ey = (wall.end.y - udy * inset) * pxPerCm + panOffset.y + offsetY * pxPerCm;
 
     ctx.strokeStyle = INDICATOR_COLOR;
     ctx.lineWidth = 1.5;
