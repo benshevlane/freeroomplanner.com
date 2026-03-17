@@ -1078,7 +1078,8 @@ export function drawWallPreview(
   isDark: boolean,
   angleDeg?: number,
   units: UnitSystem = "metric",
-  measureMode: MeasureMode = "inside"
+  measureMode: MeasureMode = "inside",
+  adjWallAngleRad?: number
 ) {
   const pxPerCm = (gridSize * zoom) / 100;
   const sx = start.x * pxPerCm + panOffset.x;
@@ -1129,7 +1130,7 @@ export function drawWallPreview(
     ctx.fillText(lengthText, mx, my - 10);
   }
 
-  // Angle indicator near cursor
+  // Angle indicator at the junction point
   if (angleDeg !== undefined && lengthCm > 10) {
     const fontSize = Math.max(10, 11 * zoom);
     const angleText = `${Math.round(angleDeg)}°`;
@@ -1137,18 +1138,32 @@ export function drawWallPreview(
     ctx.fillStyle = isDark ? "rgba(79,152,163,0.7)" : "rgba(1,105,111,0.6)";
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
-    ctx.fillText(angleText, ex + 14, ey - 14);
 
     // Small arc at the start point showing the angle
     const arcRadius = Math.min(30, Math.sqrt((ex - sx) ** 2 + (ey - sy) ** 2) * 0.3);
-    if (arcRadius > 8) {
-      const wallAngle = Math.atan2(ey - sy, ex - sx);
+    const newWallAngle = Math.atan2(ey - sy, ex - sx);
+
+    if (adjWallAngleRad !== undefined && arcRadius > 8) {
+      // Draw arc between the adjoining wall's incoming direction and the new wall
+      const adjIncoming = adjWallAngleRad + Math.PI;
+      let sweep = newWallAngle - adjIncoming;
+      sweep = ((sweep % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+      const ccw = sweep > Math.PI;
+
       ctx.beginPath();
-      ctx.arc(sx, sy, arcRadius, 0, wallAngle, wallAngle < 0);
+      ctx.arc(sx, sy, arcRadius, adjIncoming, newWallAngle, ccw);
       ctx.strokeStyle = isDark ? "rgba(79,152,163,0.4)" : "rgba(1,105,111,0.35)";
       ctx.lineWidth = 1.5;
       ctx.setLineDash([]);
       ctx.stroke();
+
+      // Position angle text near the arc bisector
+      const bisector = adjIncoming + (ccw ? -(2 * Math.PI - sweep) / 2 : sweep / 2);
+      const textDist = arcRadius + 14;
+      ctx.fillText(angleText, sx + Math.cos(bisector) * textDist, sy + Math.sin(bisector) * textDist);
+    } else {
+      // No adjoining wall — show angle text near cursor
+      ctx.fillText(angleText, ex + 14, ey - 14);
     }
   }
 }
@@ -1257,6 +1272,32 @@ export function computeWallAngle(start: Point, end: Point): number {
   let deg = Math.atan2(-dy, dx) * (180 / Math.PI);
   if (deg < 0) deg += 360;
   return deg;
+}
+
+/** Find the direction (radians, screen coords) of an adjoining wall at a junction point.
+ *  Returns the angle pointing AWAY from the junction along the existing wall, or undefined. */
+export function findAdjoiningWallDirection(
+  junctionPoint: Point,
+  walls: Wall[],
+  tolerance: number = 1
+): number | undefined {
+  for (let i = walls.length - 1; i >= 0; i--) {
+    const wall = walls[i];
+    const dxS = junctionPoint.x - wall.start.x;
+    const dyS = junctionPoint.y - wall.start.y;
+    const dxE = junctionPoint.x - wall.end.x;
+    const dyE = junctionPoint.y - wall.end.y;
+
+    if (Math.sqrt(dxS * dxS + dyS * dyS) < tolerance) {
+      // Junction is at wall.start → direction points toward wall.end
+      return Math.atan2(wall.end.y - wall.start.y, wall.end.x - wall.start.x);
+    }
+    if (Math.sqrt(dxE * dxE + dyE * dyE) < tolerance) {
+      // Junction is at wall.end → direction points toward wall.start
+      return Math.atan2(wall.start.y - wall.end.y, wall.start.x - wall.end.x);
+    }
+  }
+  return undefined;
 }
 
 export function screenToWorld(

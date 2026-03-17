@@ -22,6 +22,7 @@ import {
   getRoomKey,
   snapAngle,
   computeWallAngle,
+  findAdjoiningWallDirection,
   screenToWorld,
   snapToGrid,
   snapToWallEndpoints,
@@ -187,6 +188,7 @@ export default function FloorPlanCanvas({
 
       // Angle snapping (15° increments, strong snap) — skip if already snapped to endpoint
       let angleDeg: number | undefined;
+      let adjAngleRad: number | undefined;
       if (!didSnap) {
         const angleResult = snapAngle(state.wallDrawing.start, finalPoint, 15, 5);
         finalPoint = angleResult.snapped;
@@ -194,12 +196,23 @@ export default function FloorPlanCanvas({
         const guideSnap = drawAlignmentGuides(ctx, finalPoint, state.walls, state.gridSize, state.zoom, state.panOffset, w, h, isDark);
         if (guideSnap.snapX !== null) finalPoint = { ...finalPoint, x: guideSnap.snapX };
         if (guideSnap.snapY !== null) finalPoint = { ...finalPoint, y: guideSnap.snapY };
-        // Recompute angle after guide snap
-        angleDeg = computeWallAngle(state.wallDrawing.start, finalPoint);
       } else {
         // Draw guides even when endpoint-snapped
         drawAlignmentGuides(ctx, finalPoint, state.walls, state.gridSize, state.zoom, state.panOffset, w, h, isDark);
-        angleDeg = computeWallAngle(state.wallDrawing.start, finalPoint);
+      }
+
+      // Compute relative angle to adjoining wall (or skip if no adjoining wall)
+      adjAngleRad = findAdjoiningWallDirection(state.wallDrawing.start, state.walls);
+      if (adjAngleRad !== undefined) {
+        const newWallRad = Math.atan2(
+          finalPoint.y - state.wallDrawing.start.y,
+          finalPoint.x - state.wallDrawing.start.x
+        );
+        // Interior angle: PI - (newWall - adjWall)
+        let relativeRad = Math.PI - (newWallRad - adjAngleRad);
+        let relativeDeg = relativeRad * (180 / Math.PI);
+        relativeDeg = ((relativeDeg % 360) + 360) % 360;
+        angleDeg = relativeDeg;
       }
 
       // Compute distance to decide whether to show preview line or just start dot
@@ -211,7 +224,7 @@ export default function FloorPlanCanvas({
         // Near-zero length: show only start point indicator (e.g. after first tap on mobile)
         drawSnapIndicator(ctx, state.wallDrawing.start, state.gridSize, state.zoom, state.panOffset);
       } else {
-        drawWallPreview(ctx, state.wallDrawing.start, finalPoint, state.gridSize, state.zoom, state.panOffset, isDark, angleDeg, state.units, measureMode);
+        drawWallPreview(ctx, state.wallDrawing.start, finalPoint, state.gridSize, state.zoom, state.panOffset, isDark, angleDeg, state.units, measureMode, adjAngleRad);
         if (didSnap) {
           drawSnapIndicator(ctx, finalPoint, state.gridSize, state.zoom, state.panOffset);
         }
