@@ -412,7 +412,8 @@ export function drawWalls(
   selectedId: string | null,
   units: UnitSystem = "m",
   measureMode: MeasureMode = "inside",
-  furniture: FurnitureItem[] = []
+  furniture: FurnitureItem[] = [],
+  rooms: DetectedRoom[] = []
 ) {
   const pxPerCm = (gridSize * zoom) / 100;
 
@@ -423,7 +424,8 @@ export function drawWalls(
     for (const id of group.wallIds) mergedWallIds.add(id);
   }
 
-  // Draw all wall lines
+  // Draw all walls as solid-filled polygons (architectural style)
+  // First pass: draw filled wall rectangles
   walls.forEach((wall) => {
     const sx = wall.start.x * pxPerCm + panOffset.x;
     const sy = wall.start.y * pxPerCm + panOffset.y;
@@ -431,19 +433,60 @@ export function drawWalls(
     const ey = wall.end.y * pxPerCm + panOffset.y;
 
     const isSelected = wall.id === selectedId;
+    const halfThick = (wall.thickness * pxPerCm) / 2;
 
-    ctx.strokeStyle = isSelected ? SELECT_COLOR : (isDark ? WALL_COLOR_DARK : WALL_COLOR_LIGHT);
-    ctx.lineWidth = wall.thickness * pxPerCm;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
+    // Compute perpendicular offset for wall polygon corners
+    const dx = ex - sx;
+    const dy = ey - sy;
+    const len = Math.sqrt(dx * dx + dy * dy);
+    if (len < 0.01) return;
+    const nx = (-dy / len) * halfThick; // perpendicular normal x
+    const ny = (dx / len) * halfThick;  // perpendicular normal y
+
+    const fillColor = isSelected ? SELECT_COLOR : (isDark ? WALL_COLOR_DARK : WALL_COLOR_LIGHT);
+
+    ctx.fillStyle = fillColor;
     ctx.beginPath();
-    ctx.moveTo(sx, sy);
-    ctx.lineTo(ex, ey);
-    ctx.stroke();
+    ctx.moveTo(sx + nx, sy + ny);
+    ctx.lineTo(sx - nx, sy - ny);
+    ctx.lineTo(ex - nx, ey - ny);
+    ctx.lineTo(ex + nx, ey + ny);
+    ctx.closePath();
+    ctx.fill();
+  });
+
+  // Second pass: fill junction squares where walls meet (avoids gaps at corners)
+  const CONNECT_THRESHOLD = 15; // cm, same as wall snap threshold
+  const endpointMap = new Map<string, { x: number; y: number; thickness: number }[]>();
+  walls.forEach((wall) => {
+    const points = [
+      { x: wall.start.x, y: wall.start.y },
+      { x: wall.end.x, y: wall.end.y },
+    ];
+    points.forEach((pt) => {
+      const key = `${Math.round(pt.x / CONNECT_THRESHOLD) * CONNECT_THRESHOLD},${Math.round(pt.y / CONNECT_THRESHOLD) * CONNECT_THRESHOLD}`;
+      if (!endpointMap.has(key)) endpointMap.set(key, []);
+      endpointMap.get(key)!.push({ ...pt, thickness: wall.thickness });
+    });
+  });
+  endpointMap.forEach((endpoints) => {
+    if (endpoints.length < 2) return;
+    // Draw a filled circle at the junction to cover corner gaps
+    const avgX = endpoints.reduce((s, e) => s + e.x, 0) / endpoints.length;
+    const avgY = endpoints.reduce((s, e) => s + e.y, 0) / endpoints.length;
+    const maxThick = Math.max(...endpoints.map((e) => e.thickness));
+    const halfThick = (maxThick * pxPerCm) / 2;
+    const px = avgX * pxPerCm + panOffset.x;
+    const py = avgY * pxPerCm + panOffset.y;
+
+    ctx.fillStyle = isDark ? WALL_COLOR_DARK : WALL_COLOR_LIGHT;
+    ctx.beginPath();
+    ctx.arc(px, py, halfThick, 0, Math.PI * 2);
+    ctx.fill();
   });
 
   // Identify doors/windows for occupant checks
-  const doorsWindows = furniture.filter((f) => f.type === "door" || f.type === "window");
+  const doorsWindows = furniture.filter((f) => f.type === "door" || f.type === "door_double" || f.type === "window");
 
   // Draw individual labels for non-merged walls (skip if wall has door/window occupants — total shown separately)
   walls.forEach((wall) => {
@@ -463,7 +506,7 @@ export function drawWalls(
       ? Math.max(0, lengthCm - wallThick)
       : lengthCm;
     if (lengthCm > 10) {
-      drawWallDimensionLabel(ctx, sx, sy, ex, ey, displayLengthCm, wall.thickness * pxPerCm, zoom, isDark, units, wall, furniture, gridSize, panOffset);
+      drawWallDimensionLabel(ctx, sx, sy, ex, ey, displayLengthCm, wall.thickness * pxPerCm, zoom, isDark, units, wall, furniture, gridSize, panOffset, rooms, walls, measureMode);
     }
   });
 
@@ -481,7 +524,7 @@ export function drawWalls(
     // Find the actual wall for collision detection
     const groupWallIds = group.wallIds;
     const representativeWall = walls.find((w) => groupWallIds.has(w.id)) || walls[0];
-    drawWallDimensionLabel(ctx, sx, sy, ex, ey, displayLengthCm, thickness * pxPerCm, zoom, isDark, units, representativeWall, furniture, gridSize, panOffset);
+    drawWallDimensionLabel(ctx, sx, sy, ex, ey, displayLengthCm, thickness * pxPerCm, zoom, isDark, units, representativeWall, furniture, gridSize, panOffset, rooms, walls, measureMode);
   }
 }
 
@@ -494,25 +537,38 @@ function drawTotalWallDimensionLine(
   displayLengthCm: number, wallThicknessCm: number,
   pxPerCm: number, panOffset: Point,
   zoom: number, isDark: boolean,
-  units: UnitSystem, color: string
+  units: UnitSystem, color: string,
+  measureMode: MeasureMode = "inside"
 ) {
   const sx = wallStart.x * pxPerCm + panOffset.x;
   const sy = wallStart.y * pxPerCm + panOffset.y;
   const ex = wallEnd.x * pxPerCm + panOffset.x;
   const ey = wallEnd.y * pxPerCm + panOffset.y;
-  const segLenPx = Math.sqrt((ex - sx) ** 2 + (ey - sy) ** 2);
 
   const angle = Math.atan2(ey - sy, ex - sx);
   const wallThickPx = wallThicknessCm * pxPerCm;
+
+  // Inset endpoints along wall direction for inside mode
+  const halfThick = wallThicknessCm / 2;
+  const inset = measureMode === "inside" ? halfThick * pxPerCm : 0;
+  const dirX = Math.cos(angle);
+  const dirY = Math.sin(angle);
+  const isx = sx + dirX * inset;
+  const isy = sy + dirY * inset;
+  const iex = ex - dirX * inset;
+  const iey = ey - dirY * inset;
+
+  const segLenPx = Math.sqrt((iex - isx) ** 2 + (iey - isy) ** 2);
+
   // Offset to opposite side (negative normal) from segment measurements
   const offsetDist = -(wallThickPx / 2 + 8 * zoom);
   const normX = -Math.sin(angle);
   const normY = Math.cos(angle);
 
-  const osx = sx + normX * offsetDist;
-  const osy = sy + normY * offsetDist;
-  const oex = ex + normX * offsetDist;
-  const oey = ey + normY * offsetDist;
+  const osx = isx + normX * offsetDist;
+  const osy = isy + normY * offsetDist;
+  const oex = iex + normX * offsetDist;
+  const oey = iey + normY * offsetDist;
 
   ctx.save();
   ctx.strokeStyle = color;
@@ -580,7 +636,7 @@ export function drawWallSegmentMeasurements(
 ) {
   const pxPerCm = (gridSize * zoom) / 100;
   const color = isDark ? DIMENSION_COLOR_DARK : DIMENSION_COLOR_LIGHT;
-  const doorsWindows = furniture.filter((f) => f.type === "door" || f.type === "window");
+  const doorsWindows = furniture.filter((f) => f.type === "door" || f.type === "door_double" || f.type === "window");
   if (doorsWindows.length === 0) return;
 
   // Wall inside measurements are always shown via drawWalls(); no segment breakdown needed.
@@ -718,8 +774,12 @@ export function drawWallSegmentMeasurements(
     occupants.sort((a, b) => a.along - b.along);
 
     // Compute segments: wall start -> first door edge, between doors, last door edge -> wall end
+    // In inside mode, inset segment boundaries by half wall thickness at each wall end
+    const halfThick = wallThick / 2;
+    const wallStartAlong = measureMode === "inside" ? halfThick : 0;
+    const wallEndAlong = measureMode === "inside" ? wallLen - halfThick : wallLen;
     const segments: { startAlong: number; endAlong: number }[] = [];
-    let prevEnd = 0;
+    let prevEnd = wallStartAlong;
     for (const occ of occupants) {
       const edgeStart = occ.along - occ.halfExtent;
       const edgeEnd = occ.along + occ.halfExtent;
@@ -728,8 +788,8 @@ export function drawWallSegmentMeasurements(
       }
       prevEnd = Math.max(prevEnd, edgeEnd);
     }
-    if (wallLen - prevEnd > 1) {
-      segments.push({ startAlong: prevEnd, endAlong: wallLen });
+    if (wallEndAlong - prevEnd > 1) {
+      segments.push({ startAlong: prevEnd, endAlong: wallEndAlong });
     }
 
     // Draw each segment
@@ -751,7 +811,7 @@ export function drawWallSegmentMeasurements(
       : wallLen;
     drawTotalWallDimensionLine(
       ctx, wallStart, wallEnd, displayLengthCm, wallThick,
-      pxPerCm, panOffset, zoom, isDark, units, color
+      pxPerCm, panOffset, zoom, isDark, units, color, measureMode
     );
   }
 }
@@ -984,7 +1044,10 @@ function drawWallDimensionLabel(
   wall?: Wall,
   furniture?: FurnitureItem[],
   gridSize?: number,
-  panOffset?: Point
+  panOffset?: Point,
+  rooms: DetectedRoom[] = [],
+  allWalls: Wall[] = [],
+  measureMode: MeasureMode = "inside"
 ) {
   const angle = Math.atan2(ey - sy, ex - sx);
   const wallLengthPx = Math.sqrt((ex - sx) ** 2 + (ey - sy) ** 2);
@@ -997,14 +1060,12 @@ function drawWallDimensionLabel(
 
   // Collision avoidance: find optimal position along wall
   let labelFrac = 0.5;
-  let offsetPerp = false;
   if (wall && furniture && gridSize && panOffset) {
     const occupants = findComponentsOnWall(wall, furniture, gridSize, zoom, panOffset);
     if (occupants.length > 0) {
       const textFrac = wallLengthPx > 0 ? (textWidth + pad * 2) / wallLengthPx : 1;
       const result = findOptimalLabelPosition(occupants, textFrac);
       labelFrac = result.position;
-      offsetPerp = result.offsetPerp;
     }
   }
 
@@ -1012,12 +1073,64 @@ function drawWallDimensionLabel(
   const mx = sx + (ex - sx) * labelFrac;
   const my = sy + (ey - sy) * labelFrac;
 
-  // Perpendicular offset for collision avoidance
-  const perpOffsetPx = offsetPerp ? -(wallThicknessPx / 2 + baseFontSize + 8) : 0;
+  // Determine inside normal direction using room centroid (same logic as drawMeasurementIndicatorLines)
   const normX = -Math.sin(angle);
   const normY = Math.cos(angle);
-  const finalX = mx + normX * perpOffsetPx;
-  const finalY = my + normY * perpOffsetPx;
+  let insideNormX = normX;
+  let insideNormY = normY;
+
+  if (wall) {
+    const wallMid = { x: (wall.start.x + wall.end.x) / 2, y: (wall.start.y + wall.end.y) / 2 };
+    const wdx = wall.end.x - wall.start.x;
+    const wdy = wall.end.y - wall.start.y;
+    const wlen = Math.sqrt(wdx * wdx + wdy * wdy);
+    if (wlen > 0) {
+      const wnx = -wdy / wlen;
+      const wny = wdx / wlen;
+
+      let foundRoom = false;
+      for (const room of rooms) {
+        const hasStart = room.vertices.some(v =>
+          Math.sqrt((v.x - wall.start.x) ** 2 + (v.y - wall.start.y) ** 2) < 15
+        );
+        const hasEnd = room.vertices.some(v =>
+          Math.sqrt((v.x - wall.end.x) ** 2 + (v.y - wall.end.y) ** 2) < 15
+        );
+        if (hasStart && hasEnd) {
+          const toCentroid = { x: room.centroid.x - wallMid.x, y: room.centroid.y - wallMid.y };
+          const dot = toCentroid.x * wnx + toCentroid.y * wny;
+          insideNormX = dot >= 0 ? normX : -normX;
+          insideNormY = dot >= 0 ? normY : -normY;
+          foundRoom = true;
+          break;
+        }
+      }
+
+      if (!foundRoom && allWalls.length > 0) {
+        // Fallback: use center of all wall endpoints
+        let cx = 0, cy = 0, cnt = 0;
+        for (const w of allWalls) {
+          cx += w.start.x + w.end.x;
+          cy += w.start.y + w.end.y;
+          cnt += 2;
+        }
+        if (cnt > 0) {
+          cx /= cnt;
+          cy /= cnt;
+          const toCentroid = { x: cx - wallMid.x, y: cy - wallMid.y };
+          const dot = toCentroid.x * wnx + toCentroid.y * wny;
+          insideNormX = dot >= 0 ? normX : -normX;
+          insideNormY = dot >= 0 ? normY : -normY;
+        }
+      }
+    }
+  }
+
+  // Offset label perpendicular to wall: inside mode → toward room, full → away from room
+  const dirSign = measureMode === "inside" ? 1 : -1;
+  const perpOffsetPx = dirSign * (wallThicknessPx / 2 + baseFontSize * 0.6 + 4);
+  const finalX = mx + insideNormX * perpOffsetPx;
+  const finalY = my + insideNormY * perpOffsetPx;
 
   ctx.save();
   ctx.translate(finalX, finalY);
@@ -1027,32 +1140,17 @@ function drawWallDimensionLabel(
   }
   ctx.rotate(textAngle);
 
-  if (textWidth + pad * 2 < wallLengthPx - 4) {
-    ctx.fillStyle = isDark ? "#1c1b19" : "#f9f8f5";
-    ctx.fillRect(
-      -textWidth / 2 - pad,
-      -8 * zoom - pad,
-      textWidth + pad * 2,
-      16 * zoom + pad
-    );
-    ctx.fillStyle = isDark ? DIMENSION_COLOR_DARK : DIMENSION_COLOR_LIGHT;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(text, 0, 0);
-  } else if (wallLengthPx > 15) {
-    const offsetY = -(wallThicknessPx / 2) - baseFontSize - 2;
-    ctx.fillStyle = isDark ? "#1c1b19" : "#f9f8f5";
-    ctx.fillRect(
-      -textWidth / 2 - pad,
-      offsetY - baseFontSize * 0.4 - pad,
-      textWidth + pad * 2,
-      baseFontSize + pad * 2
-    );
-    ctx.fillStyle = isDark ? DIMENSION_COLOR_DARK : DIMENSION_COLOR_LIGHT;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(text, 0, offsetY);
-  }
+  ctx.fillStyle = isDark ? "#1c1b19" : "#f9f8f5";
+  ctx.fillRect(
+    -textWidth / 2 - pad,
+    -baseFontSize * 0.5 - pad,
+    textWidth + pad * 2,
+    baseFontSize + pad * 2
+  );
+  ctx.fillStyle = isDark ? DIMENSION_COLOR_DARK : DIMENSION_COLOR_LIGHT;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(text, 0, 0);
 
   ctx.restore();
 }
@@ -1979,16 +2077,50 @@ function drawFurnitureDetail(
     case "window": {
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.moveTo(-w / 2, 0);
-      ctx.lineTo(w / 2, 0);
+      ctx.moveTo(-w / 2, -h * 0.3);
+      ctx.lineTo(w / 2, -h * 0.3);
       ctx.stroke();
-      ctx.fillStyle = isDark ? "rgba(79, 152, 163, 0.15)" : "rgba(1, 105, 111, 0.1)";
-      ctx.fillRect(-w * 0.4, -h * 0.35, w * 0.8, h * 0.7);
-      ctx.lineWidth = 1;
-      ctx.strokeRect(-w * 0.4, -h * 0.35, w * 0.8, h * 0.7);
       ctx.beginPath();
-      ctx.moveTo(0, -h * 0.35);
-      ctx.lineTo(0, h * 0.35);
+      ctx.moveTo(-w / 2, h * 0.3);
+      ctx.lineTo(w / 2, h * 0.3);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(-w / 2, -h * 0.3);
+      ctx.lineTo(-w / 2, h * 0.3);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(w / 2, -h * 0.3);
+      ctx.lineTo(w / 2, h * 0.3);
+      ctx.stroke();
+      ctx.fillStyle = isDark ? "rgba(79, 152, 163, 0.1)" : "rgba(1, 105, 111, 0.07)";
+      ctx.fillRect(-w / 2, -h * 0.3, w, h * 0.6);
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(0, -h * 0.3);
+      ctx.lineTo(0, h * 0.3);
+      ctx.stroke();
+      break;
+    }
+    case "bay_window": {
+      ctx.lineWidth = 2;
+      const bwInset = w * 0.25;
+      ctx.beginPath();
+      ctx.moveTo(-w / 2, 0);
+      ctx.lineTo(-w / 2 + bwInset, -h / 2);
+      ctx.lineTo(w / 2 - bwInset, -h / 2);
+      ctx.lineTo(w / 2, 0);
+      ctx.closePath();
+      ctx.stroke();
+      ctx.fillStyle = isDark ? "rgba(79, 152, 163, 0.1)" : "rgba(1, 105, 111, 0.07)";
+      ctx.fill();
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(-w / 2 + bwInset, 0);
+      ctx.lineTo(-w / 2 + bwInset, -h / 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(w / 2 - bwInset, 0);
+      ctx.lineTo(w / 2 - bwInset, -h / 2);
       ctx.stroke();
       break;
     }
@@ -2147,6 +2279,61 @@ function drawFurnitureDetail(
         );
         ctx.stroke();
       }
+      break;
+    }
+
+    // ─── OTHER STRUCTURE ──────────────────────────────────────────
+    case "stairs": {
+      // Legacy generic staircase
+      ctx.lineWidth = 1;
+      const numTreads = Math.max(5, Math.round(h / (w * 0.3)));
+      const treadSpacing = h / numTreads;
+      for (let i = 1; i < numTreads; i++) {
+        const ty = -h / 2 + i * treadSpacing;
+        ctx.beginPath();
+        ctx.moveTo(-w / 2, ty);
+        ctx.lineTo(w / 2, ty);
+        ctx.stroke();
+      }
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(0, h * 0.35);
+      ctx.lineTo(0, -h * 0.35);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(0, -h * 0.35);
+      ctx.lineTo(-w * 0.15, -h * 0.2);
+      ctx.moveTo(0, -h * 0.35);
+      ctx.lineTo(w * 0.15, -h * 0.2);
+      ctx.stroke();
+      break;
+    }
+    case "radiator": {
+      // Radiator: rectangle with vertical fin lines
+      ctx.lineWidth = 1;
+      const numFins = Math.max(4, Math.round(w / 12));
+      const finSpacing = w / (numFins + 1);
+      for (let i = 1; i <= numFins; i++) {
+        const fx = -w / 2 + i * finSpacing;
+        ctx.beginPath();
+        ctx.moveTo(fx, -h * 0.35);
+        ctx.lineTo(fx, h * 0.35);
+        ctx.stroke();
+      }
+      break;
+    }
+    case "boiler": {
+      // Boiler: rectangle with circle containing "B"
+      ctx.lineWidth = 1;
+      const boilerRadius = Math.min(w, h) * 0.3;
+      ctx.beginPath();
+      ctx.arc(0, 0, boilerRadius, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = stroke;
+      ctx.font = `bold ${boilerRadius * 1.2}px sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("B", 0, 0);
       break;
     }
   }

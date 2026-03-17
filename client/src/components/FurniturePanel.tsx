@@ -15,6 +15,7 @@ import {
   DoorOpen,
   ChevronDown,
   ChevronRight,
+  TextCursorInput,
 } from "lucide-react";
 
 const CATEGORIES = ["All", "Living", "Kitchen", "Bedroom", "Bathroom", "Dining", "Structure"];
@@ -65,10 +66,11 @@ function groupByVariant(items: FurnitureTemplate[]): { key: string; primary: Fur
 interface FurniturePanelProps {
   onSelectFurniture: (template: FurnitureTemplate) => void;
   onSwitchToSelect?: () => void;
+  onAddTextBox?: () => void;
   className?: string;
 }
 
-export default function FurniturePanel({ onSelectFurniture, onSwitchToSelect, className }: FurniturePanelProps) {
+export default function FurniturePanel({ onSelectFurniture, onSwitchToSelect, onAddTextBox, className }: FurniturePanelProps) {
   const [selectedCategory, setSelectedCategory] = useState(() => {
     try {
       const stored = JSON.parse(localStorage.getItem("freeroomplanner-intent") || "{}");
@@ -165,6 +167,20 @@ export default function FurniturePanel({ onSelectFurniture, onSwitchToSelect, cl
 
       <ScrollArea className="flex-1">
         <div className="p-2 space-y-0.5">
+          {/* Text Box item */}
+          {onAddTextBox && (!search || "text box".includes(search.toLowerCase())) && (
+            <div
+              onClick={onAddTextBox}
+              className="flex items-center gap-2 px-2.5 py-2 min-h-[44px] rounded-md cursor-pointer hover-elevate transition-colors border border-dashed border-border"
+              data-testid="add-text-box"
+            >
+              <TextCursorInput className="h-4 w-4 text-primary flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate">Text Box</p>
+                <p className="text-xs text-muted-foreground">Rich text annotation</p>
+              </div>
+            </div>
+          )}
           {groups.map((group) => {
             const hasVariants = group.variants.length > 1;
             const isExpanded = expandedGroup === group.key;

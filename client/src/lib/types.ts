@@ -3,11 +3,14 @@ export interface Point {
   y: number;
 }
 
+export type WallType = "exterior" | "interior";
+
 export interface Wall {
   id: string;
   start: Point;
   end: Point;
   thickness: number; // in cm
+  wallType?: WallType; // defaults to "exterior" (30cm) when creating new walls
 }
 
 export interface FurnitureItem {
@@ -41,6 +44,56 @@ export interface RoomLabel {
   color?: LabelColor;
   background?: boolean; // white pill background
 }
+
+export interface TextBox {
+  id: string;
+  x: number; // world cm
+  y: number; // world cm
+  width: number; // world cm
+  height: number; // world cm
+  rotation: number; // degrees
+  content: string; // HTML string
+  customName?: string; // editable name for layers panel
+  // Box styling
+  borderEnabled: boolean;
+  borderColor: string;
+  borderWidth: number; // px
+  borderStyle: "solid" | "dashed" | "dotted";
+  cornerRadius: number; // px 0–40
+  backgroundColor: string;
+  backgroundOpacity: number; // 0–1
+  padding: number; // px 4–40
+  shadowEnabled: boolean;
+  shadowBlur: number; // px
+  shadowOffsetX: number; // px
+  shadowOffsetY: number; // px
+  // Text defaults
+  fontSize: number; // px
+  fontFamily: string;
+  zIndex: number;
+}
+
+export const DEFAULT_TEXT_BOX: Omit<TextBox, "id" | "x" | "y"> = {
+  width: 200,
+  height: 100,
+  rotation: 0,
+  content: "",
+  borderEnabled: false,
+  borderColor: "#000000",
+  borderWidth: 1,
+  borderStyle: "solid",
+  cornerRadius: 0,
+  backgroundColor: "#ffffff",
+  backgroundOpacity: 1,
+  padding: 12,
+  shadowEnabled: false,
+  shadowBlur: 8,
+  shadowOffsetX: 2,
+  shadowOffsetY: 2,
+  fontSize: 14,
+  fontFamily: "sans-serif",
+  zIndex: 0,
+};
 
 export type EditorTool = "select" | "wall" | "furniture" | "label" | "eraser" | "pan";
 
@@ -98,6 +151,7 @@ export interface EditorState {
   walls: Wall[];
   furniture: FurnitureItem[];
   labels: RoomLabel[];
+  textBoxes: TextBox[];
   gridSize: number; // px per meter
   zoom: number;
   panOffset: Point;
@@ -249,6 +303,7 @@ export const FURNITURE_LIBRARY: FurnitureTemplate[] = [
 
   // ─── WINDOWS ───────────────────────────────────────────────────
   { type: "window", label: "Window", width: 100, height: 15, category: "Structure", icon: "square" },
+  { type: "bay_window", label: "Bay Window", width: 180, height: 60, category: "Structure", icon: "square" },
 
   // ─── STAIRS ────────────────────────────────────────────────────
   { type: "stair_straight", label: "Straight Staircase", width: 90, height: 300, category: "Structure", icon: "arrow-up", variantGroup: "stair", defaultNumberOfSteps: 13 },
@@ -258,6 +313,10 @@ export const FURNITURE_LIBRARY: FurnitureTemplate[] = [
   { type: "stair_spiral_cw", label: "Spiral (Clockwise)", width: 160, height: 160, category: "Structure", icon: "arrow-up", variantGroup: "stair", defaultNumberOfSteps: 12, defaultSpiralDirection: "cw" },
   { type: "stair_spiral_ccw", label: "Spiral (Anti-CW)", width: 160, height: 160, category: "Structure", icon: "arrow-up", variantGroup: "stair", defaultNumberOfSteps: 12, defaultSpiralDirection: "ccw" },
   { type: "stair_winder", label: "Winder Stairs", width: 90, height: 260, category: "Structure", icon: "arrow-up", variantGroup: "stair", defaultNumberOfSteps: 13 },
+
+  // ─── OTHER STRUCTURE ────────────────────────────────────────────
+  { type: "radiator", label: "Radiator", width: 100, height: 15, category: "Structure", icon: "thermometer" },
+  { type: "boiler", label: "Boiler", width: 60, height: 60, category: "Kitchen", icon: "flame" },
 ];
 
 /** Check if a type is a stair type */
@@ -286,4 +345,5 @@ export const LEGACY_TYPE_MAP: Record<string, string> = {
   "wardrobe": "wardrobe_double",
   "dining_table_4": "table_rect_4",
   "dining_table_6": "table_rect_6",
+  "stairs": "stair_straight",
 };

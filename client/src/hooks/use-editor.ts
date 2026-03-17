@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from "react";
-import { EditorState, Wall, FurnitureItem, RoomLabel, Point, EditorTool, FurnitureTemplate, UnitSystem } from "../lib/types";
+import { EditorState, Wall, FurnitureItem, RoomLabel, TextBox, Point, EditorTool, FurnitureTemplate, UnitSystem, DEFAULT_TEXT_BOX } from "../lib/types";
 
 function generateId(): string {
   return Math.random().toString(36).slice(2, 10);
@@ -9,6 +9,7 @@ const INITIAL_STATE: EditorState = {
   walls: [],
   furniture: [],
   labels: [],
+  textBoxes: [],
   gridSize: 80, // 80px = 1m at default zoom
   zoom: 1,
   panOffset: { x: 200, y: 100 },
@@ -29,7 +30,7 @@ export function useEditor() {
 
   const pushUndo = useCallback(() => {
     setState((s) => {
-      undoStack.current.push({ ...s, walls: [...s.walls], furniture: [...s.furniture], labels: [...s.labels], roomNames: { ...s.roomNames } });
+      undoStack.current.push({ ...s, walls: [...s.walls], furniture: [...s.furniture], labels: [...s.labels], textBoxes: [...s.textBoxes], roomNames: { ...s.roomNames } });
       redoStack.current = [];
       if (undoStack.current.length > 50) undoStack.current.shift();
       return s;
@@ -40,7 +41,7 @@ export function useEditor() {
     if (undoStack.current.length === 0) return;
     const prev = undoStack.current.pop()!;
     setState((s) => {
-      redoStack.current.push({ ...s, walls: [...s.walls], furniture: [...s.furniture], labels: [...s.labels], roomNames: { ...s.roomNames } });
+      redoStack.current.push({ ...s, walls: [...s.walls], furniture: [...s.furniture], labels: [...s.labels], textBoxes: [...s.textBoxes], roomNames: { ...s.roomNames } });
       return prev;
     });
   }, []);
@@ -49,7 +50,7 @@ export function useEditor() {
     if (redoStack.current.length === 0) return;
     const next = redoStack.current.pop()!;
     setState((s) => {
-      undoStack.current.push({ ...s, walls: [...s.walls], furniture: [...s.furniture], labels: [...s.labels], roomNames: { ...s.roomNames } });
+      undoStack.current.push({ ...s, walls: [...s.walls], furniture: [...s.furniture], labels: [...s.labels], textBoxes: [...s.textBoxes], roomNames: { ...s.roomNames } });
       return next;
     });
   }, []);
@@ -76,6 +77,14 @@ export function useEditor() {
   const removeWall = useCallback((id: string) => {
     pushUndo();
     setState((s) => ({ ...s, walls: s.walls.filter((w) => w.id !== id), selectedItemId: null }));
+  }, [pushUndo]);
+
+  const updateWall = useCallback((id: string, updates: Partial<Wall>) => {
+    pushUndo();
+    setState((s) => ({
+      ...s,
+      walls: s.walls.map((w) => w.id === id ? { ...w, ...updates } : w),
+    }));
   }, [pushUndo]);
 
   const addFurniture = useCallback((template: FurnitureTemplate, position: Point) => {
@@ -185,6 +194,7 @@ export function useEditor() {
       walls: [],
       furniture: [],
       labels: [],
+      textBoxes: [],
       roomNames: {},
       selectedItemId: null,
       wallDrawing: null,
@@ -224,6 +234,41 @@ export function useEditor() {
     }));
   }, []);
 
+  const addTextBox = useCallback((position: Point) => {
+    pushUndo();
+    const textBox: TextBox = {
+      ...DEFAULT_TEXT_BOX,
+      id: generateId(),
+      x: position.x - DEFAULT_TEXT_BOX.width / 2,
+      y: position.y - DEFAULT_TEXT_BOX.height / 2,
+    };
+    setState((s) => ({ ...s, textBoxes: [...s.textBoxes, textBox], selectedItemId: textBox.id }));
+    return textBox.id;
+  }, [pushUndo]);
+
+  const moveTextBox = useCallback((id: string, x: number, y: number) => {
+    setState((s) => ({
+      ...s,
+      textBoxes: s.textBoxes.map((t) => t.id === id ? { ...t, x, y } : t),
+    }));
+  }, []);
+
+  const updateTextBox = useCallback((id: string, updates: Partial<TextBox>) => {
+    setState((s) => ({
+      ...s,
+      textBoxes: s.textBoxes.map((t) => t.id === id ? { ...t, ...updates } : t),
+    }));
+  }, []);
+
+  const removeTextBox = useCallback((id: string) => {
+    pushUndo();
+    setState((s) => ({
+      ...s,
+      textBoxes: s.textBoxes.filter((t) => t.id !== id),
+      selectedItemId: null,
+    }));
+  }, [pushUndo]);
+
   const setRoomNameForRoom = useCallback((roomKey: string, name: string) => {
     pushUndo();
     setState((s) => ({
@@ -243,12 +288,13 @@ export function useEditor() {
       walls: state.walls,
       furniture: state.furniture,
       labels: state.labels,
+      textBoxes: state.textBoxes,
       roomNames: state.roomNames,
       componentLabelsVisible: state.componentLabelsVisible,
     };
-  }, [state.roomName, state.walls, state.furniture, state.labels, state.roomNames, state.componentLabelsVisible]);
+  }, [state.roomName, state.walls, state.furniture, state.labels, state.textBoxes, state.roomNames, state.componentLabelsVisible]);
 
-  const importState = useCallback((plan: { version: number; roomName: string; walls: Wall[]; furniture: FurnitureItem[]; labels: RoomLabel[]; roomNames?: Record<string, string>; componentLabelsVisible?: boolean }) => {
+  const importState = useCallback((plan: { version: number; roomName: string; walls: Wall[]; furniture: FurnitureItem[]; labels: RoomLabel[]; textBoxes?: TextBox[]; roomNames?: Record<string, string>; componentLabelsVisible?: boolean }) => {
     pushUndo();
     setState((s) => ({
       ...s,
@@ -256,6 +302,7 @@ export function useEditor() {
       walls: plan.walls,
       furniture: plan.furniture,
       labels: plan.labels,
+      textBoxes: plan.textBoxes || [],
       roomNames: plan.roomNames || {},
       componentLabelsVisible: plan.componentLabelsVisible ?? true,
       selectedItemId: null,
@@ -269,6 +316,7 @@ export function useEditor() {
     setSelectedItem,
     addWall,
     removeWall,
+    updateWall,
     addFurniture,
     moveFurniture,
     rotateFurniture,
@@ -288,6 +336,10 @@ export function useEditor() {
     pushUndo,
     updateFurniture,
     updateLabel,
+    addTextBox,
+    moveTextBox,
+    updateTextBox,
+    removeTextBox,
     setUnits,
     exportState,
     importState,

@@ -35,6 +35,9 @@ export async function exportToPdf(state: EditorState, roomName: string) {
   state.labels.forEach((l) => {
     allPoints.push({ x: l.x - 100, y: l.y - 50 }, { x: l.x + 100, y: l.y + 50 });
   });
+  (state.textBoxes || []).forEach((t) => {
+    allPoints.push({ x: t.x, y: t.y }, { x: t.x + t.width, y: t.y + t.height });
+  });
 
   if (allPoints.length === 0) {
     // Nothing to export
@@ -76,6 +79,88 @@ export async function exportToPdf(state: EditorState, roomName: string) {
 
   // Draw labels
   drawLabels(ctx, state.labels, gridSize, zoom, panOffset, false, null);
+
+  // Draw text boxes (simplified rendering for PDF)
+  (state.textBoxes || []).forEach((tb) => {
+    const x = tb.x * pxPerCm + panOffset.x;
+    const y = tb.y * pxPerCm + panOffset.y;
+    const w = tb.width * pxPerCm;
+    const h = tb.height * pxPerCm;
+
+    ctx.save();
+    if (tb.rotation) {
+      ctx.translate(x + w / 2, y + h / 2);
+      ctx.rotate((tb.rotation * Math.PI) / 180);
+      ctx.translate(-(x + w / 2), -(y + h / 2));
+    }
+
+    // Background
+    const bgOpacity = tb.backgroundOpacity ?? 1;
+    if (bgOpacity > 0) {
+      const bgHex = tb.backgroundColor || "#ffffff";
+      const br = parseInt(bgHex.slice(1, 3), 16);
+      const bg = parseInt(bgHex.slice(3, 5), 16);
+      const bb = parseInt(bgHex.slice(5, 7), 16);
+      ctx.fillStyle = `rgba(${br}, ${bg}, ${bb}, ${bgOpacity})`;
+      ctx.beginPath();
+      const cr = tb.cornerRadius || 0;
+      if (cr > 0) {
+        ctx.moveTo(x + cr, y);
+        ctx.arcTo(x + w, y, x + w, y + h, cr);
+        ctx.arcTo(x + w, y + h, x, y + h, cr);
+        ctx.arcTo(x, y + h, x, y, cr);
+        ctx.arcTo(x, y, x + w, y, cr);
+      } else {
+        ctx.rect(x, y, w, h);
+      }
+      ctx.fill();
+    }
+
+    // Border
+    if (tb.borderEnabled) {
+      ctx.strokeStyle = tb.borderColor || "#000000";
+      ctx.lineWidth = tb.borderWidth || 1;
+      if (tb.borderStyle === "dashed") ctx.setLineDash([6, 3]);
+      else if (tb.borderStyle === "dotted") ctx.setLineDash([2, 2]);
+      else ctx.setLineDash([]);
+      ctx.strokeRect(x, y, w, h);
+      ctx.setLineDash([]);
+    }
+
+    // Render text content (strip HTML tags for simple PDF rendering)
+    if (tb.content) {
+      const textContent = tb.content.replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
+      if (textContent) {
+        const padding = (tb.padding || 12) * (pxPerCm / 100);
+        const fontSize = Math.max(8, (tb.fontSize || 14) * (pxPerCm / 100));
+        ctx.font = `400 ${fontSize}px ${tb.fontFamily || "sans-serif"}`;
+        ctx.fillStyle = "#28251d";
+        ctx.textAlign = "left";
+        ctx.textBaseline = "top";
+        // Simple word-wrap
+        const maxWidth = w - padding * 2;
+        const words = textContent.split(" ");
+        let line = "";
+        let lineY = y + padding;
+        for (const word of words) {
+          const testLine = line ? `${line} ${word}` : word;
+          if (ctx.measureText(testLine).width > maxWidth && line) {
+            ctx.fillText(line, x + padding, lineY);
+            line = word;
+            lineY += fontSize * 1.4;
+            if (lineY > y + h - padding) break;
+          } else {
+            line = testLine;
+          }
+        }
+        if (line && lineY <= y + h - padding) {
+          ctx.fillText(line, x + padding, lineY);
+        }
+      }
+    }
+
+    ctx.restore();
+  });
 
   // Title
   ctx.font = `600 ${18 * scale}px 'General Sans', sans-serif`;
