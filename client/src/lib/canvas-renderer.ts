@@ -1195,7 +1195,7 @@ export function hitTestFurniture(
   return null;
 }
 
-export type ResizeCorner = "tl" | "tr" | "bl" | "br";
+export type ResizeCorner = "tl" | "tr" | "bl" | "br" | "t" | "b" | "l" | "r";
 
 export function drawResizeHandles(
   ctx: CanvasRenderingContext2D,
@@ -1237,6 +1237,34 @@ export function drawResizeHandles(
       corner.cy - handleSize / 2,
       handleSize,
       handleSize
+    );
+  }
+
+  // Edge handles at midpoints (elongated rectangles to indicate resize axis)
+  const edgeHandleW = 12;
+  const edgeHandleH = 6;
+  const edges = [
+    { cx: 0, cy: -h / 2, rw: edgeHandleW, rh: edgeHandleH },  // top
+    { cx: 0, cy: h / 2, rw: edgeHandleW, rh: edgeHandleH },    // bottom
+    { cx: -w / 2, cy: 0, rw: edgeHandleH, rh: edgeHandleW },   // left
+    { cx: w / 2, cy: 0, rw: edgeHandleH, rh: edgeHandleW },    // right
+  ];
+
+  for (const edge of edges) {
+    ctx.fillStyle = "#01696f";
+    ctx.fillRect(
+      edge.cx - edge.rw / 2,
+      edge.cy - edge.rh / 2,
+      edge.rw,
+      edge.rh
+    );
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(
+      edge.cx - edge.rw / 2,
+      edge.cy - edge.rh / 2,
+      edge.rw,
+      edge.rh
     );
   }
 
@@ -1348,6 +1376,24 @@ export function hitTestResizeHandle(
       return c.corner;
     }
   }
+
+  // Edge handles at midpoints (tested after corners so corners take priority)
+  const edgeHandles: { cx: number; cy: number; corner: ResizeCorner }[] = [
+    { cx: 0, cy: -h / 2, corner: "t" },
+    { cx: 0, cy: h / 2, corner: "b" },
+    { cx: -w / 2, cy: 0, corner: "l" },
+    { cx: w / 2, cy: 0, corner: "r" },
+  ];
+
+  for (const e of edgeHandles) {
+    if (
+      Math.abs(localX - e.cx) <= handleSize &&
+      Math.abs(localY - e.cy) <= handleSize
+    ) {
+      return e.corner;
+    }
+  }
+
   return null;
 }
 
