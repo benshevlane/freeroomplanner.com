@@ -20,6 +20,7 @@ export interface FurnitureItem {
   height: number; // in cm
   rotation: number; // degrees
   category: string;
+  heightFromFloor?: number; // in cm, used for wall cupboards (default 145)
 }
 
 export interface RoomLabel {
@@ -58,6 +59,14 @@ export interface FurnitureTemplate {
   height: number;
   category: string;
   icon: string;
+  isWallCupboard?: boolean;
+  defaultHeightFromFloor?: number; // in cm
+}
+
+export const WALL_CUPBOARD_TYPES = ["wall_cupboard_single", "wall_cupboard_double", "wall_cupboard_corner"];
+
+export function isWallCupboard(type: string): boolean {
+  return WALL_CUPBOARD_TYPES.includes(type);
 }
 
 export const FURNITURE_LIBRARY: FurnitureTemplate[] = [
@@ -75,6 +84,9 @@ export const FURNITURE_LIBRARY: FurnitureTemplate[] = [
   { type: "fridge", label: "Fridge", width: 60, height: 65, category: "Kitchen", icon: "refrigerator" },
   { type: "dishwasher", label: "Dishwasher", width: 60, height: 60, category: "Kitchen", icon: "waves" },
   { type: "island", label: "Kitchen Island", width: 180, height: 90, category: "Kitchen", icon: "layout-grid" },
+  { type: "wall_cupboard_single", label: "Wall Cupboard (single)", width: 60, height: 35, category: "Kitchen", icon: "square", isWallCupboard: true, defaultHeightFromFloor: 145 },
+  { type: "wall_cupboard_double", label: "Wall Cupboard (double)", width: 100, height: 35, category: "Kitchen", icon: "square", isWallCupboard: true, defaultHeightFromFloor: 145 },
+  { type: "wall_cupboard_corner", label: "Corner Wall Cupboard", width: 90, height: 90, category: "Kitchen", icon: "square", isWallCupboard: true, defaultHeightFromFloor: 145 },
   // Bedroom
   { type: "bed_double", label: "Double Bed", width: 140, height: 200, category: "Bedroom", icon: "bed-double" },
   { type: "bed_single", label: "Single Bed", width: 90, height: 200, category: "Bedroom", icon: "bed-single" },

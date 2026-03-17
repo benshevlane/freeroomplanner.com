@@ -13,6 +13,7 @@ import {
   drawAlignmentGuides,
   drawDistanceMeasurements,
   drawEraserHighlight,
+  drawWallCupboardLegend,
   hitTestRotateHandle,
   snapAngle,
   computeWallAngle,
@@ -27,6 +28,7 @@ import {
   hitTestResizeHandle,
   ResizeCorner,
 } from "../lib/canvas-renderer";
+import { isWallCupboard } from "../lib/types";
 import { detectRooms } from "../lib/room-detection";
 
 interface FloorPlanCanvasProps {
@@ -198,9 +200,13 @@ export default function FloorPlanCanvas({
       }
     }
 
-    // Furniture — draw non-door/window items first
-    const regularFurniture = state.furniture.filter((f) => f.type !== "door" && f.type !== "window");
-    drawFurniture(ctx, regularFurniture, state.gridSize, state.zoom, state.panOffset, isDark, state.selectedItemId);
+    // Furniture — draw floor items first, then wall cupboards on top, then doors/windows
+    const floorFurniture = state.furniture.filter((f) => f.type !== "door" && f.type !== "window" && !isWallCupboard(f.type));
+    drawFurniture(ctx, floorFurniture, state.gridSize, state.zoom, state.panOffset, isDark, state.selectedItemId);
+
+    // Wall cupboards render above floor units
+    const wallCupboards = state.furniture.filter((f) => isWallCupboard(f.type));
+    drawFurniture(ctx, wallCupboards, state.gridSize, state.zoom, state.panOffset, isDark, state.selectedItemId);
 
     // Doors & windows render on top of walls so they overlay correctly
     const doorWindowItems = state.furniture.filter((f) => f.type === "door" || f.type === "window");
@@ -243,6 +249,11 @@ export default function FloorPlanCanvas({
 
     // Scale indicator
     drawScaleIndicator(ctx, w, h, state.gridSize, state.zoom, isDark, state.units);
+
+    // Wall cupboard legend (only show if there are wall cupboards on the canvas)
+    if (wallCupboards.length > 0) {
+      drawWallCupboardLegend(ctx, w, h, isDark);
+    }
   });
 
   function drawScaleIndicator(

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { FURNITURE_LIBRARY, FurnitureTemplate } from "../lib/types";
+import { FURNITURE_LIBRARY, FurnitureTemplate, isWallCupboard } from "../lib/types";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -25,6 +25,22 @@ const CATEGORY_ICONS: Record<string, typeof Sofa> = {
   Dining: UtensilsCrossed,
   Structure: DoorOpen,
 };
+
+function WallCupboardIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" className="flex-shrink-0 text-muted-foreground">
+      <rect
+        x="1" y="3" width="14" height="10" rx="1"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.2"
+        strokeDasharray="3 1.5"
+      />
+      <line x1="1" y1="3" x2="15" y2="13" stroke="currentColor" strokeWidth="0.7" opacity="0.4" />
+      <line x1="15" y1="3" x2="1" y2="13" stroke="currentColor" strokeWidth="0.7" opacity="0.4" />
+    </svg>
+  );
+}
 
 interface FurniturePanelProps {
   onSelectFurniture: (template: FurnitureTemplate) => void;
@@ -107,6 +123,7 @@ export default function FurniturePanel({ onSelectFurniture, onSwitchToSelect, cl
         <div className="p-2 space-y-1">
           {filtered.map((template) => {
             const CatIcon = CATEGORY_ICONS[template.category] || Sofa;
+            const isWallCup = isWallCupboard(template.type);
             return (
               <div
                 key={template.type}
@@ -117,7 +134,11 @@ export default function FurniturePanel({ onSelectFurniture, onSwitchToSelect, cl
                 data-testid={`furniture-item-${template.type}`}
               >
                 <GripVertical className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-                <CatIcon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                {isWallCup ? (
+                  <WallCupboardIcon />
+                ) : (
+                  <CatIcon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                )}
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{template.label}</p>
                   <p className="text-xs text-muted-foreground">

@@ -1,4 +1,4 @@
-import { Wall, FurnitureItem, RoomLabel } from "../lib/types";
+import { Wall, FurnitureItem, RoomLabel, isWallCupboard } from "../lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { RotateCw, Trash2, Ruler, Copy } from "lucide-react";
@@ -60,6 +60,7 @@ export default function PropertiesPanel({
 
   if (selectedFurniture) {
     const isStructural = selectedFurniture.type === "door" || selectedFurniture.type === "window";
+    const isWallCup = isWallCupboard(selectedFurniture.type);
     const widthLabel = isStructural ? "Length:" : "Width:";
     const heightLabel = isStructural ? "Thickness:" : "Height:";
     const minWidth = 20;
@@ -67,7 +68,23 @@ export default function PropertiesPanel({
 
     return (
       <div className="p-4 space-y-3" data-testid="properties-furniture">
-        <p className="text-sm font-semibold">{selectedFurniture.label}</p>
+        {isWallCup ? (
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold">Label:</span>
+            <Input
+              type="text"
+              value={selectedFurniture.label}
+              onChange={(e) => {
+                onUpdateFurniture(selectedFurniture.id, { label: e.target.value });
+              }}
+              className="h-9 w-32 text-sm md:h-7 md:w-28"
+              placeholder="e.g. W600"
+              data-testid="input-furniture-label"
+            />
+          </div>
+        ) : (
+          <p className="text-sm font-semibold">{selectedFurniture.label}</p>
+        )}
         <div className="space-y-2 text-sm">
           <div className="flex items-center gap-2">
             <span className="text-muted-foreground">{widthLabel}</span>
@@ -107,6 +124,23 @@ export default function PropertiesPanel({
             />
             <span className="text-muted-foreground text-xs">cm</span>
           </div>
+          {isWallCup && (
+            <div className="flex items-center gap-2">
+              <span className="text-muted-foreground">Height from floor:</span>
+              <Input
+                type="number"
+                min={0}
+                value={selectedFurniture.heightFromFloor ?? 145}
+                onChange={(e) => {
+                  const val = Math.max(0, parseInt(e.target.value) || 0);
+                  onUpdateFurniture(selectedFurniture.id, { heightFromFloor: val });
+                }}
+                className="h-9 w-24 text-sm md:h-7 md:w-20"
+                data-testid="input-furniture-height-from-floor"
+              />
+              <span className="text-muted-foreground text-xs">cm</span>
+            </div>
+          )}
           <div className="flex items-center gap-2">
             <span className="text-muted-foreground">Rotation:</span>
             <span className="font-medium">{selectedFurniture.rotation}°</span>

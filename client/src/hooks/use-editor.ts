@@ -81,6 +81,7 @@ export function useEditor() {
       height: template.height,
       rotation: 0,
       category: template.category,
+      ...(template.isWallCupboard ? { heightFromFloor: template.defaultHeightFromFloor ?? 145 } : {}),
     };
     setState((s) => ({ ...s, furniture: [...s.furniture, item], selectedItemId: item.id }));
   }, [pushUndo]);

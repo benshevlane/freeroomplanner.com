@@ -1,4 +1,4 @@
-import { Wall, FurnitureItem, RoomLabel, Point, UnitSystem, MeasureMode } from "./types";
+import { Wall, FurnitureItem, RoomLabel, Point, UnitSystem, MeasureMode, isWallCupboard } from "./types";
 import { DetectedRoom } from "./room-detection";
 
 /** Convert cm to display string based on unit system */
@@ -573,20 +573,44 @@ export function drawFurniture(
     ctx.rotate((item.rotation * Math.PI) / 180);
 
     const isSelected = item.id === selectedId;
+    const isWallCup = isWallCupboard(item.type);
 
-    // Fill
-    ctx.fillStyle = isDark ? FURNITURE_FILL_DARK : FURNITURE_FILL_LIGHT;
-    ctx.fillRect(-w / 2, -h / 2, w, h);
+    if (isWallCup) {
+      // Wall cupboard: light fill at 60% opacity
+      ctx.fillStyle = isDark ? "rgba(42, 40, 38, 0.6)" : "rgba(255, 255, 255, 0.6)";
+      ctx.fillRect(-w / 2, -h / 2, w, h);
 
-    // Stroke
-    ctx.strokeStyle = isSelected ? SELECT_COLOR : (isDark ? FURNITURE_STROKE_DARK : FURNITURE_STROKE_LIGHT);
-    ctx.lineWidth = isSelected ? 2 : 1;
-    ctx.setLineDash(isSelected ? [] : [4, 2]);
-    ctx.strokeRect(-w / 2, -h / 2, w, h);
-    ctx.setLineDash([]);
+      // Dashed border [6, 3]
+      ctx.strokeStyle = isSelected ? SELECT_COLOR : (isDark ? FURNITURE_STROKE_DARK : FURNITURE_STROKE_LIGHT);
+      ctx.lineWidth = isSelected ? 2 : 1.5;
+      ctx.setLineDash([6, 3]);
+      ctx.strokeRect(-w / 2, -h / 2, w, h);
+      ctx.setLineDash([]);
 
-    // Draw specific details based on type
-    drawFurnitureDetail(ctx, item.type, w, h, isDark);
+      // Cross-hatch: two diagonal lines corner-to-corner
+      ctx.strokeStyle = isDark ? "rgba(90, 89, 87, 0.4)" : "rgba(186, 185, 180, 0.5)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(-w / 2, -h / 2);
+      ctx.lineTo(w / 2, h / 2);
+      ctx.moveTo(w / 2, -h / 2);
+      ctx.lineTo(-w / 2, h / 2);
+      ctx.stroke();
+    } else {
+      // Fill
+      ctx.fillStyle = isDark ? FURNITURE_FILL_DARK : FURNITURE_FILL_LIGHT;
+      ctx.fillRect(-w / 2, -h / 2, w, h);
+
+      // Stroke
+      ctx.strokeStyle = isSelected ? SELECT_COLOR : (isDark ? FURNITURE_STROKE_DARK : FURNITURE_STROKE_LIGHT);
+      ctx.lineWidth = isSelected ? 2 : 1;
+      ctx.setLineDash(isSelected ? [] : [4, 2]);
+      ctx.strokeRect(-w / 2, -h / 2, w, h);
+      ctx.setLineDash([]);
+
+      // Draw specific details based on type
+      drawFurnitureDetail(ctx, item.type, w, h, isDark);
+    }
 
     // Label
     const fontSize = Math.max(9, Math.min(12 * zoom, w * 0.15));
@@ -1819,4 +1843,60 @@ export function drawEraserHighlight(
     ctx.setLineDash([]);
     ctx.restore();
   }
+}
+
+export function drawWallCupboardLegend(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  isDark: boolean
+) {
+  const text = "Dashed outline = wall cupboard (overhead)";
+  const fontSize = 11;
+  ctx.font = `400 ${fontSize}px 'General Sans', 'DM Sans', sans-serif`;
+  const tm = ctx.measureText(text);
+  const padding = 8;
+  const iconW = 18;
+  const iconH = 12;
+  const gap = 6;
+  const totalW = iconW + gap + tm.width + padding * 2;
+  const totalH = fontSize + padding * 2;
+  const x = w / 2 - totalW / 2;
+  const y = h - totalH - 8;
+
+  // Background
+  ctx.fillStyle = isDark ? "rgba(23, 22, 20, 0.85)" : "rgba(247, 246, 242, 0.85)";
+  ctx.beginPath();
+  ctx.roundRect(x, y, totalW, totalH, 4);
+  ctx.fill();
+
+  // Border
+  ctx.strokeStyle = isDark ? "#3a3938" : "#d4d1ca";
+  ctx.lineWidth = 1;
+  ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.roundRect(x, y, totalW, totalH, 4);
+  ctx.stroke();
+
+  // Mini icon: dashed rect with cross
+  const ix = x + padding;
+  const iy = y + (totalH - iconH) / 2;
+  ctx.strokeStyle = isDark ? "#797876" : "#7a7974";
+  ctx.lineWidth = 1;
+  ctx.setLineDash([3, 2]);
+  ctx.strokeRect(ix, iy, iconW, iconH);
+  ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.moveTo(ix, iy);
+  ctx.lineTo(ix + iconW, iy + iconH);
+  ctx.moveTo(ix + iconW, iy);
+  ctx.lineTo(ix, iy + iconH);
+  ctx.strokeStyle = isDark ? "rgba(90, 89, 87, 0.5)" : "rgba(186, 185, 180, 0.6)";
+  ctx.stroke();
+
+  // Text
+  ctx.fillStyle = isDark ? "#9a9994" : "#5a5954";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  ctx.fillText(text, ix + iconW + gap, y + totalH / 2);
 }
