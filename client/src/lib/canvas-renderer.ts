@@ -620,25 +620,7 @@ export function drawFurniture(
       drawFurnitureDetail(ctx, item.type, w, h, isDark);
     }
 
-    // Label
-    const fontSize = Math.max(9, Math.min(12 * zoom, w * 0.15));
-    ctx.font = `500 ${fontSize}px 'General Sans', 'DM Sans', sans-serif`;
-    ctx.fillStyle = isDark ? "#9a9994" : "#5a5954";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-
-    const label = item.label;
-    if (ctx.measureText(label).width < w - 8) {
-      ctx.fillText(label, 0, 0);
-    }
-
-    // Dimensions below label
-    const dimText = `${item.width}×${item.height}`;
-    const dimFontSize = Math.max(8, fontSize * 0.8);
-    ctx.font = `400 ${dimFontSize}px 'General Sans', 'DM Sans', sans-serif`;
-    if (ctx.measureText(dimText).width < w - 8) {
-      ctx.fillText(dimText, 0, fontSize * 0.7);
-    }
+    // Inline labels removed — dynamic component labels (pills) handle all labeling
 
     ctx.restore();
   });
@@ -1727,11 +1709,18 @@ export function hitTestLabel(
 
 /** Helper: get the AABB of a furniture item (axis-aligned bounding box in world cm) */
 function furnBBox(item: FurnitureItem): { left: number; right: number; top: number; bottom: number } {
+  const cx = item.x + item.width / 2;
+  const cy = item.y + item.height / 2;
+  const rad = (item.rotation * Math.PI) / 180;
+  const cos = Math.abs(Math.cos(rad));
+  const sin = Math.abs(Math.sin(rad));
+  const halfW = (item.width * cos + item.height * sin) / 2;
+  const halfH = (item.width * sin + item.height * cos) / 2;
   return {
-    left: item.x,
-    right: item.x + item.width,
-    top: item.y,
-    bottom: item.y + item.height,
+    left: cx - halfW,
+    right: cx + halfW,
+    top: cy - halfH,
+    bottom: cy + halfH,
   };
 }
 
@@ -1897,6 +1886,91 @@ function computeFurnitureToFurnitureDistances(
   return results;
 }
 
+/** Find the wall a door/window is mounted on, or null if not on any wall */
+function findHostWall(item: FurnitureItem, walls: Wall[]): Wall | null {
+  const cx = item.x + item.width / 2;
+  const cy = item.y + item.height / 2;
+
+  for (const wall of walls) {
+    const wdx = wall.end.x - wall.start.x;
+    const wdy = wall.end.y - wall.start.y;
+    const wallLen = Math.sqrt(wdx * wdx + wdy * wdy);
+    if (wallLen < 1) continue;
+    const wallDirX = wdx / wallLen;
+    const wallDirY = wdy / wallLen;
+    const wallNormX = -wallDirY;
+    const wallNormY = wallDirX;
+
+    const relX = cx - wall.start.x;
+    const relY = cy - wall.start.y;
+    const along = relX * wallDirX + relY * wallDirY;
+    const perp = Math.abs(relX * wallNormX + relY * wallNormY);
+
+    const halfExtent = Math.max(item.width, item.height) / 2;
+    const threshold = (wall.thickness || 15) / 2 + Math.min(item.width, item.height);
+    if (perp > threshold) continue;
+    if (along > -halfExtent && along < wallLen + halfExtent) return wall;
+  }
+  return null;
+}
+
+/** Compute along-wall distances from a door/window's edges to the wall endpoints */
+function computeAlongWallDistances(
+  item: FurnitureItem,
+  wall: Wall
+): { dist: number; furnitureEdgePt: Point; wallPt: Point; axis: "h" | "v" }[] {
+  const wdx = wall.end.x - wall.start.x;
+  const wdy = wall.end.y - wall.start.y;
+  const wallLen = Math.sqrt(wdx * wdx + wdy * wdy);
+  if (wallLen < 1) return [];
+  const wallDirX = wdx / wallLen;
+  const wallDirY = wdy / wallLen;
+
+  const cx = item.x + item.width / 2;
+  const cy = item.y + item.height / 2;
+  const relX = cx - wall.start.x;
+  const relY = cy - wall.start.y;
+  const along = relX * wallDirX + relY * wallDirY;
+
+  const halfExtent = Math.max(item.width, item.height) / 2;
+  const edgeStart = along - halfExtent;
+  const edgeEnd = along + halfExtent;
+
+  const distToStart = edgeStart;
+  const distToEnd = wallLen - edgeEnd;
+
+  // Use wall orientation to determine tick axis
+  const axis: "h" | "v" = Math.abs(wdx) > Math.abs(wdy) ? "h" : "v";
+
+  const results: { dist: number; furnitureEdgePt: Point; wallPt: Point; axis: "h" | "v" }[] = [];
+
+  if (distToStart > 1) {
+    results.push({
+      dist: distToStart,
+      furnitureEdgePt: {
+        x: wall.start.x + wallDirX * edgeStart,
+        y: wall.start.y + wallDirY * edgeStart,
+      },
+      wallPt: { x: wall.start.x, y: wall.start.y },
+      axis,
+    });
+  }
+
+  if (distToEnd > 1) {
+    results.push({
+      dist: distToEnd,
+      furnitureEdgePt: {
+        x: wall.start.x + wallDirX * edgeEnd,
+        y: wall.start.y + wallDirY * edgeEnd,
+      },
+      wallPt: { x: wall.end.x, y: wall.end.y },
+      axis,
+    });
+  }
+
+  return results;
+}
+
 /** Draw distance measurement lines from selected furniture to nearby walls and objects */
 export function drawDistanceMeasurements(
   ctx: CanvasRenderingContext2D,
@@ -1912,10 +1986,66 @@ export function drawDistanceMeasurements(
   const pxPerCm = (gridSize * zoom) / 100;
   const color = isDark ? "#e8894a" : "#d06220";
 
+  // For doors/windows on a wall, show along-wall distances instead of perpendicular
+  if (selectedItem.type === "door" || selectedItem.type === "window") {
+    const hostWall = findHostWall(selectedItem, walls);
+    if (hostWall) {
+      const alongDists = computeAlongWallDistances(selectedItem, hostWall);
+      const toDraw = alongDists;
+      ctx.save();
+      for (const d of toDraw) {
+        const sx = d.furnitureEdgePt.x * pxPerCm + panOffset.x;
+        const sy = d.furnitureEdgePt.y * pxPerCm + panOffset.y;
+        const ex = d.wallPt.x * pxPerCm + panOffset.x;
+        const ey = d.wallPt.y * pxPerCm + panOffset.y;
+
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 3]);
+        ctx.beginPath();
+        ctx.moveTo(sx, sy);
+        ctx.lineTo(ex, ey);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        const tickLen = 5;
+        if (d.axis === "h") {
+          ctx.beginPath();
+          ctx.moveTo(sx, sy - tickLen); ctx.lineTo(sx, sy + tickLen);
+          ctx.moveTo(ex, ey - tickLen); ctx.lineTo(ex, ey + tickLen);
+          ctx.stroke();
+        } else {
+          ctx.beginPath();
+          ctx.moveTo(sx - tickLen, sy); ctx.lineTo(sx + tickLen, sy);
+          ctx.moveTo(ex - tickLen, ey); ctx.lineTo(ex + tickLen, ey);
+          ctx.stroke();
+        }
+
+        const text = formatLength(d.dist, units);
+        const fontSize = Math.max(10, 11 * zoom);
+        ctx.font = `500 ${fontSize}px 'General Sans', 'DM Sans', sans-serif`;
+        const textW = ctx.measureText(text).width;
+        const mx = (sx + ex) / 2;
+        const my = (sy + ey) / 2;
+
+        const pad = 3;
+        ctx.fillStyle = isDark ? "rgba(23, 22, 20, 0.85)" : "rgba(247, 246, 242, 0.85)";
+        ctx.fillRect(mx - textW / 2 - pad, my - fontSize / 2 - pad, textW + pad * 2, fontSize + pad * 2);
+
+        ctx.fillStyle = color;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(text, mx, my);
+      }
+      ctx.restore();
+      return;
+    }
+  }
+
   // Gather all distances
   const wallDists = computeEdgeToWallDistances(selectedItem, walls);
   const furnDists = computeFurnitureToFurnitureDistances(selectedItem, furniture);
-  const allDists = [...wallDists, ...furnDists.map(d => ({ dist: d.dist, furnitureEdgePt: d.fromPt, wallPt: d.toPt, axis: d.axis }))]; 
+  const allDists = [...wallDists, ...furnDists.map(d => ({ dist: d.dist, furnitureEdgePt: d.fromPt, wallPt: d.toPt, axis: d.axis }))];
 
   // Keep only the closest distance per axis direction (up to 2 horizontal, 2 vertical)
   const hDists = allDists.filter(d => d.axis === "h").sort((a, b) => a.dist - b.dist).slice(0, 2);
