@@ -1,4 +1,4 @@
-import { Wall, FurnitureItem, RoomLabel, LabelSize, LabelColor, UnitSystem, isWallCupboard, cmToDisplay, displayToCm, dimensionSuffix } from "../lib/types";
+import { Wall, FurnitureItem, RoomLabel, LabelSize, LabelColor, UnitSystem, isWallCupboard, isStairType, isDoorType, getVariantsForType, getVariantGroup, FurnitureTemplate, cmToDisplay, displayToCm, dimensionSuffix } from "../lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { RotateCw, Trash2, Ruler, Copy, Bold, Square } from "lucide-react";
@@ -93,12 +93,17 @@ export default function PropertiesPanel({
   }
 
   if (selectedFurniture) {
-    const isStructural = selectedFurniture.type === "door" || selectedFurniture.type === "window";
+    const isStructural = isDoorType(selectedFurniture.type) || selectedFurniture.type === "window";
     const isWallCup = isWallCupboard(selectedFurniture.type);
+    const isStair = isStairType(selectedFurniture.type);
     const widthLabel = isStructural ? "Length:" : "Width:";
     const heightLabel = isStructural ? "Thickness:" : "Height:";
     const minWidth = 20;
     const minHeight = isStructural ? 5 : 20;
+
+    // Variant switcher
+    const variants = getVariantsForType(selectedFurniture.type);
+    const hasVariants = variants.length > 1;
 
     return (
       <div className="p-4 space-y-3" data-testid="properties-furniture">
@@ -120,6 +125,34 @@ export default function PropertiesPanel({
         ) : (
           <p className="text-sm font-semibold">{selectedFurniture.label}</p>
         )}
+
+        {/* Variant switcher */}
+        {hasVariants && (
+          <div className="space-y-1.5">
+            <p className="text-xs text-muted-foreground">Type</p>
+            <select
+              value={selectedFurniture.type}
+              onChange={(e) => {
+                const variant = variants.find(v => v.type === e.target.value);
+                if (variant) {
+                  onUpdateFurniture(selectedFurniture.id, {
+                    type: variant.type,
+                    label: variant.label,
+                    width: variant.width,
+                    height: variant.height,
+                  });
+                }
+              }}
+              className="w-full h-9 md:h-7 text-sm bg-background border border-input rounded-md px-2"
+              data-testid="select-furniture-variant"
+            >
+              {variants.map(v => (
+                <option key={v.type} value={v.type}>{v.label}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
         <div className="space-y-2 text-sm">
           <div className="flex items-center gap-2">
             <span className="text-muted-foreground">{widthLabel}</span>
@@ -177,6 +210,23 @@ export default function PropertiesPanel({
                 data-testid="input-furniture-height-from-floor"
               />
               <span className="text-muted-foreground text-xs">{dimensionSuffix(units)}</span>
+            </div>
+          )}
+          {isStair && (
+            <div className="flex items-center gap-2">
+              <span className="text-muted-foreground">Steps:</span>
+              <Input
+                type="number"
+                min={3}
+                max={30}
+                value={selectedFurniture.numberOfSteps ?? 13}
+                onChange={(e) => {
+                  const val = Math.max(3, Math.min(30, parseInt(e.target.value) || 13));
+                  onUpdateFurniture(selectedFurniture.id, { numberOfSteps: val });
+                }}
+                className="h-9 w-20 text-sm md:h-7 md:w-16"
+                data-testid="input-furniture-steps"
+              />
             </div>
           )}
           <div className="flex items-center gap-2">

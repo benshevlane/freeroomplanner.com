@@ -1135,73 +1135,617 @@ function drawFurnitureDetail(
   ctx.strokeStyle = stroke;
   ctx.lineWidth = 1;
 
+  // Helper: draw a faucet symbol (small circle + two lines)
+  const drawFaucet = (fx: number, fy: number, size: number) => {
+    ctx.beginPath();
+    ctx.arc(fx, fy, size, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(fx - size * 1.8, fy);
+    ctx.lineTo(fx - size * 0.8, fy);
+    ctx.moveTo(fx + size * 0.8, fy);
+    ctx.lineTo(fx + size * 1.8, fy);
+    ctx.stroke();
+  };
+
+  // Helper: draw drain circle
+  const drawDrain = (dx: number, dy: number, size: number) => {
+    ctx.beginPath();
+    ctx.arc(dx, dy, size, 0, Math.PI * 2);
+    ctx.fill();
+  };
+
+  ctx.fillStyle = stroke;
+
   switch (type) {
-    case "bathtub":
+    // ─── KITCHEN SINKS ────────────────────────────────────────────
+    case "sink_single":
+    case "sink_k": {
+      // Single bowl with rounded rect basin
+      const bw = w * 0.7, bh = h * 0.6;
       ctx.beginPath();
-      const rx = w * 0.42;
-      const ry = h * 0.4;
-      ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
+      ctx.roundRect(-bw / 2, -bh / 2 + h * 0.05, bw, bh, 4);
+      ctx.stroke();
+      drawDrain(0, h * 0.05, 2.5);
+      drawFaucet(0, -h * 0.38, 2.5);
+      break;
+    }
+    case "sink_single_right": {
+      // Bowl left, drainer right
+      const bw = w * 0.38, bh = h * 0.65;
+      ctx.beginPath();
+      ctx.roundRect(-w * 0.45, -bh / 2, bw, bh, 4);
+      ctx.stroke();
+      drawDrain(-w * 0.45 + bw / 2, 0, 2.5);
+      drawFaucet(-w * 0.1, -h * 0.38, 2.5);
+      // Drainer lines
+      for (let i = 0; i < 5; i++) {
+        const lx = w * 0.12 + i * w * 0.07;
+        ctx.beginPath();
+        ctx.moveTo(lx, -h * 0.25);
+        ctx.lineTo(lx, h * 0.25);
+        ctx.stroke();
+      }
+      break;
+    }
+    case "sink_single_left": {
+      // Drainer left, bowl right
+      const bw = w * 0.38, bh = h * 0.65;
+      ctx.beginPath();
+      ctx.roundRect(w * 0.45 - bw, -bh / 2, bw, bh, 4);
+      ctx.stroke();
+      drawDrain(w * 0.45 - bw / 2, 0, 2.5);
+      drawFaucet(w * 0.1, -h * 0.38, 2.5);
+      // Drainer lines
+      for (let i = 0; i < 5; i++) {
+        const lx = -w * 0.12 - i * w * 0.07;
+        ctx.beginPath();
+        ctx.moveTo(lx, -h * 0.25);
+        ctx.lineTo(lx, h * 0.25);
+        ctx.stroke();
+      }
+      break;
+    }
+    case "sink_double": {
+      // Two bowls side by side
+      const bw = w * 0.38, bh = h * 0.6;
+      ctx.beginPath();
+      ctx.roundRect(-w * 0.43, -bh / 2, bw, bh, 4);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.roundRect(w * 0.43 - bw, -bh / 2, bw, bh, 4);
+      ctx.stroke();
+      drawDrain(-w * 0.24, 0, 2);
+      drawDrain(w * 0.24, 0, 2);
+      drawFaucet(0, -h * 0.38, 2.5);
+      break;
+    }
+    case "sink_belfast": {
+      // Deep rectangular butler sink
+      const bw = w * 0.8, bh = h * 0.7;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.roundRect(-bw / 2, -bh / 2 + h * 0.05, bw, bh, 2);
+      ctx.stroke();
+      ctx.lineWidth = 1;
+      drawDrain(0, h * 0.1, 2.5);
+      drawFaucet(0, -h * 0.38, 3);
+      break;
+    }
+    case "sink_round": {
+      // Round vessel sink
+      ctx.beginPath();
+      ctx.arc(0, h * 0.05, Math.min(w, h) * 0.38, 0, Math.PI * 2);
+      ctx.stroke();
+      drawDrain(0, h * 0.05, 2);
+      drawFaucet(0, -h * 0.35, 2.5);
+      break;
+    }
+
+    // ─── HOBS / COOKTOPS ──────────────────────────────────────────
+    case "hob_4_gas":
+    case "cooker": {
+      // 4 burner circles with crosses
+      const positions = [[-0.22, -0.22], [0.22, -0.22], [-0.22, 0.22], [0.22, 0.22]];
+      const br = Math.min(w, h) * 0.16;
+      positions.forEach(([px, py]) => {
+        ctx.beginPath();
+        ctx.arc(w * px, h * py, br, 0, Math.PI * 2);
+        ctx.stroke();
+        // Burner grate cross
+        ctx.beginPath();
+        ctx.moveTo(w * px - br * 0.6, h * py);
+        ctx.lineTo(w * px + br * 0.6, h * py);
+        ctx.moveTo(w * px, h * py - br * 0.6);
+        ctx.lineTo(w * px, h * py + br * 0.6);
+        ctx.stroke();
+      });
+      break;
+    }
+    case "hob_5_gas": {
+      // 5 burners: 2 back, 2 front, 1 center (large)
+      const positions = [[-0.28, -0.25], [0.28, -0.25], [-0.28, 0.25], [0.28, 0.25]];
+      const br = Math.min(w, h) * 0.14;
+      positions.forEach(([px, py]) => {
+        ctx.beginPath();
+        ctx.arc(w * px, h * py, br, 0, Math.PI * 2);
+        ctx.stroke();
+      });
+      // Center large burner
+      ctx.beginPath();
+      ctx.arc(0, 0, br * 1.2, 0, Math.PI * 2);
       ctx.stroke();
       break;
-    case "shower":
-      ctx.beginPath();
-      ctx.arc(0, 0, Math.min(w, h) * 0.35, 0, Math.PI * 2);
-      ctx.stroke();
-      // Shower head dot
-      ctx.beginPath();
-      ctx.arc(-w * 0.25, -h * 0.25, 3, 0, Math.PI * 2);
-      ctx.fill();
+    }
+    case "hob_4_induction": {
+      // 4 induction zones (rounded rects)
+      const zw = w * 0.32, zh = h * 0.32;
+      const positions = [[-0.26, -0.26], [0.26, -0.26], [-0.26, 0.26], [0.26, 0.26]];
+      positions.forEach(([px, py]) => {
+        ctx.beginPath();
+        ctx.roundRect(w * px - zw / 2, h * py - zh / 2, zw, zh, zw * 0.3);
+        ctx.stroke();
+      });
       break;
-    case "toilet":
+    }
+    case "hob_2_compact": {
+      // 2 burners vertically
+      const br = Math.min(w, h) * 0.2;
       ctx.beginPath();
-      ctx.ellipse(0, h * 0.1, w * 0.35, h * 0.3, 0, 0, Math.PI * 2);
+      ctx.arc(0, -h * 0.22, br, 0, Math.PI * 2);
       ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(0, h * 0.22, br, 0, Math.PI * 2);
+      ctx.stroke();
+      break;
+    }
+    case "hob_6_range": {
+      // 6 burners: 3x2 grid
+      const br = Math.min(w, h) * 0.11;
+      for (let row = 0; row < 2; row++) {
+        for (let col = 0; col < 3; col++) {
+          const cx = (col - 1) * w * 0.28;
+          const cy = (row - 0.5) * h * 0.4;
+          ctx.beginPath();
+          ctx.arc(cx, cy, br, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+      }
+      break;
+    }
+
+    // ─── KITCHEN UNITS ────────────────────────────────────────────
+    case "counter": {
+      // Simple counter with front edge line
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.45, h * 0.35);
+      ctx.lineTo(w * 0.45, h * 0.35);
+      ctx.stroke();
+      break;
+    }
+    case "base_unit": {
+      // Base unit with handle
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.45, h * 0.35);
+      ctx.lineTo(w * 0.45, h * 0.35);
+      ctx.stroke();
+      // Handle
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.12, h * 0.25);
+      ctx.lineTo(w * 0.12, h * 0.25);
+      ctx.stroke();
+      break;
+    }
+    case "wall_unit": {
+      // Wall unit (handled by wall cupboard rendering, but add handle detail)
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.12, h * 0.05);
+      ctx.lineTo(w * 0.12, h * 0.05);
+      ctx.stroke();
+      break;
+    }
+    case "corner_base_unit": {
+      // L-shaped corner unit outline
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.45, -h * 0.45);
+      ctx.lineTo(w * 0.45, -h * 0.45);
+      ctx.lineTo(w * 0.45, h * 0.05);
+      ctx.lineTo(w * 0.05, h * 0.05);
+      ctx.lineTo(w * 0.05, h * 0.45);
+      ctx.lineTo(-w * 0.45, h * 0.45);
+      ctx.closePath();
+      ctx.stroke();
+      break;
+    }
+    case "island": {
+      // Kitchen island with overhang line
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.45, h * 0.35);
+      ctx.lineTo(w * 0.45, h * 0.35);
+      ctx.stroke();
+      // Overhang on other side
+      ctx.setLineDash([4, 3]);
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.45, -h * 0.38);
+      ctx.lineTo(w * 0.45, -h * 0.38);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      break;
+    }
+
+    // ─── OTHER KITCHEN ────────────────────────────────────────────
+    case "fridge": {
+      // Fridge with divider line and handle
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.45, -h * 0.1);
+      ctx.lineTo(w * 0.45, -h * 0.1);
+      ctx.stroke();
+      // Handle
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(w * 0.32, -h * 0.35);
+      ctx.lineTo(w * 0.32, -h * 0.15);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(w * 0.32, h * 0.05);
+      ctx.lineTo(w * 0.32, h * 0.35);
+      ctx.stroke();
+      ctx.lineWidth = 1;
+      break;
+    }
+    case "dishwasher": {
+      // Dishwasher front panel with handle
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.15, -h * 0.25);
+      ctx.lineTo(w * 0.15, -h * 0.25);
+      ctx.stroke();
+      // Front edge
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.45, h * 0.35);
+      ctx.lineTo(w * 0.45, h * 0.35);
+      ctx.stroke();
+      break;
+    }
+
+    // ─── TOILETS ──────────────────────────────────────────────────
+    case "toilet_close":
+    case "toilet": {
+      // Close-coupled: tank at back, bowl in front
       ctx.fillStyle = stroke;
-      ctx.fillRect(-w * 0.35, -h * 0.45, w * 0.7, h * 0.15);
+      ctx.fillRect(-w * 0.38, -h * 0.47, w * 0.76, h * 0.18);
+      ctx.beginPath();
+      ctx.ellipse(0, h * 0.1, w * 0.36, h * 0.32, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      // Seat opening
+      ctx.beginPath();
+      ctx.ellipse(0, h * 0.08, w * 0.24, h * 0.22, 0, 0, Math.PI * 2);
+      ctx.stroke();
       break;
+    }
+    case "toilet_wall_hung": {
+      // Wall-hung: no tank visible, bowl only with wall plate
+      ctx.strokeRect(-w * 0.4, -h * 0.46, w * 0.8, h * 0.12);
+      ctx.beginPath();
+      ctx.ellipse(0, h * 0.1, w * 0.38, h * 0.35, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.ellipse(0, h * 0.08, w * 0.25, h * 0.24, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      break;
+    }
+    case "toilet_btw": {
+      // Back-to-wall: concealed cistern, bowl projects
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.3;
+      ctx.fillRect(-w * 0.4, -h * 0.47, w * 0.8, h * 0.2);
+      ctx.globalAlpha = 1;
+      ctx.beginPath();
+      ctx.ellipse(0, h * 0.1, w * 0.38, h * 0.33, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.ellipse(0, h * 0.08, w * 0.25, h * 0.22, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      break;
+    }
+    case "toilet_corner": {
+      // Corner: triangular tank shape at back
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.45, -h * 0.45);
+      ctx.lineTo(w * 0.45, -h * 0.45);
+      ctx.lineTo(w * 0.0, -h * 0.15);
+      ctx.closePath();
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.ellipse(0, h * 0.12, w * 0.34, h * 0.3, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      break;
+    }
+
+    // ─── BATHS ────────────────────────────────────────────────────
+    case "bath_standard":
+    case "bathtub": {
+      // Standard bath: outer rect already drawn, inner rounded ellipse
+      ctx.beginPath();
+      ctx.roundRect(-w * 0.44, -h * 0.44, w * 0.88, h * 0.88, Math.min(w, h) * 0.12);
+      ctx.stroke();
+      // Drain
+      drawDrain(0, h * 0.3, 3);
+      // Faucet
+      drawFaucet(0, -h * 0.38, 2.5);
+      break;
+    }
+    case "bath_p_left": {
+      // P-shape: wider shower end on the left
+      ctx.beginPath();
+      ctx.roundRect(-w * 0.44, -h * 0.44, w * 0.88, h * 0.88, Math.min(w, h) * 0.1);
+      ctx.stroke();
+      // Shower area curve
+      ctx.beginPath();
+      ctx.arc(-w * 0.1, -h * 0.44, w * 0.35, 0, Math.PI);
+      ctx.stroke();
+      drawDrain(0, h * 0.3, 3);
+      break;
+    }
+    case "bath_p_right": {
+      ctx.beginPath();
+      ctx.roundRect(-w * 0.44, -h * 0.44, w * 0.88, h * 0.88, Math.min(w, h) * 0.1);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(w * 0.1, -h * 0.44, w * 0.35, 0, Math.PI);
+      ctx.stroke();
+      drawDrain(0, h * 0.3, 3);
+      break;
+    }
+    case "bath_freestanding": {
+      // Freestanding slipper: ellipse inside
+      ctx.beginPath();
+      ctx.ellipse(0, 0, w * 0.44, h * 0.42, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      drawDrain(0, h * 0.28, 3);
+      drawFaucet(0, -h * 0.36, 2.5);
+      break;
+    }
+    case "bath_corner": {
+      // Corner bath: quarter-circle inner shape
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.44, -h * 0.44);
+      ctx.lineTo(w * 0.44, -h * 0.44);
+      ctx.lineTo(w * 0.44, -h * 0.2);
+      ctx.arc(-w * 0.44, -h * 0.44, w * 0.88, 0, Math.PI / 2);
+      ctx.closePath();
+      ctx.stroke();
+      drawDrain(0, 0, 3);
+      break;
+    }
+
+    // ─── SHOWERS ──────────────────────────────────────────────────
+    case "shower_square":
+    case "shower": {
+      // Square enclosure with shower head and drain
+      ctx.beginPath();
+      ctx.arc(0, 0, Math.min(w, h) * 0.32, 0, Math.PI * 2);
+      ctx.stroke();
+      // Shower head
+      drawDrain(-w * 0.3, -h * 0.3, 3.5);
+      // Drain center
+      drawDrain(0, h * 0.05, 2);
+      break;
+    }
+    case "shower_rect": {
+      // Rectangular enclosure
+      ctx.beginPath();
+      ctx.arc(0, 0, Math.min(w, h) * 0.3, 0, Math.PI * 2);
+      ctx.stroke();
+      drawDrain(-w * 0.35, -h * 0.3, 3.5);
+      drawDrain(0, h * 0.05, 2);
+      break;
+    }
+    case "shower_quadrant": {
+      // Quadrant: curved front edge
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.44, -h * 0.44);
+      ctx.lineTo(w * 0.44, -h * 0.44);
+      ctx.lineTo(w * 0.44, -h * 0.1);
+      ctx.arc(-w * 0.44, -h * 0.44, w * 0.88, 0, Math.PI / 2);
+      ctx.closePath();
+      ctx.stroke();
+      drawDrain(-w * 0.15, -h * 0.15, 3.5);
+      drawDrain(-w * 0.05, h * 0.05, 2);
+      break;
+    }
+    case "shower_walkin": {
+      // Walk-in: glass panel line
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.15, -h * 0.44);
+      ctx.lineTo(-w * 0.15, h * 0.44);
+      ctx.stroke();
+      // Glass fill
+      ctx.fillStyle = isDark ? "rgba(79, 152, 163, 0.08)" : "rgba(1, 105, 111, 0.06)";
+      ctx.fillRect(-w * 0.14, -h * 0.44, w * 0.58, h * 0.88);
+      ctx.fillStyle = stroke;
+      drawDrain(w * 0.15, -h * 0.25, 3.5);
+      drawDrain(w * 0.15, h * 0.1, 2);
+      break;
+    }
+
+    // ─── BASINS ───────────────────────────────────────────────────
     case "basin":
+    case "basin_pedestal": {
       ctx.beginPath();
       ctx.ellipse(0, 0, w * 0.35, h * 0.3, 0, 0, Math.PI * 2);
       ctx.stroke();
-      break;
-    case "bed_double":
-    case "bed_king":
-    case "bed_single":
-      // Pillow(s)
-      const pw = type === "bed_single" ? w * 0.7 : w * 0.38;
-      const ph = h * 0.1;
-      const py = -h * 0.38;
-      if (type === "bed_single") {
-        ctx.strokeRect(-pw / 2, py, pw, ph);
-      } else {
-        ctx.strokeRect(-w * 0.42, py, pw, ph);
-        ctx.strokeRect(w * 0.42 - pw, py, pw, ph);
+      drawDrain(0, h * 0.05, 2);
+      drawFaucet(0, -h * 0.28, 2);
+      if (type === "basin_pedestal") {
+        // Pedestal base
+        ctx.beginPath();
+        ctx.moveTo(-w * 0.08, h * 0.3);
+        ctx.lineTo(-w * 0.12, h * 0.45);
+        ctx.lineTo(w * 0.12, h * 0.45);
+        ctx.lineTo(w * 0.08, h * 0.3);
+        ctx.stroke();
       }
       break;
-    case "cooker":
-      // Four burners
-      const br = Math.min(w, h) * 0.14;
+    }
+
+    // ─── BEDS ─────────────────────────────────────────────────────
+    case "bed_single": {
+      // Pillow
+      const pw = w * 0.7, ph = h * 0.08;
       ctx.beginPath();
-      ctx.arc(-w * 0.2, -h * 0.2, br, 0, Math.PI * 2);
+      ctx.roundRect(-pw / 2, -h * 0.42, pw, ph, 3);
       ctx.stroke();
+      // Duvet line
       ctx.beginPath();
-      ctx.arc(w * 0.2, -h * 0.2, br, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.arc(-w * 0.2, h * 0.2, br, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.arc(w * 0.2, h * 0.2, br, 0, Math.PI * 2);
-      ctx.stroke();
-      break;
-    case "sink_k":
-      ctx.beginPath();
-      ctx.ellipse(0, 0, w * 0.3, h * 0.3, 0, 0, Math.PI * 2);
+      ctx.moveTo(-w * 0.4, -h * 0.28);
+      ctx.lineTo(-w * 0.4, h * 0.42);
+      ctx.lineTo(w * 0.4, h * 0.42);
+      ctx.lineTo(w * 0.4, -h * 0.28);
       ctx.stroke();
       break;
-    case "sofa_3":
+    }
+    case "bed_double":
+    case "bed_king":
+    case "bed_superking": {
+      // Two pillows
+      const pw = w * 0.38, ph = h * 0.08;
+      ctx.beginPath();
+      ctx.roundRect(-w * 0.42, -h * 0.42, pw, ph, 3);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.roundRect(w * 0.42 - pw, -h * 0.42, pw, ph, 3);
+      ctx.stroke();
+      // Duvet fold line
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.4, -h * 0.28);
+      ctx.lineTo(-w * 0.4, h * 0.42);
+      ctx.lineTo(w * 0.4, h * 0.42);
+      ctx.lineTo(w * 0.4, -h * 0.28);
+      ctx.stroke();
+      // Center line
+      ctx.beginPath();
+      ctx.moveTo(0, -h * 0.28);
+      ctx.lineTo(0, h * 0.42);
+      ctx.stroke();
+      break;
+    }
+    case "bed_bunk": {
+      // Bunk bed: two pillows stacked with divider
+      const pw = w * 0.7, ph = h * 0.06;
+      ctx.beginPath();
+      ctx.roundRect(-pw / 2, -h * 0.42, pw, ph, 3);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.roundRect(-pw / 2, h * 0.08, pw, ph, 3);
+      ctx.stroke();
+      // Divider line for bunk
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.45, 0);
+      ctx.lineTo(w * 0.45, 0);
+      ctx.stroke();
+      ctx.lineWidth = 1;
+      break;
+    }
+
+    // ─── WARDROBES / STORAGE ──────────────────────────────────────
+    case "wardrobe_single": {
+      // Single door with handle
+      ctx.beginPath();
+      ctx.moveTo(0, -h * 0.42);
+      ctx.lineTo(0, h * 0.42);
+      ctx.stroke();
+      // Handle dot
+      drawDrain(w * 0.12, 0, 2);
+      break;
+    }
+    case "wardrobe_double": {
+      // Two doors with handles
+      ctx.beginPath();
+      ctx.moveTo(0, -h * 0.42);
+      ctx.lineTo(0, h * 0.42);
+      ctx.stroke();
+      drawDrain(-w * 0.12, 0, 2);
+      drawDrain(w * 0.12, 0, 2);
+      break;
+    }
+    case "wardrobe_sliding": {
+      // Sliding doors: two overlapping panels
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.1, -h * 0.42);
+      ctx.lineTo(-w * 0.1, h * 0.42);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(w * 0.1, -h * 0.42);
+      ctx.lineTo(w * 0.1, h * 0.42);
+      ctx.stroke();
+      // Arrows
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.3, 0);
+      ctx.lineTo(-w * 0.15, 0);
+      ctx.moveTo(w * 0.15, 0);
+      ctx.lineTo(w * 0.3, 0);
+      ctx.stroke();
+      break;
+    }
+    case "wardrobe_walkin": {
+      // Walk-in: rails along sides
+      ctx.setLineDash([3, 3]);
+      ctx.strokeRect(-w * 0.42, -h * 0.42, w * 0.15, h * 0.84);
+      ctx.strokeRect(w * 0.27, -h * 0.42, w * 0.15, h * 0.84);
+      ctx.setLineDash([]);
+      // Entry gap at bottom
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.15, h * 0.44);
+      ctx.lineTo(w * 0.15, h * 0.44);
+      ctx.stroke();
+      break;
+    }
+    case "chest_of_drawers": {
+      // 4 drawer lines
+      for (let i = 0; i < 4; i++) {
+        const dy = -h * 0.35 + i * h * 0.22;
+        ctx.beginPath();
+        ctx.moveTo(-w * 0.42, dy);
+        ctx.lineTo(w * 0.42, dy);
+        ctx.stroke();
+        // Small handle
+        ctx.beginPath();
+        ctx.moveTo(-w * 0.06, dy + h * 0.06);
+        ctx.lineTo(w * 0.06, dy + h * 0.06);
+        ctx.stroke();
+      }
+      break;
+    }
+    case "nightstand": {
+      // Simple box with drawer line and handle
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.4, -h * 0.1);
+      ctx.lineTo(w * 0.4, -h * 0.1);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.08, h * 0.08);
+      ctx.lineTo(w * 0.08, h * 0.08);
+      ctx.stroke();
+      break;
+    }
+    case "desk": {
+      // Desk with leg insets
+      ctx.setLineDash([3, 2]);
+      ctx.strokeRect(-w * 0.44, -h * 0.38, w * 0.25, h * 0.76);
+      ctx.setLineDash([]);
+      // Keyboard tray area
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.15, h * 0.35);
+      ctx.lineTo(w * 0.42, h * 0.35);
+      ctx.stroke();
+      break;
+    }
+
+    // ─── SOFAS ────────────────────────────────────────────────────
     case "sofa_2":
-      // Back
+    case "sofa_3": {
+      // Back cushion
       ctx.fillStyle = stroke;
       ctx.globalAlpha = 0.3;
       ctx.fillRect(-w * 0.48, -h * 0.48, w * 0.96, h * 0.2);
@@ -1209,44 +1753,402 @@ function drawFurnitureDetail(
       // Arms
       ctx.strokeRect(-w * 0.48, -h * 0.28, w * 0.1, h * 0.7);
       ctx.strokeRect(w * 0.38, -h * 0.28, w * 0.1, h * 0.7);
+      // Seat cushion dividers
+      const seats = type === "sofa_2" ? 2 : 3;
+      const seatW = (w * 0.76) / seats;
+      for (let i = 1; i < seats; i++) {
+        const sx = -w * 0.38 + i * seatW;
+        ctx.beginPath();
+        ctx.moveTo(sx, -h * 0.28);
+        ctx.lineTo(sx, h * 0.42);
+        ctx.stroke();
+      }
       break;
-    case "dining_table_4":
-    case "dining_table_6":
-      // Table outline already drawn, just add line details
+    }
+    case "sofa_l_left": {
+      // L-shape: main body + chaise on left
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.3;
+      ctx.fillRect(-w * 0.48, -h * 0.48, w * 0.96, h * 0.15);
+      ctx.fillRect(-w * 0.48, -h * 0.33, w * 0.2, h * 0.81);
+      ctx.globalAlpha = 1;
+      // Arm right
+      ctx.strokeRect(w * 0.38, -h * 0.33, w * 0.1, h * 0.55);
+      // Chaise divider
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.28, -h * 0.1);
+      ctx.lineTo(-w * 0.28, h * 0.48);
+      ctx.stroke();
+      break;
+    }
+    case "sofa_l_right": {
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.3;
+      ctx.fillRect(-w * 0.48, -h * 0.48, w * 0.96, h * 0.15);
+      ctx.fillRect(w * 0.28, -h * 0.33, w * 0.2, h * 0.81);
+      ctx.globalAlpha = 1;
+      ctx.strokeRect(-w * 0.48, -h * 0.33, w * 0.1, h * 0.55);
+      ctx.beginPath();
+      ctx.moveTo(w * 0.28, -h * 0.1);
+      ctx.lineTo(w * 0.28, h * 0.48);
+      ctx.stroke();
+      break;
+    }
+    case "sofa_corner": {
+      // Corner sofa: L-shape filling the square
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.3;
+      ctx.fillRect(-w * 0.48, -h * 0.48, w * 0.96, h * 0.15);
+      ctx.fillRect(-w * 0.48, -h * 0.33, w * 0.15, h * 0.81);
+      ctx.globalAlpha = 1;
+      // Lower-right open area (seat)
+      ctx.strokeRect(w * 0.33, -h * 0.33, w * 0.15, h * 0.55);
+      ctx.strokeRect(-w * 0.33, h * 0.22, w * 0.66, h * 0.15);
+      break;
+    }
+    case "armchair": {
+      // Armchair: back + two arms + seat
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.3;
+      ctx.fillRect(-w * 0.42, -h * 0.42, w * 0.84, h * 0.2);
+      ctx.globalAlpha = 1;
+      ctx.strokeRect(-w * 0.42, -h * 0.22, w * 0.15, h * 0.6);
+      ctx.strokeRect(w * 0.27, -h * 0.22, w * 0.15, h * 0.6);
+      break;
+    }
+
+    // ─── OTHER LIVING ─────────────────────────────────────────────
+    case "coffee_table": {
+      // Simple table with center line
       ctx.beginPath();
       ctx.moveTo(-w * 0.4, 0);
       ctx.lineTo(w * 0.4, 0);
       ctx.stroke();
       break;
+    }
+    case "tv_unit": {
+      // TV unit with shelf line
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.45, -h * 0.15);
+      ctx.lineTo(w * 0.45, -h * 0.15);
+      ctx.stroke();
+      // TV screen rectangle
+      ctx.strokeRect(-w * 0.35, -h * 0.42, w * 0.7, h * 0.25);
+      break;
+    }
+    case "bookshelf": {
+      // Vertical dividers for shelf sections
+      const sections = 5;
+      for (let i = 1; i < sections; i++) {
+        const bx = -w * 0.45 + (w * 0.9 / sections) * i;
+        ctx.beginPath();
+        ctx.moveTo(bx, -h * 0.4);
+        ctx.lineTo(bx, h * 0.4);
+        ctx.stroke();
+      }
+      break;
+    }
+
+    // ─── DINING TABLES ────────────────────────────────────────────
+    case "table_rect_2":
+    case "table_rect_4":
+    case "table_rect_6":
+    case "dining_table_4":
+    case "dining_table_6": {
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.4, 0);
+      ctx.lineTo(w * 0.4, 0);
+      ctx.stroke();
+      break;
+    }
+    case "table_round_2":
+    case "table_round_4":
+    case "table_round_6": {
+      const r = Math.min(w, h) * 0.42;
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, Math.PI * 2);
+      ctx.stroke();
+      break;
+    }
+    case "table_oval": {
+      ctx.beginPath();
+      ctx.ellipse(0, 0, w * 0.42, h * 0.38, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      break;
+    }
+    case "dining_chair": {
+      // Chair: seat + back
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.3;
+      ctx.fillRect(-w * 0.38, -h * 0.42, w * 0.76, h * 0.18);
+      ctx.globalAlpha = 1;
+      break;
+    }
+
+    // ─── DOORS ────────────────────────────────────────────────────
     case "door":
-      // Draw door as a line with a 90° arc showing swing direction
+    case "door_single_left": {
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.moveTo(-w / 2, h / 2);
       ctx.lineTo(-w / 2, -h / 2);
       ctx.stroke();
-      // Arc for swing
       ctx.beginPath();
       ctx.arc(-w / 2, -h / 2, w, 0, Math.PI / 2);
       ctx.stroke();
       break;
-    case "window":
-      // Draw window as a line with glass rectangle indicator
+    }
+    case "door_single_right": {
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(w / 2, h / 2);
+      ctx.lineTo(w / 2, -h / 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(w / 2, -h / 2, w, Math.PI / 2, Math.PI);
+      ctx.stroke();
+      break;
+    }
+    case "door_double": {
+      ctx.lineWidth = 2;
+      // Left leaf
+      ctx.beginPath();
+      ctx.moveTo(-w / 2, h / 2);
+      ctx.lineTo(-w / 2, -h / 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(-w / 2, -h / 2, w / 2, 0, Math.PI / 2);
+      ctx.stroke();
+      // Right leaf
+      ctx.beginPath();
+      ctx.moveTo(w / 2, h / 2);
+      ctx.lineTo(w / 2, -h / 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(w / 2, -h / 2, w / 2, Math.PI / 2, Math.PI);
+      ctx.stroke();
+      break;
+    }
+    case "door_sliding": {
+      ctx.lineWidth = 2;
+      // Door panel
+      ctx.beginPath();
+      ctx.moveTo(-w / 2, 0);
+      ctx.lineTo(w * 0.1, 0);
+      ctx.stroke();
+      // Arrow showing slide direction
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(w * 0.15, 0);
+      ctx.lineTo(w * 0.45, 0);
+      ctx.moveTo(w * 0.38, -h * 0.2);
+      ctx.lineTo(w * 0.45, 0);
+      ctx.lineTo(w * 0.38, h * 0.2);
+      ctx.stroke();
+      break;
+    }
+    case "door_bifold": {
+      ctx.lineWidth = 2;
+      // Two folding panels
+      ctx.beginPath();
+      ctx.moveTo(-w / 2, h / 2);
+      ctx.lineTo(-w * 0.05, -h / 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.05, -h / 2);
+      ctx.lineTo(w * 0.4, h / 2);
+      ctx.stroke();
+      break;
+    }
+    case "door_pocket": {
+      ctx.lineWidth = 2;
+      // Pocket: door slides into wall
+      ctx.setLineDash([4, 3]);
+      ctx.beginPath();
+      ctx.moveTo(-w / 2, 0);
+      ctx.lineTo(w * 0.1, 0);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      // Wall pocket
+      ctx.lineWidth = 1;
+      ctx.strokeRect(w * 0.1, -h * 0.35, w * 0.38, h * 0.7);
+      break;
+    }
+
+    // ─── WINDOWS ──────────────────────────────────────────────────
+    case "window": {
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.moveTo(-w / 2, 0);
       ctx.lineTo(w / 2, 0);
       ctx.stroke();
-      // Glass pane indicator
       ctx.fillStyle = isDark ? "rgba(79, 152, 163, 0.15)" : "rgba(1, 105, 111, 0.1)";
       ctx.fillRect(-w * 0.4, -h * 0.35, w * 0.8, h * 0.7);
+      ctx.lineWidth = 1;
       ctx.strokeRect(-w * 0.4, -h * 0.35, w * 0.8, h * 0.7);
-      // Center divider
       ctx.beginPath();
       ctx.moveTo(0, -h * 0.35);
       ctx.lineTo(0, h * 0.35);
       ctx.stroke();
       break;
+    }
+
+    // ─── STAIRS ───────────────────────────────────────────────────
+    case "stair_straight": {
+      // Straight staircase: parallel tread lines with arrow
+      const steps = 13;
+      for (let i = 0; i <= steps; i++) {
+        const sy = -h * 0.46 + (h * 0.92 / steps) * i;
+        ctx.beginPath();
+        ctx.moveTo(-w * 0.44, sy);
+        ctx.lineTo(w * 0.44, sy);
+        ctx.stroke();
+      }
+      // Direction arrow
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(0, h * 0.4);
+      ctx.lineTo(0, -h * 0.35);
+      ctx.moveTo(-w * 0.1, -h * 0.25);
+      ctx.lineTo(0, -h * 0.35);
+      ctx.lineTo(w * 0.1, -h * 0.25);
+      ctx.stroke();
+      ctx.lineWidth = 1;
+      break;
+    }
+    case "stair_l_left": {
+      // L-shape: straight run then left turn
+      const straightSteps = 9;
+      const turnSteps = 4;
+      // Straight section (bottom half)
+      for (let i = 0; i <= straightSteps; i++) {
+        const sy = h * 0.46 - (h * 0.55 / straightSteps) * i;
+        ctx.beginPath();
+        ctx.moveTo(w * 0.06, sy);
+        ctx.lineTo(w * 0.44, sy);
+        ctx.stroke();
+      }
+      // Turn section (top-left)
+      for (let i = 0; i <= turnSteps; i++) {
+        const sx = w * 0.06 - (w * 0.5 / turnSteps) * i;
+        ctx.beginPath();
+        ctx.moveTo(sx, -h * 0.09);
+        ctx.lineTo(sx, -h * 0.46);
+        ctx.stroke();
+      }
+      // Arrow
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(w * 0.25, h * 0.4);
+      ctx.lineTo(w * 0.25, -h * 0.05);
+      ctx.lineTo(-w * 0.35, -h * 0.05);
+      ctx.stroke();
+      ctx.lineWidth = 1;
+      break;
+    }
+    case "stair_l_right": {
+      const straightSteps = 9;
+      const turnSteps = 4;
+      for (let i = 0; i <= straightSteps; i++) {
+        const sy = h * 0.46 - (h * 0.55 / straightSteps) * i;
+        ctx.beginPath();
+        ctx.moveTo(-w * 0.44, sy);
+        ctx.lineTo(-w * 0.06, sy);
+        ctx.stroke();
+      }
+      for (let i = 0; i <= turnSteps; i++) {
+        const sx = -w * 0.06 + (w * 0.5 / turnSteps) * i;
+        ctx.beginPath();
+        ctx.moveTo(sx, -h * 0.09);
+        ctx.lineTo(sx, -h * 0.46);
+        ctx.stroke();
+      }
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.25, h * 0.4);
+      ctx.lineTo(-w * 0.25, -h * 0.05);
+      ctx.lineTo(w * 0.35, -h * 0.05);
+      ctx.stroke();
+      ctx.lineWidth = 1;
+      break;
+    }
+    case "stair_u": {
+      // U-shape: two parallel runs connected by landing
+      const steps = 6;
+      // Left run (going up)
+      for (let i = 0; i <= steps; i++) {
+        const sy = h * 0.46 - (h * 0.55 / steps) * i;
+        ctx.beginPath();
+        ctx.moveTo(-w * 0.44, sy);
+        ctx.lineTo(-w * 0.06, sy);
+        ctx.stroke();
+      }
+      // Right run (going up)
+      for (let i = 0; i <= steps; i++) {
+        const sy = -h * 0.46 + (h * 0.55 / steps) * i;
+        ctx.beginPath();
+        ctx.moveTo(w * 0.06, sy);
+        ctx.lineTo(w * 0.44, sy);
+        ctx.stroke();
+      }
+      // Landing at top
+      ctx.strokeRect(-w * 0.44, -h * 0.46, w * 0.88, h * 0.18);
+      // Arrow
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.25, h * 0.4);
+      ctx.lineTo(-w * 0.25, -h * 0.35);
+      ctx.stroke();
+      ctx.lineWidth = 1;
+      break;
+    }
+    case "stair_spiral_cw":
+    case "stair_spiral_ccw": {
+      // Spiral: wedge-shaped treads radiating from center
+      const r = Math.min(w, h) * 0.44;
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, Math.PI * 2);
+      ctx.stroke();
+      // Center post
+      ctx.beginPath();
+      ctx.arc(0, 0, r * 0.08, 0, Math.PI * 2);
+      ctx.fill();
+      // Tread lines
+      const numTreads = 12;
+      for (let i = 0; i < numTreads; i++) {
+        const angle = (i / numTreads) * Math.PI * 2;
+        ctx.beginPath();
+        ctx.moveTo(r * 0.08 * Math.cos(angle), r * 0.08 * Math.sin(angle));
+        ctx.lineTo(r * Math.cos(angle), r * Math.sin(angle));
+        ctx.stroke();
+      }
+      break;
+    }
+    case "stair_winder": {
+      // Winder: straight with fan-shaped treads at turn
+      const straightSteps = 8;
+      const winderSteps = 3;
+      // Straight section
+      for (let i = 0; i <= straightSteps; i++) {
+        const sy = h * 0.46 - (h * 0.6 / straightSteps) * i;
+        ctx.beginPath();
+        ctx.moveTo(-w * 0.44, sy);
+        ctx.lineTo(w * 0.44, sy);
+        ctx.stroke();
+      }
+      // Winder treads (fan at top)
+      for (let i = 0; i <= winderSteps; i++) {
+        const angle = (i / winderSteps) * (Math.PI / 2) - Math.PI / 2;
+        ctx.beginPath();
+        ctx.moveTo(-w * 0.44, -h * 0.14);
+        ctx.lineTo(
+          -w * 0.44 + w * 0.88 * Math.cos(angle - Math.PI / 2) * -0.5 + w * 0.44,
+          -h * 0.14 + h * 0.32 * Math.sin(angle - Math.PI / 2) * -1
+        );
+        ctx.stroke();
+      }
+      break;
+    }
   }
 }
 

@@ -1,5 +1,5 @@
 import { useRef, useEffect, useCallback, useState } from "react";
-import { EditorState, Point, FurnitureTemplate, FurnitureItem, RoomLabel, UnitSystem, MeasureMode } from "../lib/types";
+import { EditorState, Point, FurnitureTemplate, FurnitureItem, RoomLabel, UnitSystem, MeasureMode, getVariantsForType } from "../lib/types";
 import {
   drawGrid,
   drawWalls,
@@ -120,6 +120,9 @@ export default function FloorPlanCanvas({
 
   // Track selected room key for highlighting
   const [selectedRoomKey, setSelectedRoomKey] = useState<string | null>(null);
+
+  // Context menu state for right-click variant switching
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; furnitureId: string; variants: FurnitureTemplate[] } | null>(null);
 
   // Canvas resize
   useEffect(() => {
@@ -383,6 +386,9 @@ export default function FloorPlanCanvas({
     (e: React.PointerEvent) => {
       // Prevent browser text selection / iOS callout while interacting with canvas
       e.preventDefault();
+
+      // Dismiss context menu on any click
+      setContextMenu(null);
 
       const pos = getCanvasPos(e);
       setMousePos(pos);
@@ -1057,10 +1063,29 @@ export default function FloorPlanCanvas({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [state.selectedItemId, state.furniture, state.walls, state.labels, onRemoveFurniture, onRemoveWall, onRemoveLabel, onSetWallDrawing, onSelectItem]);
 
-  // Prevent native context menu so right-click can pan
+  // Right-click context menu: show variant switcher if clicking on furniture with variants
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
-  }, []);
+    setContextMenu(null);
+
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const screenX = e.clientX - rect.left;
+    const screenY = e.clientY - rect.top;
+    const worldPos = screenToWorld(screenX, screenY, state.gridSize, state.zoom, state.panOffset);
+
+    const pxPerCm = (state.gridSize * state.zoom) / 100;
+    const hit = hitTestFurniture(state.furniture, worldPos.x, worldPos.y, pxPerCm);
+    if (hit) {
+      const variants = getVariantsForType(hit.type);
+      if (variants.length > 1) {
+        onSelectItem(hit.id);
+        setContextMenu({ x: e.clientX - rect.left, y: e.clientY - rect.top, furnitureId: hit.id, variants });
+        return;
+      }
+    }
+  }, [state.furniture, state.gridSize, state.zoom, state.panOffset, onSelectItem]);
 
   const cursorStyle = (() => {
     if (isPanning) return "grabbing";
@@ -1102,6 +1127,38 @@ export default function FloorPlanCanvas({
         onContextMenu={handleContextMenu}
         data-testid="floor-plan-canvas"
       />
+      {/* Context menu for variant switching */}
+      {contextMenu && (
+        <div
+          className="absolute bg-popover border border-border rounded-lg shadow-lg z-20 py-1 min-w-[160px]"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+          onMouseLeave={() => setContextMenu(null)}
+        >
+          <p className="px-3 py-1.5 text-xs font-semibold text-muted-foreground border-b border-border mb-1">Change type</p>
+          {contextMenu.variants.map((v) => {
+            const isCurrent = state.furniture.find(f => f.id === contextMenu.furnitureId)?.type === v.type;
+            return (
+              <button
+                key={v.type}
+                className={`w-full text-left px-3 py-1.5 text-sm hover:bg-accent transition-colors ${isCurrent ? "font-semibold text-primary" : ""}`}
+                onClick={() => {
+                  onUpdateFurniture(contextMenu.furnitureId, {
+                    type: v.type,
+                    label: v.label,
+                    width: v.width,
+                    height: v.height,
+                  });
+                  setContextMenu(null);
+                }}
+              >
+                {v.label}
+                <span className="text-xs text-muted-foreground ml-1">{v.width}×{v.height}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* Inline label editing overlay */}
       {isEditingLabel && (
         <input
