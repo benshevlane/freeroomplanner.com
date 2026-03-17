@@ -1,3 +1,4 @@
+import { Wall, FurnitureItem, RoomLabel, Point, UnitSystem, MeasureMode, LabelColor } from "./types";
 import { Wall, FurnitureItem, RoomLabel, Point, UnitSystem, MeasureMode, isWallCupboard } from "./types";
 import { DetectedRoom } from "./room-detection";
 
@@ -762,6 +763,28 @@ function drawFurnitureDetail(
   }
 }
 
+/** Resolve a LabelColor to a CSS color value */
+function resolveLabelColor(color: LabelColor | undefined, isDark: boolean, isSelected: boolean): string {
+  if (isSelected) return SELECT_COLOR;
+  switch (color) {
+    case "teal": return isDark ? DIMENSION_COLOR_DARK : DIMENSION_COLOR_LIGHT;
+    case "red": return isDark ? "#e57373" : "#d32f2f";
+    case "grey": return isDark ? "#797876" : "#9e9e9e";
+    case "black":
+    default: return isDark ? "#cdccca" : "#3a3938";
+  }
+}
+
+/** Resolve a LabelSize to pixel font size */
+function resolveLabelSize(size: string | undefined): number {
+  switch (size) {
+    case "small": return 12;
+    case "large": return 24;
+    case "medium":
+    default: return 16;
+  }
+}
+
 export function drawLabels(
   ctx: CanvasRenderingContext2D,
   labels: RoomLabel[],
@@ -778,14 +801,55 @@ export function drawLabels(
     const y = label.y * pxPerCm + panOffset.y;
     const isSelected = label.id === selectedId;
 
-    ctx.font = `600 ${label.fontSize * zoom}px 'General Sans', 'DM Sans', sans-serif`;
-    ctx.fillStyle = isSelected
-      ? SELECT_COLOR
-      : isDark ? "#797876" : "#7a7974";
+    const resolvedSize = resolveLabelSize(label.size);
+    const fontSize = resolvedSize * zoom;
+    const weight = label.bold ? "700" : "600";
+    ctx.font = `${weight} ${fontSize}px 'General Sans', 'DM Sans', sans-serif`;
+
+    const textWidth = ctx.measureText(label.text).width;
+    const textHeight = fontSize;
+
+    // Background pill if enabled
+    if (label.background) {
+      const padX = 8;
+      const padY = 4;
+      const pillW = textWidth + padX * 2;
+      const pillH = textHeight + padY * 2;
+      const pillX = x - pillW / 2;
+      const pillY = y - pillH / 2;
+      const r = pillH / 2;
+
+      ctx.fillStyle = isDark ? "rgba(23, 22, 20, 0.85)" : "rgba(255, 255, 255, 0.9)";
+      ctx.beginPath();
+      ctx.moveTo(pillX + r, pillY);
+      ctx.lineTo(pillX + pillW - r, pillY);
+      ctx.arcTo(pillX + pillW, pillY, pillX + pillW, pillY + r, r);
+      ctx.arcTo(pillX + pillW, pillY + pillH, pillX + pillW - r, pillY + pillH, r);
+      ctx.lineTo(pillX + r, pillY + pillH);
+      ctx.arcTo(pillX, pillY + pillH, pillX, pillY + pillH - r, r);
+      ctx.arcTo(pillX, pillY, pillX + r, pillY, r);
+      ctx.closePath();
+      ctx.fill();
+
+      // Subtle border
+      ctx.strokeStyle = isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.08)";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+
+    ctx.fillStyle = resolveLabelColor(label.color, isDark, isSelected);
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(label.text, x, y);
   });
+}
+
+/** Generate a stable key for a detected room based on its sorted vertex coordinates */
+export function getRoomKey(room: { vertices: Point[] }): string {
+  const sorted = [...room.vertices]
+    .map((v) => `${Math.round(v.x)},${Math.round(v.y)}`)
+    .sort();
+  return sorted.join("|");
 }
 
 export function drawRoomAreas(
@@ -795,7 +859,9 @@ export function drawRoomAreas(
   zoom: number,
   panOffset: Point,
   isDark: boolean,
-  units: UnitSystem = "metric"
+  units: UnitSystem = "metric",
+  roomNames: Record<string, string> = {},
+  selectedRoomKey: string | null = null
 ) {
   const pxPerCm = (gridSize * zoom) / 100;
 
@@ -817,17 +883,181 @@ export function drawRoomAreas(
     ctx.fillStyle = isDark ? "rgba(79, 152, 163, 0.06)" : "rgba(1, 105, 111, 0.04)";
     ctx.fill();
 
-    // Draw area text at centroid
+    // Draw room name + area text at centroid
     const cx = room.centroid.x * pxPerCm + panOffset.x;
     const cy = room.centroid.y * pxPerCm + panOffset.y;
 
-    const text = formatArea(room.area, units);
-    const fontSize = Math.max(11, 13 * zoom);
-    ctx.font = `500 ${fontSize}px 'General Sans', 'DM Sans', sans-serif`;
-    ctx.fillStyle = isDark ? "rgba(79, 152, 163, 0.6)" : "rgba(1, 105, 111, 0.5)";
+    const roomKey = getRoomKey(room);
+    const roomName = roomNames[roomKey] || "Room";
+    const areaText = formatArea(room.area, units);
+    const isSelected = roomKey === selectedRoomKey;
+
+    // Compute room bounding box to check if label fits
+    let minRX = Infinity, maxRX = -Infinity, minRY = Infinity, maxRY = -Infinity;
+    for (const v of room.vertices) {
+      const vx = v.x * pxPerCm + panOffset.x;
+      const vy = v.y * pxPerCm + panOffset.y;
+      if (vx < minRX) minRX = vx;
+      if (vx > maxRX) maxRX = vx;
+      if (vy < minRY) minRY = vy;
+      if (vy > maxRY) maxRY = vy;
+    }
+    const roomWidthPx = maxRX - minRX;
+    const roomHeightPx = maxRY - minRY;
+
+    // Adaptive font size: shrink to fit small rooms
+    let nameFontSize = Math.max(11, 14 * zoom);
+    let areaFontSize = Math.max(9, 11 * zoom);
+
+    // Measure text at current size and shrink if needed
+    ctx.font = `600 ${nameFontSize}px 'General Sans', 'DM Sans', sans-serif`;
+    let nameWidth = ctx.measureText(roomName).width;
+    ctx.font = `500 ${areaFontSize}px 'General Sans', 'DM Sans', sans-serif`;
+    let areaWidth = ctx.measureText(areaText).width;
+    const maxTextWidth = Math.max(nameWidth, areaWidth);
+    const totalHeight = nameFontSize + areaFontSize + 4;
+
+    // Shrink fonts if text doesn't fit the room
+    if (maxTextWidth > roomWidthPx * 0.85 || totalHeight > roomHeightPx * 0.7) {
+      const scaleFactor = Math.min(
+        (roomWidthPx * 0.8) / (maxTextWidth || 1),
+        (roomHeightPx * 0.6) / (totalHeight || 1),
+        1
+      );
+      const clampedScale = Math.max(0.4, Math.min(1, scaleFactor));
+      nameFontSize *= clampedScale;
+      areaFontSize *= clampedScale;
+    }
+
+    const baseColor = isSelected
+      ? (isDark ? "#4f98a3" : "#01696f")
+      : (isDark ? "rgba(79, 152, 163, 0.7)" : "rgba(1, 105, 111, 0.6)");
+    const areaColor = isSelected
+      ? (isDark ? "rgba(79, 152, 163, 0.9)" : "rgba(1, 105, 111, 0.8)")
+      : (isDark ? "rgba(79, 152, 163, 0.5)" : "rgba(1, 105, 111, 0.4)");
+
+    // Room name (larger, bolder)
+    ctx.font = `600 ${nameFontSize}px 'General Sans', 'DM Sans', sans-serif`;
+    ctx.fillStyle = baseColor;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(text, cx, cy);
+    ctx.fillText(roomName, cx, cy - areaFontSize * 0.4);
+
+    // Area (smaller, lighter)
+    ctx.font = `500 ${areaFontSize}px 'General Sans', 'DM Sans', sans-serif`;
+    ctx.fillStyle = areaColor;
+    ctx.fillText(areaText, cx, cy + nameFontSize * 0.5);
+  });
+}
+
+/** Hit-test room labels: returns the room key if double-clicked on a room label */
+export function hitTestRoomLabel(
+  screenX: number,
+  screenY: number,
+  rooms: DetectedRoom[],
+  gridSize: number,
+  zoom: number,
+  panOffset: Point,
+  roomNames: Record<string, string>
+): { roomKey: string; centroid: Point } | null {
+  const pxPerCm = (gridSize * zoom) / 100;
+
+  for (const room of rooms) {
+    const cx = room.centroid.x * pxPerCm + panOffset.x;
+    const cy = room.centroid.y * pxPerCm + panOffset.y;
+    const roomKey = getRoomKey(room);
+    const roomName = roomNames[roomKey] || "Room";
+
+    const nameFontSize = Math.max(11, 14 * zoom);
+    const areaFontSize = Math.max(9, 11 * zoom);
+    const totalHeight = nameFontSize + areaFontSize + 8;
+    const estWidth = Math.max(roomName.length, 8) * nameFontSize * 0.55;
+
+    if (
+      screenX >= cx - estWidth / 2 &&
+      screenX <= cx + estWidth / 2 &&
+      screenY >= cy - totalHeight / 2 &&
+      screenY <= cy + totalHeight / 2
+    ) {
+      return { roomKey, centroid: room.centroid };
+    }
+  }
+  return null;
+}
+
+/** Draw component labels beneath/beside furniture items */
+export function drawComponentLabels(
+  ctx: CanvasRenderingContext2D,
+  furniture: FurnitureItem[],
+  gridSize: number,
+  zoom: number,
+  panOffset: Point,
+  isDark: boolean,
+  selectedId: string | null,
+  units: UnitSystem = "metric"
+) {
+  const pxPerCm = (gridSize * zoom) / 100;
+
+  furniture.forEach((item) => {
+    const centerX = (item.x + item.width / 2) * pxPerCm + panOffset.x;
+    const centerY = (item.y + item.height / 2) * pxPerCm + panOffset.y;
+    const h = item.height * pxPerCm;
+    const isSelected = item.id === selectedId;
+
+    // Position label below the item
+    const labelY = centerY + h / 2 + 14 * zoom;
+
+    const displayName = item.customName || item.label;
+    const dimText = `${item.width} \u00D7 ${item.height} cm`;
+
+    const nameFontSize = Math.max(9, 11 * zoom);
+    const dimFontSize = Math.max(8, 9 * zoom);
+
+    // Name line
+    ctx.font = `${isSelected ? "600" : "500"} ${nameFontSize}px 'General Sans', 'DM Sans', sans-serif`;
+    const nameColor = isSelected
+      ? (isDark ? "#4f98a3" : "#01696f")
+      : (isDark ? "rgba(79, 152, 163, 0.65)" : "rgba(1, 105, 111, 0.55)");
+    ctx.fillStyle = nameColor;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+
+    // Background pill for readability
+    const nameWidth = ctx.measureText(displayName).width;
+    ctx.font = `400 ${dimFontSize}px 'General Sans', 'DM Sans', sans-serif`;
+    const dimWidth = ctx.measureText(dimText).width;
+    const maxWidth = Math.max(nameWidth, dimWidth);
+    const pillW = maxWidth + 10;
+    const pillH = nameFontSize + dimFontSize + 8;
+    const pillX = centerX - pillW / 2;
+    const pillY = labelY - 2;
+
+    ctx.fillStyle = isDark ? "rgba(23, 22, 20, 0.7)" : "rgba(247, 246, 242, 0.75)";
+    ctx.beginPath();
+    const r = 4;
+    ctx.moveTo(pillX + r, pillY);
+    ctx.lineTo(pillX + pillW - r, pillY);
+    ctx.arcTo(pillX + pillW, pillY, pillX + pillW, pillY + r, r);
+    ctx.lineTo(pillX + pillW, pillY + pillH - r);
+    ctx.arcTo(pillX + pillW, pillY + pillH, pillX + pillW - r, pillY + pillH, r);
+    ctx.lineTo(pillX + r, pillY + pillH);
+    ctx.arcTo(pillX, pillY + pillH, pillX, pillY + pillH - r, r);
+    ctx.lineTo(pillX, pillY + r);
+    ctx.arcTo(pillX, pillY, pillX + r, pillY, r);
+    ctx.closePath();
+    ctx.fill();
+
+    // Draw name
+    ctx.font = `${isSelected ? "600" : "500"} ${nameFontSize}px 'General Sans', 'DM Sans', sans-serif`;
+    ctx.fillStyle = nameColor;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    ctx.fillText(displayName, centerX, labelY);
+
+    // Draw dimensions
+    ctx.font = `400 ${dimFontSize}px 'General Sans', 'DM Sans', sans-serif`;
+    ctx.fillStyle = isDark ? "rgba(121, 120, 118, 0.8)" : "rgba(122, 121, 116, 0.7)";
+    ctx.fillText(dimText, centerX, labelY + nameFontSize + 2);
   });
 }
 
@@ -1891,6 +2121,289 @@ export function drawEraserHighlight(
   }
 }
 
+// ==========================================
+// Label Collision Avoidance System
+// ==========================================
+
+interface LabelRect {
+  x: number; // center x (screen px)
+  y: number; // center y (screen px)
+  w: number; // half-width
+  h: number; // half-height
+  priority: number; // 0 = highest (room), 1 = wall, 2 = component, 3 = freeform
+  anchorX: number; // original anchor point
+  anchorY: number;
+}
+
+function rectsOverlap(a: LabelRect, b: LabelRect): boolean {
+  return (
+    Math.abs(a.x - b.x) < a.w + b.w + 2 &&
+    Math.abs(a.y - b.y) < a.h + b.h + 2
+  );
+}
+
+/** Run collision detection and nudge overlapping labels. Draws leader lines for nudged labels. */
+export function resolveAndDrawLabelCollisions(
+  ctx: CanvasRenderingContext2D,
+  rooms: DetectedRoom[],
+  walls: Wall[],
+  furniture: FurnitureItem[],
+  labels: RoomLabel[],
+  gridSize: number,
+  zoom: number,
+  panOffset: Point,
+  isDark: boolean,
+  roomNames: Record<string, string>,
+  componentLabelsVisible: boolean
+): void {
+  // Collect all label rects with priority
+  const allRects: LabelRect[] = [];
+  const pxPerCm = (gridSize * zoom) / 100;
+
+  // Room labels (priority 0)
+  for (const room of rooms) {
+    const cx = room.centroid.x * pxPerCm + panOffset.x;
+    const cy = room.centroid.y * pxPerCm + panOffset.y;
+    const roomKey = getRoomKey(room);
+    const name = roomNames[roomKey] || "Room";
+    const nameFontSize = Math.max(11, 14 * zoom);
+    const areaFontSize = Math.max(9, 11 * zoom);
+    ctx.font = `600 ${nameFontSize}px 'General Sans', 'DM Sans', sans-serif`;
+    const nameW = ctx.measureText(name).width;
+    const totalH = nameFontSize + areaFontSize + 4;
+    allRects.push({
+      x: cx, y: cy, w: nameW / 2 + 4, h: totalH / 2 + 2,
+      priority: 0, anchorX: cx, anchorY: cy,
+    });
+  }
+
+  // Component labels (priority 2)
+  if (componentLabelsVisible) {
+    for (const item of furniture) {
+      const centerX = (item.x + item.width / 2) * pxPerCm + panOffset.x;
+      const h = item.height * pxPerCm;
+      const labelY = (item.y + item.height / 2) * pxPerCm + panOffset.y + h / 2 + 14 * zoom;
+      const displayName = item.customName || item.label;
+      const nameFontSize = Math.max(9, 11 * zoom);
+      const dimFontSize = Math.max(8, 9 * zoom);
+      ctx.font = `500 ${nameFontSize}px 'General Sans', 'DM Sans', sans-serif`;
+      const nameW = ctx.measureText(displayName).width;
+      const totalH = nameFontSize + dimFontSize + 8;
+      allRects.push({
+        x: centerX, y: labelY + totalH / 2 - 2,
+        w: nameW / 2 + 8, h: totalH / 2 + 2,
+        priority: 2, anchorX: centerX, anchorY: labelY,
+      });
+    }
+  }
+
+  // Freeform labels (priority 3)
+  for (const label of labels) {
+    const x = label.x * pxPerCm + panOffset.x;
+    const y = label.y * pxPerCm + panOffset.y;
+    const resolvedSize = resolveLabelSize(label.size);
+    const fontSize = resolvedSize * zoom;
+    const weight = label.bold ? "700" : "600";
+    ctx.font = `${weight} ${fontSize}px 'General Sans', 'DM Sans', sans-serif`;
+    const textW = ctx.measureText(label.text).width;
+    allRects.push({
+      x, y, w: textW / 2 + 4, h: fontSize / 2 + 4,
+      priority: 3, anchorX: x, anchorY: y,
+    });
+  }
+
+  // Sort by priority (highest priority = lowest number = processed first)
+  allRects.sort((a, b) => a.priority - b.priority);
+
+  // Nudge lower-priority labels away from higher-priority ones
+  const nudgedLabels: { rect: LabelRect; nudged: boolean }[] = [];
+  for (const rect of allRects) {
+    let nudged = false;
+    for (const placed of nudgedLabels) {
+      if (rectsOverlap(rect, placed.rect)) {
+        // Nudge along perpendicular axis (vertical)
+        const dy = rect.y - placed.rect.y;
+        const nudgeDir = dy >= 0 ? 1 : -1;
+        const needed = placed.rect.h + rect.h + 4 - Math.abs(dy);
+        if (needed > 0) {
+          rect.y += nudgeDir * needed;
+          nudged = true;
+        }
+      }
+    }
+    nudgedLabels.push({ rect, nudged });
+  }
+
+  // Draw leader lines for nudged labels
+  ctx.save();
+  ctx.setLineDash([3, 3]);
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = isDark ? "rgba(79, 152, 163, 0.25)" : "rgba(1, 105, 111, 0.2)";
+
+  for (const { rect, nudged } of nudgedLabels) {
+    if (nudged && Math.abs(rect.y - rect.anchorY) > 4) {
+      ctx.beginPath();
+      ctx.moveTo(rect.anchorX, rect.anchorY);
+      ctx.lineTo(rect.x, rect.y);
+      ctx.stroke();
+    }
+  }
+
+  ctx.setLineDash([]);
+  ctx.restore();
+}
+
+/** Detect parallel wall pairs with different lengths and flag with amber color */
+export function findParallelWallDiscrepancies(
+  walls: Wall[]
+): Set<string> {
+  const flagged = new Set<string>();
+  const PARALLEL_THRESHOLD = 0.05; // cross product threshold
+  const DISTANCE_THRESHOLD = 500; // cm - max distance between walls to consider them a pair
+
+  for (let i = 0; i < walls.length; i++) {
+    for (let j = i + 1; j < walls.length; j++) {
+      const a = walls[i];
+      const b = walls[j];
+
+      const dxA = a.end.x - a.start.x;
+      const dyA = a.end.y - a.start.y;
+      const lenA = Math.sqrt(dxA * dxA + dyA * dyA);
+      if (lenA < 10) continue;
+
+      const dxB = b.end.x - b.start.x;
+      const dyB = b.end.y - b.start.y;
+      const lenB = Math.sqrt(dxB * dxB + dyB * dyB);
+      if (lenB < 10) continue;
+
+      // Check if parallel
+      const cross = Math.abs((dxA / lenA) * (dyB / lenB) - (dyA / lenA) * (dxB / lenB));
+      if (cross > PARALLEL_THRESHOLD) continue;
+
+      // Check if close enough (perpendicular distance between midpoints)
+      const midAx = (a.start.x + a.end.x) / 2;
+      const midAy = (a.start.y + a.end.y) / 2;
+      const midBx = (b.start.x + b.end.x) / 2;
+      const midBy = (b.start.y + b.end.y) / 2;
+      const perpDist = Math.sqrt((midAx - midBx) ** 2 + (midAy - midBy) ** 2);
+      if (perpDist > DISTANCE_THRESHOLD) continue;
+
+      // Check if lengths differ significantly (> 1cm)
+      if (Math.abs(lenA - lenB) > 1) {
+        flagged.add(a.id);
+        flagged.add(b.id);
+      }
+    }
+  }
+
+  return flagged;
+}
+
+/** Draw wall labels with amber highlight for discrepant parallel walls */
+export function drawWallLabelsWithDiscrepancy(
+  ctx: CanvasRenderingContext2D,
+  walls: Wall[],
+  gridSize: number,
+  zoom: number,
+  panOffset: Point,
+  isDark: boolean,
+  units: UnitSystem,
+  measureMode: MeasureMode,
+  furniture: FurnitureItem[],
+  flaggedWalls: Set<string>,
+  canvasWidth: number,
+  canvasHeight: number
+) {
+  // Collect all wall label positions for crowding check
+  const pxPerCm = (gridSize * zoom) / 100;
+
+  interface WallLabelInfo {
+    wallId: string;
+    screenX: number;
+    screenY: number;
+    textWidth: number;
+    lengthCm: number;
+    isFlagged: boolean;
+  }
+
+  const labelInfos: WallLabelInfo[] = [];
+
+  walls.forEach((wall) => {
+    const dx = wall.end.x - wall.start.x;
+    const dy = wall.end.y - wall.start.y;
+    const lengthCm = Math.sqrt(dx * dx + dy * dy);
+    if (lengthCm <= 10) return;
+
+    const sx = wall.start.x * pxPerCm + panOffset.x;
+    const sy = wall.start.y * pxPerCm + panOffset.y;
+    const ex = wall.end.x * pxPerCm + panOffset.x;
+    const ey = wall.end.y * pxPerCm + panOffset.y;
+    const mx = (sx + ex) / 2;
+    const my = (sy + ey) / 2;
+
+    // Check if on screen
+    if (mx < -50 || mx > canvasWidth + 50 || my < -50 || my > canvasHeight + 50) return;
+
+    const displayLengthCm = measureMode === "inside"
+      ? Math.max(0, lengthCm - 2 * (wall.thickness || 15))
+      : lengthCm;
+    const baseFontSize = Math.max(11, 12 * zoom);
+    const text = formatLength(displayLengthCm, units);
+    ctx.font = `500 ${baseFontSize}px 'General Sans', 'DM Sans', sans-serif`;
+    const textWidth = ctx.measureText(text).width;
+
+    labelInfos.push({
+      wallId: wall.id,
+      screenX: mx,
+      screenY: my,
+      textWidth,
+      lengthCm,
+      isFlagged: flaggedWalls.has(wall.id),
+    });
+  });
+
+  // At very low zoom, check for crowding and hide less important labels
+  let hiddenCount = 0;
+  const visibleSet = new Set<string>();
+  const sortedByLength = [...labelInfos].sort((a, b) => b.lengthCm - a.lengthCm);
+
+  for (const info of sortedByLength) {
+    let overlaps = false;
+    for (const visId of visibleSet) {
+      const vis = labelInfos.find((l) => l.wallId === visId);
+      if (!vis) continue;
+      const dx = Math.abs(info.screenX - vis.screenX);
+      const dy = Math.abs(info.screenY - vis.screenY);
+      if (dx < (info.textWidth + vis.textWidth) / 2 + 8 && dy < 20) {
+        overlaps = true;
+        break;
+      }
+    }
+    if (!overlaps) {
+      visibleSet.add(info.wallId);
+    } else {
+      hiddenCount++;
+    }
+  }
+
+  // Draw "+N hidden" indicator if any labels were hidden
+  if (hiddenCount > 0) {
+    const fontSize = Math.max(10, 11 * zoom);
+    ctx.font = `500 ${fontSize}px 'General Sans', 'DM Sans', sans-serif`;
+    const text = `+${hiddenCount} hidden`;
+    const textW = ctx.measureText(text).width;
+    const x = canvasWidth - textW - 16;
+    const y = 16;
+
+    ctx.fillStyle = isDark ? "rgba(23, 22, 20, 0.75)" : "rgba(247, 246, 242, 0.8)";
+    ctx.fillRect(x - 6, y - 2, textW + 12, fontSize + 6);
+    ctx.fillStyle = isDark ? "#797876" : "#7a7974";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    ctx.fillText(text, x, y);
+  }
+
+  return { visibleSet, hiddenCount };
 export function drawWallCupboardLegend(
   ctx: CanvasRenderingContext2D,
   w: number,

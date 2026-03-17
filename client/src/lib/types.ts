@@ -20,8 +20,12 @@ export interface FurnitureItem {
   height: number; // in cm
   rotation: number; // degrees
   category: string;
+  customName?: string; // user-renamed label, persists across sessions
   heightFromFloor?: number; // in cm, used for wall cupboards (default 145)
 }
+
+export type LabelSize = "small" | "medium" | "large";
+export type LabelColor = "black" | "teal" | "red" | "grey";
 
 export interface RoomLabel {
   id: string;
@@ -29,6 +33,11 @@ export interface RoomLabel {
   x: number;
   y: number;
   fontSize: number;
+  // Freeform label formatting
+  size?: LabelSize;
+  bold?: boolean;
+  color?: LabelColor;
+  background?: boolean; // white pill background
 }
 
 export type EditorTool = "select" | "wall" | "furniture" | "label" | "eraser" | "pan";
@@ -50,6 +59,10 @@ export interface EditorState {
   wallChainStart: Point | null; // first click of current wall chain (for auto-close)
   roomName: string;
   units: UnitSystem;
+  // Room name overrides keyed by room vertex signature
+  roomNames: Record<string, string>;
+  // Toggle for component labels visibility
+  componentLabelsVisible: boolean;
 }
 
 export interface FurnitureTemplate {
