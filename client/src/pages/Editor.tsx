@@ -5,7 +5,7 @@ import FloorPlanCanvas from "../components/FloorPlanCanvas";
 import EditorToolbar from "../components/EditorToolbar";
 import FurniturePanel from "../components/FurniturePanel";
 import PropertiesPanel from "../components/PropertiesPanel";
-import RoomSketchLogo from "../components/RoomSketchLogo";
+import FreeRoomPlannerLogo from "../components/FreeRoomPlannerLogo";
 import MobileWizard from "../components/MobileWizard";
 import { PerplexityAttribution } from "../components/PerplexityAttribution";
 import IntentCapture from "../components/IntentCapture";
@@ -42,27 +42,27 @@ export default function Editor() {
   const { state } = editor;
   const isMobile = useIsMobile();
   const [showIntentCapture, setShowIntentCapture] = useState(() => {
-    return !localStorage.getItem("roomsketch-intent");
+    return !localStorage.getItem("freeroomplanner-intent");
   });
   const [isDark, setIsDark] = useState(() =>
     window.matchMedia("(prefers-color-scheme: dark)").matches
   );
   const [measureMode, setMeasureMode] = useState<MeasureMode>(() => {
-    const stored = localStorage.getItem("roomsketch-measure-mode");
+    const stored = localStorage.getItem("freeroomplanner-measure-mode");
     return (stored === "inside" || stored === "full") ? stored : "inside";
   });
 
   const toggleMeasureMode = useCallback(() => {
     setMeasureMode((prev) => {
       const next = prev === "full" ? "inside" : "full";
-      localStorage.setItem("roomsketch-measure-mode", next);
+      localStorage.setItem("freeroomplanner-measure-mode", next);
       return next;
     });
   }, []);
   // Mobile onboarding wizard
   const [showMobileWizard, setShowMobileWizard] = useState(false);
   useEffect(() => {
-    if (isMobile && !localStorage.getItem("roomsketch-mobile-wizard-shown")) {
+    if (isMobile && !localStorage.getItem("freeroomplanner-mobile-wizard-shown")) {
       setShowMobileWizard(true);
     }
   }, [isMobile]);
@@ -255,7 +255,7 @@ export default function Editor() {
       // Draw branding watermark
       const w = finalCanvas.width;
       const h = finalCanvas.height;
-      const text = "Made with roomsketch.io";
+      const text = "Made with freeroomplanner.com";
       const fontSize = Math.max(14, Math.round(h * 0.018));
       ctx.font = `500 ${fontSize}px 'General Sans', 'DM Sans', sans-serif`;
       const metrics = ctx.measureText(text);
@@ -364,8 +364,8 @@ export default function Editor() {
     <div className="h-screen flex flex-col bg-background" data-testid="editor-page">
       {/* Header */}
       <header className="flex items-center gap-3 px-4 py-2 border-b border-border bg-card">
-        <RoomSketchLogo size={24} className="text-primary flex-shrink-0" />
-        <span className="text-sm font-semibold tracking-tight hidden md:inline">RoomSketch</span>
+        <FreeRoomPlannerLogo size={24} className="text-primary flex-shrink-0" />
+        <span className="text-sm font-semibold tracking-tight hidden md:inline">Free Room Planner</span>
         <Separator orientation="vertical" className="h-5 hidden md:block" />
         <Input
           value={state.roomName}

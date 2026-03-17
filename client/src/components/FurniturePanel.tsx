@@ -51,7 +51,7 @@ interface FurniturePanelProps {
 export default function FurniturePanel({ onSelectFurniture, onSwitchToSelect, className }: FurniturePanelProps) {
   const [selectedCategory, setSelectedCategory] = useState(() => {
     try {
-      const stored = JSON.parse(localStorage.getItem("roomsketch-intent") || "{}");
+      const stored = JSON.parse(localStorage.getItem("freeroomplanner-intent") || "{}");
       const map: Record<string, string> = {
         kitchen_renovation: "Kitchen",
         bathroom_renovation: "Bathroom",

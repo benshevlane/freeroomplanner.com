@@ -29,7 +29,7 @@ export default function IntentCapture({ onComplete }: IntentCaptureProps) {
     setSelected(value);
 
     const data = { intent: value };
-    localStorage.setItem("roomsketch-intent", JSON.stringify(data));
+    localStorage.setItem("freeroomplanner-intent", JSON.stringify(data));
     console.log("[IntentCapture] Selected intent:", data);
 
     // Brief delay to show selection highlight, then transition out

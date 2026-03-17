@@ -1,4 +1,4 @@
-# RoomSketch
+# Free Room Planner
 
 A free, browser-based room planning tool for homeowners. Draw floor plans, place furniture, and export to PDF — no login required.
 
@@ -48,7 +48,7 @@ The app runs on `http://localhost:5000` by default.
 ## Project Structure
 
 ```
-roomsketch/
+freeroomplanner/
 ├── client/
 │   └── src/
 │       ├── components/     # React components (Canvas, Toolbar, Panels)

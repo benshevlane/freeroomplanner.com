@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
-import RoomSketchLogo from "@/components/RoomSketchLogo";
+import FreeRoomPlannerLogo from "@/components/FreeRoomPlannerLogo";
 
 const features = [
   {
@@ -110,8 +110,8 @@ export default function Landing() {
       <header className={`sticky top-0 z-50 border-b ${isDark ? "bg-[#1a1a18]/95 border-[#2e2e2a]" : "bg-[#faf8f4]/95 border-[#e8e3d8]"} backdrop-blur-sm`}>
         <div className="max-w-5xl mx-auto px-5 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <RoomSketchLogo size={24} className={isDark ? "text-[#5ba89a]" : "text-[#3d8a7c]"} />
-            <span className="font-semibold text-[15px] tracking-tight">RoomSketch</span>
+            <FreeRoomPlannerLogo size={24} className={isDark ? "text-[#5ba89a]" : "text-[#3d8a7c]"} />
+            <span className="font-semibold text-[15px] tracking-tight">Free Room Planner</span>
           </div>
           <nav className="hidden sm:flex items-center gap-6 text-sm">
             <a href="#how-it-works" onClick={scrollTo("how-it-works")} className={`${isDark ? "text-[#a09a8c] hover:text-[#f0ede6]" : "text-[#6b6457] hover:text-[#1a1a18]"} transition-colors`}>How it works</a>
@@ -177,7 +177,7 @@ export default function Landing() {
               <span className="w-2.5 h-2.5 rounded-full bg-[#ff5f57]"/>
               <span className="w-2.5 h-2.5 rounded-full bg-[#ffbd2e]"/>
               <span className="w-2.5 h-2.5 rounded-full bg-[#28c840]"/>
-              <span className={`ml-3 text-xs ${isDark ? "text-[#5a5a52]" : "text-[#9a9488]"}`}>roomsketch.io/app</span>
+              <span className={`ml-3 text-xs ${isDark ? "text-[#5a5a52]" : "text-[#9a9488]"}`}>freeroomplanner.com/app</span>
             </div>
             {/* Floor plan SVG */}
             <svg viewBox="0 0 480 280" className="w-full" style={{ background: isDark ? "#222220" : "#faf8f4" }}>
@@ -288,7 +288,7 @@ export default function Landing() {
       <section className="max-w-5xl mx-auto px-5 py-20">
         <div className="rs-fade opacity-0 translate-y-4 transition-all duration-700 text-center mb-12">
           <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mb-3">Built for real projects</h2>
-          <p className={`${isDark ? "text-[#a09a8c]" : "text-[#6b6457]"}`}>Homeowners use RoomSketch to communicate clearly before work starts.</p>
+          <p className={`${isDark ? "text-[#a09a8c]" : "text-[#6b6457]"}`}>Homeowners use Free Room Planner to communicate clearly before work starts.</p>
         </div>
         <div className="grid sm:grid-cols-2 gap-5">
           {useCases.map((u, i) => (
@@ -341,7 +341,7 @@ export default function Landing() {
             onClick={goToApp}
             className="px-8 py-3.5 rounded-xl text-base font-semibold bg-[#3d8a7c] hover:bg-[#327368] text-white transition-colors shadow-md"
           >
-            Open RoomSketch — free
+            Open Free Room Planner
           </button>
         </div>
       </section>
@@ -350,10 +350,10 @@ export default function Landing() {
       <footer className={`border-t py-8 ${isDark ? "border-[#2e2e2a] bg-[#1a1a18] text-[#5a5a52]" : "border-[#e8e3d8] bg-[#faf8f4] text-[#9a9488]"}`}>
         <div className="max-w-5xl mx-auto px-5 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
           <div className="flex items-center gap-2">
-            <RoomSketchLogo size={16} className={isDark ? "text-[#5a5a52]" : "text-[#9a9488]"} />
-            <span>RoomSketch — Free Room Planner</span>
+            <FreeRoomPlannerLogo size={16} className={isDark ? "text-[#5a5a52]" : "text-[#9a9488]"} />
+            <span>Free Room Planner</span>
           </div>
-          <span>© {new Date().getFullYear()} RoomSketch. Free to use.</span>
+          <span>© {new Date().getFullYear()} Free Room Planner. Free to use.</span>
         </div>
       </footer>
 
