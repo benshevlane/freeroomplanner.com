@@ -2502,6 +2502,8 @@ export function drawDistanceMeasurements(
       const alongDists = computeAlongWallDistances(selectedItem, hostWall);
       const toDraw = alongDists;
       ctx.save();
+
+      // First pass: draw all dashed lines and end ticks
       for (const d of toDraw) {
         const sx = d.furnitureEdgePt.x * pxPerCm + panOffset.x;
         const sy = d.furnitureEdgePt.y * pxPerCm + panOffset.y;
@@ -2529,6 +2531,14 @@ export function drawDistanceMeasurements(
           ctx.moveTo(ex - tickLen, ey); ctx.lineTo(ex + tickLen, ey);
           ctx.stroke();
         }
+      }
+
+      // Second pass: draw all labels on top of lines
+      for (const d of toDraw) {
+        const sx = d.furnitureEdgePt.x * pxPerCm + panOffset.x;
+        const sy = d.furnitureEdgePt.y * pxPerCm + panOffset.y;
+        const ex = d.wallPt.x * pxPerCm + panOffset.x;
+        const ey = d.wallPt.y * pxPerCm + panOffset.y;
 
         const text = formatLength(d.dist, units);
         const fontSize = Math.max(10, 11 * zoom);
@@ -2556,12 +2566,14 @@ export function drawDistanceMeasurements(
   const furnDists = computeFurnitureToFurnitureDistances(selectedItem, furniture);
   const allDists = [...wallDists, ...furnDists.map(d => ({ dist: d.dist, furnitureEdgePt: d.fromPt, wallPt: d.toPt, axis: d.axis }))];
 
-  // Keep only the closest distance per axis direction (up to 2 horizontal, 2 vertical)
-  const hDists = allDists.filter(d => d.axis === "h").sort((a, b) => a.dist - b.dist).slice(0, 2);
-  const vDists = allDists.filter(d => d.axis === "v").sort((a, b) => a.dist - b.dist).slice(0, 2);
+  // Keep only the closest distance per axis direction (1 horizontal, 1 vertical)
+  const hDists = allDists.filter(d => d.axis === "h").sort((a, b) => a.dist - b.dist).slice(0, 1);
+  const vDists = allDists.filter(d => d.axis === "v").sort((a, b) => a.dist - b.dist).slice(0, 1);
   const toDraw = [...hDists, ...vDists];
 
   ctx.save();
+
+  // First pass: draw all dashed lines and end ticks
   for (const d of toDraw) {
     const sx = d.furnitureEdgePt.x * pxPerCm + panOffset.x;
     const sy = d.furnitureEdgePt.y * pxPerCm + panOffset.y;
@@ -2591,8 +2603,15 @@ export function drawDistanceMeasurements(
       ctx.moveTo(ex - tickLen, ey); ctx.lineTo(ex + tickLen, ey);
       ctx.stroke();
     }
+  }
 
-    // Label
+  // Second pass: draw all labels on top of lines
+  for (const d of toDraw) {
+    const sx = d.furnitureEdgePt.x * pxPerCm + panOffset.x;
+    const sy = d.furnitureEdgePt.y * pxPerCm + panOffset.y;
+    const ex = d.wallPt.x * pxPerCm + panOffset.x;
+    const ey = d.wallPt.y * pxPerCm + panOffset.y;
+
     const text = formatLength(d.dist, units);
     const fontSize = Math.max(10, 11 * zoom);
     ctx.font = `500 ${fontSize}px 'General Sans', 'DM Sans', sans-serif`;
