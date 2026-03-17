@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from "react";
-import { EditorState, Wall, FurnitureItem, RoomLabel, Point, EditorTool, FurnitureTemplate, UnitSystem } from "../lib/types";
+import { EditorState, Wall, FurnitureItem, RoomLabel, ArrowItem, Point, EditorTool, FurnitureTemplate, UnitSystem } from "../lib/types";
 
 function generateId(): string {
   return Math.random().toString(36).slice(2, 10);
@@ -9,6 +9,7 @@ const INITIAL_STATE: EditorState = {
   walls: [],
   furniture: [],
   labels: [],
+  arrows: [],
   gridSize: 80, // 80px = 1m at default zoom
   zoom: 1,
   panOffset: { x: 200, y: 100 },
@@ -16,6 +17,7 @@ const INITIAL_STATE: EditorState = {
   selectedItemId: null,
   wallDrawing: null,
   wallChainStart: null,
+  arrowDrawing: null,
   roomName: "My Room",
   units: "m" as UnitSystem,
   roomNames: {},
@@ -29,7 +31,7 @@ export function useEditor() {
 
   const pushUndo = useCallback(() => {
     setState((s) => {
-      undoStack.current.push({ ...s, walls: [...s.walls], furniture: [...s.furniture], labels: [...s.labels], roomNames: { ...s.roomNames } });
+      undoStack.current.push({ ...s, walls: [...s.walls], furniture: [...s.furniture], labels: [...s.labels], arrows: [...s.arrows], roomNames: { ...s.roomNames } });
       redoStack.current = [];
       if (undoStack.current.length > 50) undoStack.current.shift();
       return s;
@@ -40,7 +42,7 @@ export function useEditor() {
     if (undoStack.current.length === 0) return;
     const prev = undoStack.current.pop()!;
     setState((s) => {
-      redoStack.current.push({ ...s, walls: [...s.walls], furniture: [...s.furniture], labels: [...s.labels], roomNames: { ...s.roomNames } });
+      redoStack.current.push({ ...s, walls: [...s.walls], furniture: [...s.furniture], labels: [...s.labels], arrows: [...s.arrows], roomNames: { ...s.roomNames } });
       return prev;
     });
   }, []);
@@ -49,13 +51,13 @@ export function useEditor() {
     if (redoStack.current.length === 0) return;
     const next = redoStack.current.pop()!;
     setState((s) => {
-      undoStack.current.push({ ...s, walls: [...s.walls], furniture: [...s.furniture], labels: [...s.labels], roomNames: { ...s.roomNames } });
+      undoStack.current.push({ ...s, walls: [...s.walls], furniture: [...s.furniture], labels: [...s.labels], arrows: [...s.arrows], roomNames: { ...s.roomNames } });
       return next;
     });
   }, []);
 
   const setTool = useCallback((tool: EditorTool) => {
-    setState((s) => ({ ...s, selectedTool: tool, selectedItemId: null, wallDrawing: null, wallChainStart: null }));
+    setState((s) => ({ ...s, selectedTool: tool, selectedItemId: null, wallDrawing: null, wallChainStart: null, arrowDrawing: null }));
   }, []);
 
   const setSelectedItem = useCallback((id: string | null) => {
@@ -96,12 +98,39 @@ export function useEditor() {
   }, [pushUndo]);
 
   const moveFurniture = useCallback((id: string, x: number, y: number) => {
-    setState((s) => ({
-      ...s,
-      furniture: s.furniture.map((f) =>
+    setState((s) => {
+      const updatedFurniture = s.furniture.map((f) =>
         f.id === id ? { ...f, x, y } : f
-      ),
-    }));
+      );
+      // Update arrows attached to this furniture
+      const movedItem = updatedFurniture.find((f) => f.id === id);
+      if (!movedItem || s.arrows.length === 0) {
+        return { ...s, furniture: updatedFurniture };
+      }
+      const updatedArrows = s.arrows.map((a) => {
+        let updated = a;
+        if (a.startAttachment?.componentId === id) {
+          updated = {
+            ...updated,
+            startPoint: {
+              x: movedItem.x + movedItem.width * a.startAttachment.anchorX,
+              y: movedItem.y + movedItem.height * a.startAttachment.anchorY,
+            },
+          };
+        }
+        if (a.endAttachment?.componentId === id) {
+          updated = {
+            ...updated,
+            endPoint: {
+              x: movedItem.x + movedItem.width * a.endAttachment.anchorX,
+              y: movedItem.y + movedItem.height * a.endAttachment.anchorY,
+            },
+          };
+        }
+        return updated;
+      });
+      return { ...s, furniture: updatedFurniture, arrows: updatedArrows };
+    });
   }, []);
 
   const rotateFurniture = useCallback((id: string) => {
@@ -185,9 +214,11 @@ export function useEditor() {
       walls: [],
       furniture: [],
       labels: [],
+      arrows: [],
       roomNames: {},
       selectedItemId: null,
       wallDrawing: null,
+      arrowDrawing: null,
     }));
   }, [pushUndo]);
 
@@ -224,6 +255,45 @@ export function useEditor() {
     }));
   }, []);
 
+  // Arrow methods
+  const addArrow = useCallback((arrow: ArrowItem) => {
+    pushUndo();
+    setState((s) => ({ ...s, arrows: [...s.arrows, arrow], selectedItemId: arrow.id }));
+  }, [pushUndo]);
+
+  const removeArrow = useCallback((id: string) => {
+    pushUndo();
+    setState((s) => ({
+      ...s,
+      arrows: s.arrows.filter((a) => a.id !== id),
+      selectedItemId: null,
+    }));
+  }, [pushUndo]);
+
+  const updateArrow = useCallback((id: string, updates: Partial<ArrowItem>) => {
+    setState((s) => ({
+      ...s,
+      arrows: s.arrows.map((a) =>
+        a.id === id ? { ...a, ...updates } : a
+      ),
+    }));
+  }, []);
+
+  const moveArrowEndpoint = useCallback((id: string, endpoint: "start" | "end", point: Point) => {
+    setState((s) => ({
+      ...s,
+      arrows: s.arrows.map((a) =>
+        a.id === id
+          ? endpoint === "start" ? { ...a, startPoint: point } : { ...a, endPoint: point }
+          : a
+      ),
+    }));
+  }, []);
+
+  const setArrowDrawing = useCallback((drawing: { start: Point } | null) => {
+    setState((s) => ({ ...s, arrowDrawing: drawing }));
+  }, []);
+
   const setRoomNameForRoom = useCallback((roomKey: string, name: string) => {
     pushUndo();
     setState((s) => ({
@@ -243,12 +313,13 @@ export function useEditor() {
       walls: state.walls,
       furniture: state.furniture,
       labels: state.labels,
+      arrows: state.arrows,
       roomNames: state.roomNames,
       componentLabelsVisible: state.componentLabelsVisible,
     };
-  }, [state.roomName, state.walls, state.furniture, state.labels, state.roomNames, state.componentLabelsVisible]);
+  }, [state.roomName, state.walls, state.furniture, state.labels, state.arrows, state.roomNames, state.componentLabelsVisible]);
 
-  const importState = useCallback((plan: { version: number; roomName: string; walls: Wall[]; furniture: FurnitureItem[]; labels: RoomLabel[]; roomNames?: Record<string, string>; componentLabelsVisible?: boolean }) => {
+  const importState = useCallback((plan: { version: number; roomName: string; walls: Wall[]; furniture: FurnitureItem[]; labels: RoomLabel[]; arrows?: ArrowItem[]; roomNames?: Record<string, string>; componentLabelsVisible?: boolean }) => {
     pushUndo();
     setState((s) => ({
       ...s,
@@ -256,10 +327,12 @@ export function useEditor() {
       walls: plan.walls,
       furniture: plan.furniture,
       labels: plan.labels,
+      arrows: plan.arrows || [],
       roomNames: plan.roomNames || {},
       componentLabelsVisible: plan.componentLabelsVisible ?? true,
       selectedItemId: null,
       wallDrawing: null,
+      arrowDrawing: null,
     }));
   }, [pushUndo]);
 
@@ -294,5 +367,10 @@ export function useEditor() {
     splitWallAndConnect,
     setRoomNameForRoom,
     toggleComponentLabels,
+    addArrow,
+    removeArrow,
+    updateArrow,
+    moveArrowEndpoint,
+    setArrowDrawing,
   };
 }

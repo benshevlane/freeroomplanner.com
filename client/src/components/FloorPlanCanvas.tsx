@@ -1,5 +1,5 @@
 import { useRef, useEffect, useCallback, useState } from "react";
-import { EditorState, Point, FurnitureTemplate, FurnitureItem, RoomLabel, UnitSystem, MeasureMode } from "../lib/types";
+import { EditorState, Point, FurnitureTemplate, FurnitureItem, RoomLabel, ArrowItem, UnitSystem, MeasureMode } from "../lib/types";
 import {
   drawGrid,
   drawWalls,
@@ -35,6 +35,15 @@ import {
   hitTestLabel,
   hitTestResizeHandle,
   ResizeCorner,
+  drawArrows,
+  drawArrowHandles,
+  drawArrowPreview,
+  hitTestArrow,
+  hitTestArrowHandle,
+  ArrowHandle,
+  snapArrowToComponents,
+  resolveArrowAttachment,
+  drawArrowSnapIndicator,
 } from "../lib/canvas-renderer";
 import { isWallCupboard } from "../lib/types";
 import { detectRooms } from "../lib/room-detection";
@@ -61,6 +70,11 @@ interface FloorPlanCanvasProps {
   onUpdateFurniture: (id: string, updates: Partial<FurnitureItem>) => void;
   onSplitWallAndConnect: (wallId: string, splitPoint: Point, newWallStart: Point) => void;
   onSetRoomName: (roomKey: string, name: string) => void;
+  onAddArrow: (arrow: ArrowItem) => void;
+  onRemoveArrow: (id: string) => void;
+  onUpdateArrow: (id: string, updates: Partial<ArrowItem>) => void;
+  onMoveArrowEndpoint: (id: string, endpoint: "start" | "end", point: Point) => void;
+  onSetArrowDrawing: (drawing: { start: Point } | null) => void;
 }
 
 export default function FloorPlanCanvas({
@@ -85,6 +99,11 @@ export default function FloorPlanCanvas({
   onUpdateFurniture,
   onSplitWallAndConnect,
   onSetRoomName,
+  onAddArrow,
+  onRemoveArrow,
+  onUpdateArrow,
+  onMoveArrowEndpoint,
+  onSetArrowDrawing,
 }: FloorPlanCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -101,6 +120,12 @@ export default function FloorPlanCanvas({
   const [isRotating, setIsRotating] = useState(false);
   const [rotateStartAngle, setRotateStartAngle] = useState(0);
   const [rotateItemStartRot, setRotateItemStartRot] = useState(0);
+
+  // Arrow drawing/editing state
+  const [isDraggingArrowHandle, setIsDraggingArrowHandle] = useState(false);
+  const [arrowDragHandle, setArrowDragHandle] = useState<ArrowHandle | null>(null);
+  const arrowDrawingRef = useRef(state.arrowDrawing);
+  arrowDrawingRef.current = state.arrowDrawing;
 
   // Inline label editing state
   const [editingLabel, setEditingLabel] = useState<{ id: string | null; x: number; y: number; text: string; isNew: boolean; isRoomLabel?: boolean; roomKey?: string }>({ id: null, x: 0, y: 0, text: "", isNew: false });
@@ -251,6 +276,40 @@ export default function FloorPlanCanvas({
     const doorWindowItems = state.furniture.filter((f) => f.type === "door" || f.type === "window");
     drawFurniture(ctx, doorWindowItems, state.gridSize, state.zoom, state.panOffset, isDark, state.selectedItemId);
 
+    // Draw arrows (above furniture, below labels)
+    // First resolve attachments — update arrow endpoints that are attached to moved components
+    const resolvedArrows = state.arrows.map((arrow) => {
+      let resolved = arrow;
+      if (arrow.startAttachment) {
+        const pt = resolveArrowAttachment(arrow.startAttachment, state.furniture);
+        if (pt) resolved = { ...resolved, startPoint: pt };
+      }
+      if (arrow.endAttachment) {
+        const pt = resolveArrowAttachment(arrow.endAttachment, state.furniture);
+        if (pt) resolved = { ...resolved, endPoint: pt };
+      }
+      return resolved;
+    });
+    drawArrows(ctx, resolvedArrows, state.gridSize, state.zoom, state.panOffset, isDark, state.selectedItemId);
+
+    // Draw arrow handles for selected arrow
+    const selectedArrow = resolvedArrows.find((a) => a.id === state.selectedItemId);
+    if (selectedArrow && state.selectedTool === "select") {
+      drawArrowHandles(ctx, selectedArrow, state.gridSize, state.zoom, state.panOffset);
+    }
+
+    // Arrow preview while drawing
+    if (state.arrowDrawing && state.selectedTool === "arrow") {
+      const worldMouse = screenToWorld(mousePos.x, mousePos.y, state.gridSize, state.zoom, state.panOffset);
+      const gridSnapped = snapToGrid(worldMouse, 10);
+      const compSnap = snapArrowToComponents(worldMouse, state.furniture, 15);
+      const finalPoint = compSnap.didSnap ? compSnap.snapped : gridSnapped;
+      drawArrowPreview(ctx, state.arrowDrawing.start, finalPoint, state.gridSize, state.zoom, state.panOffset, isDark);
+      if (compSnap.didSnap) {
+        drawArrowSnapIndicator(ctx, compSnap.snapped, state.gridSize, state.zoom, state.panOffset, true);
+      }
+    }
+
     // Collect component label positions (without drawing) for collision resolution
     const componentLabelInfos = state.componentLabelsVisible
       ? collectComponentLabelRects(ctx, state.furniture, state.gridSize, state.zoom, state.panOffset, isDark, state.selectedItemId, state.units)
@@ -293,7 +352,7 @@ export default function FloorPlanCanvas({
 
     // Eraser hover highlight
     if (state.selectedTool === "eraser" && eraserHoverId) {
-      drawEraserHighlight(ctx, eraserHoverId, state.walls, state.furniture, state.labels, state.gridSize, state.zoom, state.panOffset);
+      drawEraserHighlight(ctx, eraserHoverId, state.walls, state.furniture, state.labels, state.gridSize, state.zoom, state.panOffset, state.arrows);
     }
 
     // Scale indicator
@@ -427,6 +486,18 @@ export default function FloorPlanCanvas({
       if (!ctx) return;
 
       if (state.selectedTool === "select") {
+        // Check arrow handle first if an arrow is selected
+        const selectedArrowItem = state.arrows.find((a) => a.id === state.selectedItemId);
+        if (selectedArrowItem) {
+          const handle = hitTestArrowHandle(pos.x, pos.y, selectedArrowItem, state.gridSize, state.zoom, state.panOffset);
+          if (handle) {
+            setIsDraggingArrowHandle(true);
+            setArrowDragHandle(handle);
+            onPushUndo();
+            return;
+          }
+        }
+
         // Check rotation handle first, then resize handles
         const selectedFurn = state.furniture.find((f) => f.id === state.selectedItemId);
         if (selectedFurn) {
@@ -458,7 +529,7 @@ export default function FloorPlanCanvas({
           }
         }
 
-        // Try to hit test furniture first, then walls, then labels
+        // Try to hit test furniture first, then arrows, then walls, then labels
         const hitFurn = hitTestFurniture(pos.x, pos.y, state.furniture, state.gridSize, state.zoom, state.panOffset);
         if (hitFurn) {
           const pxPerCm = (state.gridSize * state.zoom) / 100;
@@ -483,6 +554,13 @@ export default function FloorPlanCanvas({
           return;
         }
 
+        // Hit test arrows
+        const hitArr = hitTestArrow(pos.x, pos.y, state.arrows, state.gridSize, state.zoom, state.panOffset);
+        if (hitArr) {
+          onSelectItem(hitArr.id);
+          return;
+        }
+
         const hitW = hitTestWall(pos.x, pos.y, state.walls, state.gridSize, state.zoom, state.panOffset);
         if (hitW) {
           onSelectItem(hitW.id);
@@ -491,6 +569,17 @@ export default function FloorPlanCanvas({
 
         onSelectItem(null);
         setSelectedRoomKey(null);
+      } else if (state.selectedTool === "arrow") {
+        // Arrow drawing tool
+        const world = screenToWorld(pos.x, pos.y, state.gridSize, state.zoom, state.panOffset);
+        const gridSnapped = snapToGrid(world, 10);
+        const compSnap = snapArrowToComponents(world, state.furniture, 15);
+        const finalPoint = compSnap.didSnap ? compSnap.snapped : gridSnapped;
+
+        if (!arrowDrawingRef.current) {
+          onSetArrowDrawing({ start: finalPoint });
+          arrowDrawingRef.current = { start: finalPoint };
+        }
       } else if (state.selectedTool === "wall") {
         const world = screenToWorld(pos.x, pos.y, state.gridSize, state.zoom, state.panOffset);
         const gridSnapped = snapToGrid(world, 10);
@@ -545,6 +634,9 @@ export default function FloorPlanCanvas({
         const hitLbl = hitTestLabel(pos.x, pos.y, state.labels, state.gridSize, state.zoom, state.panOffset, ctx);
         if (hitLbl) { onRemoveLabel(hitLbl.id); return; }
 
+        const hitArr = hitTestArrow(pos.x, pos.y, state.arrows, state.gridSize, state.zoom, state.panOffset);
+        if (hitArr) { onRemoveArrow(hitArr.id); return; }
+
         const hitW = hitTestWall(pos.x, pos.y, state.walls, state.gridSize, state.zoom, state.panOffset);
         if (hitW) { onRemoveWall(hitW.id); return; }
       } else if (state.selectedTool === "label") {
@@ -560,7 +652,7 @@ export default function FloorPlanCanvas({
         setTimeout(() => labelInputRef.current?.focus(), 0);
       }
     },
-    [state, getCanvasPos, onSelectItem, onAddWall, onSetWallDrawing, onRemoveWall, onRemoveFurniture, onRemoveLabel, onPushUndo, onUpdateFurniture, onSplitWallAndConnect]
+    [state, getCanvasPos, onSelectItem, onAddWall, onSetWallDrawing, onRemoveWall, onRemoveFurniture, onRemoveLabel, onRemoveArrow, onPushUndo, onUpdateFurniture, onSplitWallAndConnect, onSetArrowDrawing]
   );
 
   // Store world position for new labels
@@ -724,6 +816,46 @@ export default function FloorPlanCanvas({
         return;
       }
 
+      // Arrow handle dragging
+      if (isDraggingArrowHandle && arrowDragHandle && state.selectedItemId) {
+        const world = screenToWorld(pos.x, pos.y, state.gridSize, state.zoom, state.panOffset);
+        const gridSnapped = snapToGrid(world, 10);
+        const compSnap = snapArrowToComponents(world, state.furniture, 15);
+        const finalPoint = compSnap.didSnap ? compSnap.snapped : gridSnapped;
+        const arrow = state.arrows.find((a) => a.id === state.selectedItemId);
+        if (arrow) {
+          if (arrowDragHandle === "start") {
+            const updates: Partial<ArrowItem> = { startPoint: finalPoint };
+            if (compSnap.didSnap && compSnap.attachment) {
+              updates.startAttachment = compSnap.attachment;
+            } else {
+              updates.startAttachment = undefined;
+            }
+            onUpdateArrow(state.selectedItemId, updates);
+          } else if (arrowDragHandle === "end") {
+            const updates: Partial<ArrowItem> = { endPoint: finalPoint };
+            if (compSnap.didSnap && compSnap.attachment) {
+              updates.endAttachment = compSnap.attachment;
+            } else {
+              updates.endAttachment = undefined;
+            }
+            onUpdateArrow(state.selectedItemId, updates);
+          } else if (arrowDragHandle === "midpoint") {
+            // Convert straight to curved by creating a control point
+            onUpdateArrow(state.selectedItemId, {
+              lineType: "curved",
+              controlPoints: [finalPoint],
+            });
+            setArrowDragHandle({ type: "control", index: 0 });
+          } else if (typeof arrowDragHandle === "object" && arrowDragHandle.type === "control") {
+            const newCps = [...arrow.controlPoints];
+            newCps[arrowDragHandle.index] = finalPoint;
+            onUpdateArrow(state.selectedItemId, { controlPoints: newCps });
+          }
+        }
+        return;
+      }
+
       if (isDragging && state.selectedItemId) {
         const pxPerCm = (state.gridSize * state.zoom) / 100;
         const worldX = (pos.x - dragItemOffset.x - state.panOffset.x) / pxPerCm;
@@ -775,8 +907,13 @@ export default function FloorPlanCanvas({
           if (hitLbl) {
             setEraserHoverId(hitLbl.id);
           } else {
-            const hitW = hitTestWall(pos.x, pos.y, state.walls, state.gridSize, state.zoom, state.panOffset);
-            setEraserHoverId(hitW ? hitW.id : null);
+            const hitArr = hitTestArrow(pos.x, pos.y, state.arrows, state.gridSize, state.zoom, state.panOffset);
+            if (hitArr) {
+              setEraserHoverId(hitArr.id);
+            } else {
+              const hitW = hitTestWall(pos.x, pos.y, state.walls, state.gridSize, state.zoom, state.panOffset);
+              setEraserHoverId(hitW ? hitW.id : null);
+            }
           }
         } else {
           setEraserHoverId(null);
@@ -785,7 +922,7 @@ export default function FloorPlanCanvas({
         setEraserHoverId(null);
       }
     },
-    [state, isPanning, isDragging, isResizing, isRotating, rotateStartAngle, rotateItemStartRot, resizeStart, resizeCorner, dragStart, dragItemOffset, eraserHoverId, getCanvasPos, onSetPan, onSetZoom, onMoveFurniture, onMoveLabel, onUpdateFurniture]
+    [state, isPanning, isDragging, isResizing, isRotating, isDraggingArrowHandle, arrowDragHandle, rotateStartAngle, rotateItemStartRot, resizeStart, resizeCorner, dragStart, dragItemOffset, eraserHoverId, getCanvasPos, onSetPan, onSetZoom, onMoveFurniture, onMoveLabel, onUpdateFurniture, onUpdateArrow]
   );
 
   const handlePointerUp = useCallback(
@@ -840,6 +977,46 @@ export default function FloorPlanCanvas({
         return;
       }
 
+      // Arrow drawing complete on pointer up
+      if (state.selectedTool === "arrow" && arrowDrawingRef.current) {
+        const pos = getCanvasPos(e);
+        const world = screenToWorld(pos.x, pos.y, state.gridSize, state.zoom, state.panOffset);
+        const gridSnapped = snapToGrid(world, 10);
+        const compSnap = snapArrowToComponents(world, state.furniture, 15);
+        const finalPoint = compSnap.didSnap ? compSnap.snapped : gridSnapped;
+
+        const dx = finalPoint.x - arrowDrawingRef.current.start.x;
+        const dy = finalPoint.y - arrowDrawingRef.current.start.y;
+        if (Math.sqrt(dx * dx + dy * dy) > 5) {
+          // Check start point attachment too
+          const startSnap = snapArrowToComponents(arrowDrawingRef.current.start, state.furniture, 15);
+          const arrow: ArrowItem = {
+            id: Math.random().toString(36).slice(2, 10),
+            startPoint: arrowDrawingRef.current.start,
+            endPoint: finalPoint,
+            lineType: "straight",
+            controlPoints: [],
+            startHead: "none",
+            endHead: "filled-triangle",
+            strokeColor: isDark ? "#cdccca" : "#28251d",
+            strokeWeight: 2,
+            lineStyle: "solid",
+            dashPattern: "short",
+            opacity: 1,
+            startAttachment: startSnap.didSnap ? startSnap.attachment : undefined,
+            endAttachment: compSnap.didSnap ? compSnap.attachment : undefined,
+          };
+          onAddArrow(arrow);
+        }
+        onSetArrowDrawing(null);
+        arrowDrawingRef.current = null;
+        return;
+      }
+
+      if (isDraggingArrowHandle) {
+        onPushUndo();
+      }
+
       if (isDragging) {
         onPushUndo();
       }
@@ -847,10 +1024,12 @@ export default function FloorPlanCanvas({
       setIsPanning(false);
       setIsResizing(false);
       setIsRotating(false);
+      setIsDraggingArrowHandle(false);
+      setArrowDragHandle(null);
       setResizeCorner(null);
       setResizeStart(null);
     },
-    [isDragging, onPushUndo, state.selectedTool, state.gridSize, state.zoom, state.panOffset, state.walls, getCanvasPos, onAddWall, onSetWallDrawing, onSplitWallAndConnect]
+    [isDragging, isDraggingArrowHandle, onPushUndo, state.selectedTool, state.gridSize, state.zoom, state.panOffset, state.walls, state.furniture, isDark, getCanvasPos, onAddWall, onSetWallDrawing, onSplitWallAndConnect, onAddArrow, onSetArrowDrawing]
   );
 
   const handleWheel = useCallback(
@@ -899,6 +1078,68 @@ export default function FloorPlanCanvas({
         if (!ctx) return;
         const rect = canvas.getBoundingClientRect();
         const pos = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+
+        // Check if double-clicking an arrow
+        const hitArr = hitTestArrow(pos.x, pos.y, state.arrows, state.gridSize, state.zoom, state.panOffset);
+        if (hitArr) {
+          const handle = hitTestArrowHandle(pos.x, pos.y, hitArr, state.gridSize, state.zoom, state.panOffset);
+
+          // Polyline: double-click on a waypoint to delete it
+          if (hitArr.lineType === "polyline" && handle && typeof handle === "object" && handle.type === "control") {
+            onPushUndo();
+            const newCps = [...hitArr.controlPoints];
+            newCps.splice(handle.index, 1);
+            onUpdateArrow(hitArr.id, { controlPoints: newCps });
+            return;
+          }
+
+          // Polyline: double-click on segment to insert waypoint
+          if (hitArr.lineType === "polyline" && !handle) {
+            const world = screenToWorld(pos.x, pos.y, state.gridSize, state.zoom, state.panOffset);
+            const snapped = snapToGrid(world, 10);
+            onPushUndo();
+            // Find which segment was clicked and insert there
+            const allPts = [hitArr.startPoint, ...hitArr.controlPoints, hitArr.endPoint];
+            const pxPerCm = (state.gridSize * state.zoom) / 100;
+            let bestSeg = 0;
+            let bestDist = Infinity;
+            for (let i = 0; i < allPts.length - 1; i++) {
+              const p1x = allPts[i].x * pxPerCm + state.panOffset.x;
+              const p1y = allPts[i].y * pxPerCm + state.panOffset.y;
+              const p2x = allPts[i + 1].x * pxPerCm + state.panOffset.x;
+              const p2y = allPts[i + 1].y * pxPerCm + state.panOffset.y;
+              const dx = p2x - p1x, dy = p2y - p1y;
+              const lenSq = dx * dx + dy * dy;
+              let t = lenSq === 0 ? 0 : ((pos.x - p1x) * dx + (pos.y - p1y) * dy) / lenSq;
+              t = Math.max(0, Math.min(1, t));
+              const cx = p1x + t * dx, cy = p1y + t * dy;
+              const d = Math.sqrt((pos.x - cx) ** 2 + (pos.y - cy) ** 2);
+              if (d < bestDist) { bestDist = d; bestSeg = i; }
+            }
+            const newCps = [...hitArr.controlPoints];
+            // Insert at the position corresponding to the segment (segment i is between allPts[i] and allPts[i+1])
+            // controlPoints index = segment index - 1 (since first segment is startPoint to controlPoints[0])
+            newCps.splice(bestSeg, 0, snapped);
+            onUpdateArrow(hitArr.id, { controlPoints: newCps });
+            return;
+          }
+
+          // Otherwise: add/edit label (when not clicking a handle)
+          if (!handle) {
+            const pxPerCm = (state.gridSize * state.zoom) / 100;
+            const mid = {
+              x: ((hitArr.startPoint.x + hitArr.endPoint.x) / 2) * pxPerCm + state.panOffset.x,
+              y: ((hitArr.startPoint.y + hitArr.endPoint.y) / 2) * pxPerCm + state.panOffset.y,
+            };
+            setEditingLabel({ id: hitArr.id, x: mid.x, y: mid.y, text: hitArr.label || "", isNew: false });
+            editingLabelWorldPos.current = {
+              x: (hitArr.startPoint.x + hitArr.endPoint.x) / 2,
+              y: (hitArr.startPoint.y + hitArr.endPoint.y) / 2,
+            };
+            setTimeout(() => labelInputRef.current?.focus(), 0);
+            return;
+          }
+        }
 
         // Check room labels first
         const rooms = detectRooms(state.walls);
@@ -964,21 +1205,27 @@ export default function FloorPlanCanvas({
         onAddLabel(text, editingLabelWorldPos.current);
       }
     } else if (editingLabel.id) {
-      // Check if this is a furniture rename
-      const furn = state.furniture.find((f) => f.id === editingLabel.id);
-      if (furn) {
-        if (text) {
-          onUpdateFurniture(editingLabel.id, { customName: text });
-        }
+      // Check if this is an arrow label
+      const arr = state.arrows.find((a) => a.id === editingLabel.id);
+      if (arr) {
+        onUpdateArrow(editingLabel.id, { label: text || undefined });
       } else {
-        // Freeform label update
-        if (text) {
-          onUpdateLabel(editingLabel.id, { text });
+        // Check if this is a furniture rename
+        const furn = state.furniture.find((f) => f.id === editingLabel.id);
+        if (furn) {
+          if (text) {
+            onUpdateFurniture(editingLabel.id, { customName: text });
+          }
+        } else {
+          // Freeform label update
+          if (text) {
+            onUpdateLabel(editingLabel.id, { text });
+          }
         }
       }
     }
     setEditingLabel({ id: null, x: 0, y: 0, text: "", isNew: false });
-  }, [editingLabel, onAddLabel, onUpdateLabel, onSetRoomName, onUpdateFurniture, state.furniture]);
+  }, [editingLabel, onAddLabel, onUpdateLabel, onSetRoomName, onUpdateFurniture, onUpdateArrow, state.furniture, state.arrows]);
 
   const cancelLabel = useCallback(() => {
     setEditingLabel({ id: null, x: 0, y: 0, text: "", isNew: false });
@@ -1011,6 +1258,25 @@ export default function FloorPlanCanvas({
         const pos = getCanvasPosMouse(e);
         const world = screenToWorld(pos.x, pos.y, state.gridSize, state.zoom, state.panOffset);
         const snapped = snapToGrid(world, 10);
+        // Handle arrow template drop
+        if (template.type === "arrow") {
+          const arrow: ArrowItem = {
+            id: Math.random().toString(36).slice(2, 10),
+            startPoint: { x: snapped.x - 75, y: snapped.y },
+            endPoint: { x: snapped.x + 75, y: snapped.y },
+            lineType: "straight",
+            controlPoints: [],
+            startHead: "none",
+            endHead: "filled-triangle",
+            strokeColor: isDark ? "#cdccca" : "#28251d",
+            strokeWeight: 2,
+            lineStyle: "solid",
+            dashPattern: "short",
+            opacity: 1,
+          };
+          onAddArrow(arrow);
+          return;
+        }
         // Snap opening thickness to wall thickness on drop
         const isOpening = template.type === "door" || template.type === "window";
         if (isOpening) {
@@ -1039,6 +1305,8 @@ export default function FloorPlanCanvas({
         onSetWallDrawing(null);
         wallDrawingRef.current = null;
         wallPendingCommitRef.current = false;
+        onSetArrowDrawing(null);
+        arrowDrawingRef.current = null;
         onSelectItem(null);
         setSelectedRoomKey(null);
       }
@@ -1050,12 +1318,14 @@ export default function FloorPlanCanvas({
           if (wall) onRemoveWall(state.selectedItemId);
           const lbl = state.labels.find((l) => l.id === state.selectedItemId);
           if (lbl) onRemoveLabel(state.selectedItemId);
+          const arr = state.arrows.find((a) => a.id === state.selectedItemId);
+          if (arr) onRemoveArrow(state.selectedItemId);
         }
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [state.selectedItemId, state.furniture, state.walls, state.labels, onRemoveFurniture, onRemoveWall, onRemoveLabel, onSetWallDrawing, onSelectItem]);
+  }, [state.selectedItemId, state.furniture, state.walls, state.labels, state.arrows, onRemoveFurniture, onRemoveWall, onRemoveLabel, onRemoveArrow, onSetWallDrawing, onSetArrowDrawing, onSelectItem]);
 
   // Prevent native context menu so right-click can pan
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
@@ -1073,6 +1343,7 @@ export default function FloorPlanCanvas({
     }
     if (state.selectedTool === "pan") return "grab";
     if (state.selectedTool === "wall") return "crosshair";
+    if (state.selectedTool === "arrow") return "crosshair";
     if (state.selectedTool === "eraser") return "crosshair";
     if (state.selectedTool === "label") return "text";
     if (state.selectedTool === "select") return isDragging ? "grabbing" : "default";

@@ -1,4 +1,4 @@
-import { Wall, FurnitureItem, RoomLabel, Point, UnitSystem, MeasureMode, LabelColor, isWallCupboard } from "./types";
+import { Wall, FurnitureItem, RoomLabel, ArrowItem, ArrowHeadType, Point, UnitSystem, MeasureMode, LabelColor, isWallCupboard } from "./types";
 import { DetectedRoom } from "./room-detection";
 
 /** Convert cm to display string based on unit system */
@@ -2753,7 +2753,8 @@ export function drawEraserHighlight(
   labels: RoomLabel[],
   gridSize: number,
   zoom: number,
-  panOffset: Point
+  panOffset: Point,
+  arrows?: ArrowItem[],
 ) {
   const pxPerCm = (gridSize * zoom) / 100;
   const ERASER_COLOR = "#e53935";
@@ -2840,6 +2841,31 @@ export function drawEraserHighlight(
     ctx.strokeRect(lx - tw / 2 - pad, ly - th / 2 - pad, tw + pad * 2, th + pad * 2);
     ctx.setLineDash([]);
     ctx.restore();
+    return;
+  }
+
+  // Check arrows
+  if (arrows) {
+    const arrow = arrows.find((a) => a.id === hoveredId);
+    if (arrow) {
+      const sx = arrow.startPoint.x * pxPerCm + panOffset.x;
+      const sy = arrow.startPoint.y * pxPerCm + panOffset.y;
+      const ex = arrow.endPoint.x * pxPerCm + panOffset.x;
+      const ey = arrow.endPoint.y * pxPerCm + panOffset.y;
+
+      ctx.save();
+      ctx.strokeStyle = ERASER_COLOR;
+      ctx.lineWidth = arrow.strokeWeight + 6;
+      ctx.lineCap = "round";
+      ctx.globalAlpha = 0.35;
+      ctx.setLineDash([6, 4]);
+      ctx.beginPath();
+      ctx.moveTo(sx, sy);
+      ctx.lineTo(ex, ey);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
   }
 }
 
@@ -3355,4 +3381,590 @@ export function drawWallCupboardLegend(
   ctx.textAlign = "left";
   ctx.textBaseline = "middle";
   ctx.fillText(text, ix + iconW + gap, y + totalH / 2);
+}
+
+// ─── Arrow rendering ───────────────────────────────────────────────────────────
+
+function drawArrowHead(
+  ctx: CanvasRenderingContext2D,
+  x: number, y: number,
+  angle: number,
+  headType: ArrowHeadType,
+  size: number,
+  strokeColor: string,
+  strokeWeight: number,
+) {
+  if (headType === "none") return;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+  ctx.fillStyle = strokeColor;
+  ctx.strokeStyle = strokeColor;
+  ctx.lineWidth = strokeWeight * 0.5;
+  ctx.lineJoin = "round";
+
+  const s = size;
+  switch (headType) {
+    case "filled-triangle":
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(-s, -s * 0.45);
+      ctx.lineTo(-s, s * 0.45);
+      ctx.closePath();
+      ctx.fill();
+      break;
+    case "open-chevron":
+      ctx.beginPath();
+      ctx.moveTo(-s, -s * 0.45);
+      ctx.lineTo(0, 0);
+      ctx.lineTo(-s, s * 0.45);
+      ctx.stroke();
+      break;
+    case "circle": {
+      const r = s * 0.35;
+      ctx.beginPath();
+      ctx.arc(-r, 0, r, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    }
+    case "diamond-filled":
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(-s * 0.5, -s * 0.35);
+      ctx.lineTo(-s, 0);
+      ctx.lineTo(-s * 0.5, s * 0.35);
+      ctx.closePath();
+      ctx.fill();
+      break;
+    case "diamond-outline":
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(-s * 0.5, -s * 0.35);
+      ctx.lineTo(-s, 0);
+      ctx.lineTo(-s * 0.5, s * 0.35);
+      ctx.closePath();
+      ctx.stroke();
+      break;
+    case "square": {
+      const half = s * 0.35;
+      ctx.fillRect(-half * 2, -half, half * 2, half * 2);
+      break;
+    }
+  }
+  ctx.restore();
+}
+
+/** Compute points along an orthogonal route between two points */
+function computeOrthogonalPath(start: Point, end: Point, controlPoints: Point[]): Point[] {
+  if (controlPoints.length > 0) {
+    return [start, ...controlPoints, end];
+  }
+  // Auto-route: horizontal first, then vertical
+  const mid: Point = { x: end.x, y: start.y };
+  if (Math.abs(start.x - end.x) < 1) return [start, end];
+  if (Math.abs(start.y - end.y) < 1) return [start, end];
+  return [start, mid, end];
+}
+
+/** Get the midpoint of an arrow for label placement */
+function getArrowMidpoint(arrow: ArrowItem, pxPerCm: number, panOffset: Point): Point {
+  const sx = arrow.startPoint.x * pxPerCm + panOffset.x;
+  const sy = arrow.startPoint.y * pxPerCm + panOffset.y;
+  const ex = arrow.endPoint.x * pxPerCm + panOffset.x;
+  const ey = arrow.endPoint.y * pxPerCm + panOffset.y;
+
+  if (arrow.lineType === "curved" && arrow.controlPoints.length > 0) {
+    const cp = arrow.controlPoints[0];
+    const cpx = cp.x * pxPerCm + panOffset.x;
+    const cpy = cp.y * pxPerCm + panOffset.y;
+    // Quadratic bezier at t=0.5
+    const t = 0.5;
+    const x = (1 - t) * (1 - t) * sx + 2 * (1 - t) * t * cpx + t * t * ex;
+    const y = (1 - t) * (1 - t) * sy + 2 * (1 - t) * t * cpy + t * t * ey;
+    return { x, y };
+  }
+  return { x: (sx + ex) / 2, y: (sy + ey) / 2 };
+}
+
+export function drawArrows(
+  ctx: CanvasRenderingContext2D,
+  arrows: ArrowItem[],
+  gridSize: number,
+  zoom: number,
+  panOffset: Point,
+  isDark: boolean,
+  selectedItemId: string | null,
+) {
+  const pxPerCm = (gridSize * zoom) / 100;
+
+  for (const arrow of arrows) {
+    const sx = arrow.startPoint.x * pxPerCm + panOffset.x;
+    const sy = arrow.startPoint.y * pxPerCm + panOffset.y;
+    const ex = arrow.endPoint.x * pxPerCm + panOffset.x;
+    const ey = arrow.endPoint.y * pxPerCm + panOffset.y;
+    const isSelected = arrow.id === selectedItemId;
+
+    ctx.save();
+    ctx.globalAlpha = arrow.opacity;
+    ctx.strokeStyle = arrow.strokeColor;
+    ctx.lineWidth = arrow.strokeWeight;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+
+    // Set dash pattern
+    if (arrow.lineStyle === "dashed") {
+      const dashLen = arrow.dashPattern === "long" ? 16 : arrow.dashPattern === "dash-dot" ? 12 : 8;
+      const gapLen = arrow.dashPattern === "dash-dot" ? 4 : 6;
+      const dotLen = arrow.dashPattern === "dash-dot" ? 2 : 0;
+      if (arrow.dashPattern === "dash-dot") {
+        ctx.setLineDash([dashLen, gapLen, dotLen, gapLen]);
+      } else {
+        ctx.setLineDash([dashLen, gapLen]);
+      }
+    } else if (arrow.lineStyle === "dotted") {
+      ctx.setLineDash([2, 4]);
+    } else {
+      ctx.setLineDash([]);
+    }
+
+    // Draw the arrow path
+    ctx.beginPath();
+    if (arrow.lineType === "curved" && arrow.controlPoints.length > 0) {
+      const cp = arrow.controlPoints[0];
+      const cpx = cp.x * pxPerCm + panOffset.x;
+      const cpy = cp.y * pxPerCm + panOffset.y;
+      ctx.moveTo(sx, sy);
+      ctx.quadraticCurveTo(cpx, cpy, ex, ey);
+    } else if (arrow.lineType === "orthogonal") {
+      const path = computeOrthogonalPath(arrow.startPoint, arrow.endPoint, arrow.controlPoints);
+      for (let i = 0; i < path.length; i++) {
+        const px = path[i].x * pxPerCm + panOffset.x;
+        const py = path[i].y * pxPerCm + panOffset.y;
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+    } else if (arrow.lineType === "polyline" && arrow.controlPoints.length > 0) {
+      ctx.moveTo(sx, sy);
+      for (const cp of arrow.controlPoints) {
+        ctx.lineTo(cp.x * pxPerCm + panOffset.x, cp.y * pxPerCm + panOffset.y);
+      }
+      ctx.lineTo(ex, ey);
+    } else {
+      // Straight line
+      ctx.moveTo(sx, sy);
+      ctx.lineTo(ex, ey);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Draw arrowheads
+    const headSize = Math.max(10, arrow.strokeWeight * 3);
+
+    // End head angle
+    let endAngle: number;
+    if (arrow.lineType === "curved" && arrow.controlPoints.length > 0) {
+      const cp = arrow.controlPoints[0];
+      const cpx = cp.x * pxPerCm + panOffset.x;
+      const cpy = cp.y * pxPerCm + panOffset.y;
+      // Tangent at t=1 for quadratic bezier
+      endAngle = Math.atan2(ey - cpy, ex - cpx);
+    } else if (arrow.lineType === "orthogonal") {
+      const path = computeOrthogonalPath(arrow.startPoint, arrow.endPoint, arrow.controlPoints);
+      const last = path[path.length - 1];
+      const prev = path[path.length - 2];
+      endAngle = Math.atan2(
+        last.y * pxPerCm + panOffset.y - (prev.y * pxPerCm + panOffset.y),
+        last.x * pxPerCm + panOffset.x - (prev.x * pxPerCm + panOffset.x)
+      );
+    } else if (arrow.lineType === "polyline" && arrow.controlPoints.length > 0) {
+      const lastCp = arrow.controlPoints[arrow.controlPoints.length - 1];
+      endAngle = Math.atan2(ey - (lastCp.y * pxPerCm + panOffset.y), ex - (lastCp.x * pxPerCm + panOffset.x));
+    } else {
+      endAngle = Math.atan2(ey - sy, ex - sx);
+    }
+    drawArrowHead(ctx, ex, ey, endAngle, arrow.endHead, headSize, arrow.strokeColor, arrow.strokeWeight);
+
+    // Start head angle (reversed)
+    let startAngle: number;
+    if (arrow.lineType === "curved" && arrow.controlPoints.length > 0) {
+      const cp = arrow.controlPoints[0];
+      const cpx = cp.x * pxPerCm + panOffset.x;
+      const cpy = cp.y * pxPerCm + panOffset.y;
+      startAngle = Math.atan2(sy - cpy, sx - cpx);
+    } else if (arrow.lineType === "orthogonal") {
+      const path = computeOrthogonalPath(arrow.startPoint, arrow.endPoint, arrow.controlPoints);
+      startAngle = Math.atan2(
+        path[0].y * pxPerCm + panOffset.y - (path[1].y * pxPerCm + panOffset.y),
+        path[0].x * pxPerCm + panOffset.x - (path[1].x * pxPerCm + panOffset.x)
+      );
+    } else if (arrow.lineType === "polyline" && arrow.controlPoints.length > 0) {
+      const firstCp = arrow.controlPoints[0];
+      startAngle = Math.atan2(sy - (firstCp.y * pxPerCm + panOffset.y), sx - (firstCp.x * pxPerCm + panOffset.x));
+    } else {
+      startAngle = Math.atan2(sy - ey, sx - ex);
+    }
+    drawArrowHead(ctx, sx, sy, startAngle, arrow.startHead, headSize, arrow.strokeColor, arrow.strokeWeight);
+
+    ctx.globalAlpha = 1;
+
+    // Draw label if present
+    if (arrow.label) {
+      const mid = getArrowMidpoint(arrow, pxPerCm, panOffset);
+      const fontSize = arrow.labelFontSize || 14;
+      ctx.font = `500 ${fontSize}px 'General Sans', 'DM Sans', sans-serif`;
+      const tm = ctx.measureText(arrow.label);
+      const padX = 4;
+      const padY = 2;
+      // White background
+      ctx.fillStyle = isDark ? "rgba(23, 22, 20, 0.9)" : "rgba(255, 255, 255, 0.9)";
+      ctx.fillRect(mid.x - tm.width / 2 - padX, mid.y - fontSize / 2 - padY, tm.width + padX * 2, fontSize + padY * 2);
+      // Text
+      ctx.fillStyle = arrow.labelColor || (isDark ? "#cdccca" : "#28251d");
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(arrow.label, mid.x, mid.y);
+    }
+
+    // Selection highlight
+    if (isSelected) {
+      ctx.strokeStyle = SELECT_COLOR;
+      ctx.lineWidth = arrow.strokeWeight + 4;
+      ctx.globalAlpha = 0.3;
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      if (arrow.lineType === "curved" && arrow.controlPoints.length > 0) {
+        const cp = arrow.controlPoints[0];
+        ctx.moveTo(sx, sy);
+        ctx.quadraticCurveTo(cp.x * pxPerCm + panOffset.x, cp.y * pxPerCm + panOffset.y, ex, ey);
+      } else if (arrow.lineType === "orthogonal") {
+        const path = computeOrthogonalPath(arrow.startPoint, arrow.endPoint, arrow.controlPoints);
+        for (let i = 0; i < path.length; i++) {
+          const px = path[i].x * pxPerCm + panOffset.x;
+          const py = path[i].y * pxPerCm + panOffset.y;
+          if (i === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        }
+      } else if (arrow.lineType === "polyline" && arrow.controlPoints.length > 0) {
+        ctx.moveTo(sx, sy);
+        for (const cp of arrow.controlPoints) {
+          ctx.lineTo(cp.x * pxPerCm + panOffset.x, cp.y * pxPerCm + panOffset.y);
+        }
+        ctx.lineTo(ex, ey);
+      } else {
+        ctx.moveTo(sx, sy);
+        ctx.lineTo(ex, ey);
+      }
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+
+    // Draw attachment indicators
+    if (isSelected) {
+      for (const [pt, att] of [[arrow.startPoint, arrow.startAttachment], [arrow.endPoint, arrow.endAttachment]] as [Point, typeof arrow.startAttachment][]) {
+        const px = pt.x * pxPerCm + panOffset.x;
+        const py = pt.y * pxPerCm + panOffset.y;
+        if (att) {
+          // Green dot for attached endpoint
+          ctx.fillStyle = "#22c55e";
+          ctx.beginPath();
+          ctx.arc(px, py, 4, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    }
+
+    ctx.restore();
+  }
+}
+
+export function drawArrowHandles(
+  ctx: CanvasRenderingContext2D,
+  arrow: ArrowItem,
+  gridSize: number,
+  zoom: number,
+  panOffset: Point,
+) {
+  const pxPerCm = (gridSize * zoom) / 100;
+  const handleRadius = 5;
+
+  const drawHandle = (pt: Point, color: string = SELECT_COLOR) => {
+    const x = pt.x * pxPerCm + panOffset.x;
+    const y = pt.y * pxPerCm + panOffset.y;
+    ctx.fillStyle = "#ffffff";
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(x, y, handleRadius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  };
+
+  // Start and end handles
+  drawHandle(arrow.startPoint);
+  drawHandle(arrow.endPoint);
+
+  // Midpoint handle for straight arrows (drag to convert to curve)
+  if (arrow.lineType === "straight") {
+    const mid = {
+      x: (arrow.startPoint.x + arrow.endPoint.x) / 2,
+      y: (arrow.startPoint.y + arrow.endPoint.y) / 2,
+    };
+    drawHandle(mid, "#888888");
+  }
+
+  // Control point handle for curved arrows
+  if (arrow.lineType === "curved" && arrow.controlPoints.length > 0) {
+    const cp = arrow.controlPoints[0];
+    // Draw control handle arm (dashed line)
+    const cpx = cp.x * pxPerCm + panOffset.x;
+    const cpy = cp.y * pxPerCm + panOffset.y;
+    const sx = arrow.startPoint.x * pxPerCm + panOffset.x;
+    const sy = arrow.startPoint.y * pxPerCm + panOffset.y;
+    const ex = arrow.endPoint.x * pxPerCm + panOffset.x;
+    const ey = arrow.endPoint.y * pxPerCm + panOffset.y;
+    ctx.save();
+    ctx.setLineDash([4, 4]);
+    ctx.strokeStyle = "rgba(1, 105, 111, 0.4)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(sx, sy);
+    ctx.lineTo(cpx, cpy);
+    ctx.lineTo(ex, ey);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+    drawHandle(cp, "#e67e22");
+  }
+
+  // Waypoint handles for polyline
+  if (arrow.lineType === "polyline") {
+    for (const cp of arrow.controlPoints) {
+      drawHandle(cp, "#e67e22");
+    }
+  }
+
+  // Bend point handles for orthogonal
+  if (arrow.lineType === "orthogonal" && arrow.controlPoints.length > 0) {
+    for (const cp of arrow.controlPoints) {
+      drawHandle(cp, "#e67e22");
+    }
+  }
+}
+
+export function drawArrowPreview(
+  ctx: CanvasRenderingContext2D,
+  start: Point,
+  end: Point,
+  gridSize: number,
+  zoom: number,
+  panOffset: Point,
+  isDark: boolean,
+) {
+  const pxPerCm = (gridSize * zoom) / 100;
+  const sx = start.x * pxPerCm + panOffset.x;
+  const sy = start.y * pxPerCm + panOffset.y;
+  const ex = end.x * pxPerCm + panOffset.x;
+  const ey = end.y * pxPerCm + panOffset.y;
+
+  ctx.save();
+  ctx.strokeStyle = isDark ? "#cdccca" : "#28251d";
+  ctx.lineWidth = 2;
+  ctx.setLineDash([6, 4]);
+  ctx.beginPath();
+  ctx.moveTo(sx, sy);
+  ctx.lineTo(ex, ey);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Draw arrowhead at end
+  const angle = Math.atan2(ey - sy, ex - sx);
+  drawArrowHead(ctx, ex, ey, angle, "filled-triangle", 12, isDark ? "#cdccca" : "#28251d", 2);
+
+  // Draw start dot
+  ctx.fillStyle = SELECT_COLOR;
+  ctx.beginPath();
+  ctx.arc(sx, sy, 4, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
+/** Hit test an arrow. Returns the arrow if the point is close to the line. */
+export function hitTestArrow(
+  screenX: number, screenY: number,
+  arrows: ArrowItem[],
+  gridSize: number, zoom: number, panOffset: Point,
+): ArrowItem | null {
+  const pxPerCm = (gridSize * zoom) / 100;
+  const threshold = 8; // px
+
+  // Test in reverse order (topmost first)
+  for (let i = arrows.length - 1; i >= 0; i--) {
+    const arrow = arrows[i];
+    const sx = arrow.startPoint.x * pxPerCm + panOffset.x;
+    const sy = arrow.startPoint.y * pxPerCm + panOffset.y;
+    const ex = arrow.endPoint.x * pxPerCm + panOffset.x;
+    const ey = arrow.endPoint.y * pxPerCm + panOffset.y;
+
+    if (arrow.lineType === "curved" && arrow.controlPoints.length > 0) {
+      // Test along quadratic bezier curve by sampling
+      const cp = arrow.controlPoints[0];
+      const cpx = cp.x * pxPerCm + panOffset.x;
+      const cpy = cp.y * pxPerCm + panOffset.y;
+      for (let t = 0; t <= 1; t += 0.02) {
+        const bx = (1 - t) * (1 - t) * sx + 2 * (1 - t) * t * cpx + t * t * ex;
+        const by = (1 - t) * (1 - t) * sy + 2 * (1 - t) * t * cpy + t * t * ey;
+        const d = Math.sqrt((screenX - bx) ** 2 + (screenY - by) ** 2);
+        if (d < threshold + arrow.strokeWeight) return arrow;
+      }
+    } else if (arrow.lineType === "polyline" || arrow.lineType === "orthogonal") {
+      const allPoints: Point[] = arrow.lineType === "orthogonal"
+        ? computeOrthogonalPath(arrow.startPoint, arrow.endPoint, arrow.controlPoints)
+        : [arrow.startPoint, ...arrow.controlPoints, arrow.endPoint];
+      for (let j = 0; j < allPoints.length - 1; j++) {
+        const p1x = allPoints[j].x * pxPerCm + panOffset.x;
+        const p1y = allPoints[j].y * pxPerCm + panOffset.y;
+        const p2x = allPoints[j + 1].x * pxPerCm + panOffset.x;
+        const p2y = allPoints[j + 1].y * pxPerCm + panOffset.y;
+        const dist = pointToLineSegmentDist(screenX, screenY, p1x, p1y, p2x, p2y);
+        if (dist < threshold + arrow.strokeWeight) return arrow;
+      }
+    } else {
+      // Straight line
+      const dist = pointToLineSegmentDist(screenX, screenY, sx, sy, ex, ey);
+      if (dist < threshold + arrow.strokeWeight) return arrow;
+    }
+  }
+  return null;
+}
+
+function pointToLineSegmentDist(px: number, py: number, x1: number, y1: number, x2: number, y2: number): number {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq === 0) return Math.sqrt((px - x1) ** 2 + (py - y1) ** 2);
+  let t = ((px - x1) * dx + (py - y1) * dy) / lenSq;
+  t = Math.max(0, Math.min(1, t));
+  const closestX = x1 + t * dx;
+  const closestY = y1 + t * dy;
+  return Math.sqrt((px - closestX) ** 2 + (py - closestY) ** 2);
+}
+
+export type ArrowHandle = "start" | "end" | "midpoint" | { type: "control"; index: number };
+
+export function hitTestArrowHandle(
+  screenX: number, screenY: number,
+  arrow: ArrowItem,
+  gridSize: number, zoom: number, panOffset: Point,
+): ArrowHandle | null {
+  const pxPerCm = (gridSize * zoom) / 100;
+  const handleRadius = 8;
+
+  const test = (pt: Point) => {
+    const x = pt.x * pxPerCm + panOffset.x;
+    const y = pt.y * pxPerCm + panOffset.y;
+    return Math.sqrt((screenX - x) ** 2 + (screenY - y) ** 2) < handleRadius;
+  };
+
+  if (test(arrow.startPoint)) return "start";
+  if (test(arrow.endPoint)) return "end";
+
+  // Control points
+  if (arrow.lineType === "curved" || arrow.lineType === "polyline" || arrow.lineType === "orthogonal") {
+    for (let i = 0; i < arrow.controlPoints.length; i++) {
+      if (test(arrow.controlPoints[i])) return { type: "control", index: i };
+    }
+  }
+
+  // Midpoint handle for straight arrows
+  if (arrow.lineType === "straight") {
+    const mid = {
+      x: (arrow.startPoint.x + arrow.endPoint.x) / 2,
+      y: (arrow.startPoint.y + arrow.endPoint.y) / 2,
+    };
+    if (test(mid)) return "midpoint";
+  }
+
+  return null;
+}
+
+/** Snap arrow endpoint to component anchor points (center, corners, edge midpoints) */
+export function snapArrowToComponents(
+  point: Point,
+  furniture: FurnitureItem[],
+  threshold: number,
+): { snapped: Point; didSnap: boolean; attachment?: { componentId: string; anchorX: number; anchorY: number } } {
+  let bestDist = threshold;
+  let bestSnap: Point | null = null;
+  let bestAttachment: { componentId: string; anchorX: number; anchorY: number } | undefined;
+
+  for (const item of furniture) {
+    const cx = item.x + item.width / 2;
+    const cy = item.y + item.height / 2;
+    // Anchor points: center + 4 corners + 4 edge midpoints
+    const anchors = [
+      { x: cx, y: cy, ax: 0.5, ay: 0.5 },
+      { x: item.x, y: item.y, ax: 0, ay: 0 },
+      { x: item.x + item.width, y: item.y, ax: 1, ay: 0 },
+      { x: item.x, y: item.y + item.height, ax: 0, ay: 1 },
+      { x: item.x + item.width, y: item.y + item.height, ax: 1, ay: 1 },
+      { x: cx, y: item.y, ax: 0.5, ay: 0 },
+      { x: cx, y: item.y + item.height, ax: 0.5, ay: 1 },
+      { x: item.x, y: cy, ax: 0, ay: 0.5 },
+      { x: item.x + item.width, y: cy, ax: 1, ay: 0.5 },
+    ];
+    for (const a of anchors) {
+      const d = Math.sqrt((point.x - a.x) ** 2 + (point.y - a.y) ** 2);
+      if (d < bestDist) {
+        bestDist = d;
+        bestSnap = { x: a.x, y: a.y };
+        bestAttachment = { componentId: item.id, anchorX: a.ax, anchorY: a.ay };
+      }
+    }
+  }
+
+  if (bestSnap) {
+    return { snapped: bestSnap, didSnap: true, attachment: bestAttachment };
+  }
+  return { snapped: point, didSnap: false };
+}
+
+/** Resolve attached arrow endpoints to current component positions */
+export function resolveArrowAttachment(
+  attachment: { componentId: string; anchorX: number; anchorY: number },
+  furniture: FurnitureItem[],
+): Point | null {
+  const item = furniture.find((f) => f.id === attachment.componentId);
+  if (!item) return null;
+  return {
+    x: item.x + item.width * attachment.anchorX,
+    y: item.y + item.height * attachment.anchorY,
+  };
+}
+
+/** Draw snap indicator ring when near component anchor */
+export function drawArrowSnapIndicator(
+  ctx: CanvasRenderingContext2D,
+  point: Point,
+  gridSize: number, zoom: number, panOffset: Point,
+  isAttached: boolean,
+) {
+  const pxPerCm = (gridSize * zoom) / 100;
+  const x = point.x * pxPerCm + panOffset.x;
+  const y = point.y * pxPerCm + panOffset.y;
+
+  ctx.save();
+  ctx.strokeStyle = isAttached ? "#22c55e" : SELECT_COLOR;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(x, y, 8, 0, Math.PI * 2);
+  ctx.stroke();
+
+  if (isAttached) {
+    ctx.fillStyle = "rgba(34, 197, 94, 0.3)";
+    ctx.beginPath();
+    ctx.arc(x, y, 8, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
 }

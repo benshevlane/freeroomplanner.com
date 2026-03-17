@@ -13,9 +13,10 @@ import {
   Search,
   GripVertical,
   DoorOpen,
+  MoveRight,
 } from "lucide-react";
 
-const CATEGORIES = ["All", "Living", "Kitchen", "Bedroom", "Bathroom", "Dining", "Structure"];
+const CATEGORIES = ["All", "Living", "Kitchen", "Bedroom", "Bathroom", "Dining", "Structure", "Annotation"];
 
 const CATEGORY_ICONS: Record<string, typeof Sofa> = {
   Living: Sofa,
@@ -24,6 +25,7 @@ const CATEGORY_ICONS: Record<string, typeof Sofa> = {
   Bathroom: Bath,
   Dining: UtensilsCrossed,
   Structure: DoorOpen,
+  Annotation: MoveRight,
 };
 
 function WallCupboardIcon() {

@@ -11,7 +11,7 @@ import MobileWizard from "../components/MobileWizard";
 import DesktopWizard from "../components/DesktopWizard";
 import { PerplexityAttribution } from "../components/PerplexityAttribution";
 import IntentCapture from "../components/IntentCapture";
-import { FurnitureTemplate, FurnitureItem, RoomLabel, Point, UnitSystem, MeasureMode } from "../lib/types";
+import { FurnitureTemplate, FurnitureItem, RoomLabel, ArrowItem, Point, UnitSystem, MeasureMode } from "../lib/types";
 import html2canvas from "html2canvas";
 import { trackEvent } from "@/lib/analytics";
 import { Input } from "@/components/ui/input";
@@ -107,7 +107,8 @@ export default function Editor() {
   const selectedWall = state.walls.find((w) => w.id === state.selectedItemId) || null;
   const selectedFurniture = state.furniture.find((f) => f.id === state.selectedItemId) || null;
   const selectedLabel = state.labels.find((l) => l.id === state.selectedItemId) || null;
-  const hasSelection = !!(selectedWall || selectedFurniture || selectedLabel);
+  const selectedArrow = state.arrows.find((a) => a.id === state.selectedItemId) || null;
+  const hasSelection = !!(selectedWall || selectedFurniture || selectedLabel || selectedArrow);
 
   // Auto-open properties sheet on mobile when something is selected
   useEffect(() => {
@@ -204,6 +205,9 @@ export default function Editor() {
       if (e.key === "h" || e.key === "H") {
         if (!e.ctrlKey && !e.metaKey) editor.setTool("pan");
       }
+      if (e.key === "a" || e.key === "A") {
+        if (!e.ctrlKey && !e.metaKey) editor.setTool("arrow");
+      }
 
       if ((e.ctrlKey || e.metaKey) && e.key === "z") {
         e.preventDefault();
@@ -242,7 +246,8 @@ export default function Editor() {
     if (selectedWall) editor.removeWall(selectedWall.id);
     if (selectedFurniture) editor.removeFurniture(selectedFurniture.id);
     if (selectedLabel) editor.removeLabel(selectedLabel.id);
-  }, [selectedWall, selectedFurniture, selectedLabel, editor]);
+    if (selectedArrow) editor.removeArrow(selectedArrow.id);
+  }, [selectedWall, selectedFurniture, selectedLabel, selectedArrow, editor]);
 
   const handleSavePlan = useCallback(async () => {
     try {
@@ -348,6 +353,31 @@ export default function Editor() {
 
   const handleSelectFurniture = useCallback(
     (template: FurnitureTemplate) => {
+      // Handle arrow template specially — place a default arrow
+      if (template.type === "arrow") {
+        const pxPerCm = (state.gridSize * state.zoom) / 100;
+        const centerWorld = {
+          x: (400 - state.panOffset.x) / pxPerCm,
+          y: (300 - state.panOffset.y) / pxPerCm,
+        };
+        const arrow: ArrowItem = {
+          id: generateId(),
+          startPoint: { x: centerWorld.x - 75, y: centerWorld.y },
+          endPoint: { x: centerWorld.x + 75, y: centerWorld.y },
+          lineType: "straight",
+          controlPoints: [],
+          startHead: "none",
+          endHead: "filled-triangle",
+          strokeColor: document.documentElement.classList.contains("dark") ? "#cdccca" : "#28251d",
+          strokeWeight: 2,
+          lineStyle: "solid",
+          dashPattern: "short",
+          opacity: 1,
+        };
+        editor.addArrow(arrow);
+        editor.setTool("select");
+        return;
+      }
       // Place at center of visible area
       const centerWorld = {
         x: (400 - state.panOffset.x) / ((state.gridSize * state.zoom) / 100),
@@ -361,6 +391,25 @@ export default function Editor() {
 
   const handleDropFurniture = useCallback(
     (template: FurnitureTemplate, position: Point) => {
+      if (template.type === "arrow") {
+        const arrow: ArrowItem = {
+          id: generateId(),
+          startPoint: { x: position.x - 75, y: position.y },
+          endPoint: { x: position.x + 75, y: position.y },
+          lineType: "straight",
+          controlPoints: [],
+          startHead: "none",
+          endHead: "filled-triangle",
+          strokeColor: document.documentElement.classList.contains("dark") ? "#cdccca" : "#28251d",
+          strokeWeight: 2,
+          lineStyle: "solid",
+          dashPattern: "short",
+          opacity: 1,
+        };
+        editor.addArrow(arrow);
+        editor.setTool("select");
+        return;
+      }
       editor.addFurniture(template, position);
       editor.setTool("select");
     },
@@ -436,6 +485,7 @@ export default function Editor() {
                   <ShortcutRow keys="V" action="Select & Move tool" />
                   <ShortcutRow keys="W" action="Draw Walls tool" />
                   <ShortcutRow keys="L" action="Add Label tool" />
+                  <ShortcutRow keys="A" action="Arrow tool" />
                   <ShortcutRow keys="E" action="Eraser tool" />
                   <Separator className="my-2" />
                   <ShortcutRow keys="Ctrl+Z" action="Undo" />
@@ -532,11 +582,13 @@ export default function Editor() {
                       selectedWall={selectedWall}
                       selectedFurniture={selectedFurniture}
                       selectedLabel={selectedLabel}
+                      selectedArrow={selectedArrow}
                       onRotate={handleRotateSelected}
                       onDelete={handleDeleteSelected}
                       onDuplicate={handleDuplicate}
                       onUpdateFurniture={handleUpdateFurniture}
                       onUpdateLabel={editor.updateLabel}
+                      onUpdateArrow={editor.updateArrow}
                       units={state.units}
                     />
                   </ScrollArea>
@@ -572,6 +624,11 @@ export default function Editor() {
           onUpdateFurniture={handleUpdateFurniture}
           onSplitWallAndConnect={editor.splitWallAndConnect}
           onSetRoomName={editor.setRoomNameForRoom}
+          onAddArrow={editor.addArrow}
+          onRemoveArrow={editor.removeArrow}
+          onUpdateArrow={editor.updateArrow}
+          onMoveArrowEndpoint={editor.moveArrowEndpoint}
+          onSetArrowDrawing={editor.setArrowDrawing}
         />
 
         {/* Desktop: Properties sidebar */}
@@ -582,11 +639,13 @@ export default function Editor() {
                 selectedWall={selectedWall}
                 selectedFurniture={selectedFurniture}
                 selectedLabel={selectedLabel}
+                selectedArrow={selectedArrow}
                 onRotate={handleRotateSelected}
                 onDelete={handleDeleteSelected}
                 onDuplicate={handleDuplicate}
                 onUpdateFurniture={handleUpdateFurniture}
                 onUpdateLabel={editor.updateLabel}
+                onUpdateArrow={editor.updateArrow}
                 units={state.units}
               />
             </ScrollArea>
@@ -604,6 +663,10 @@ export default function Editor() {
               <div className="flex justify-between">
                 <span>Labels</span>
                 <span className="font-medium tabular-nums">{state.labels.length}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Arrows</span>
+                <span className="font-medium tabular-nums">{state.arrows.length}</span>
               </div>
             </div>
 

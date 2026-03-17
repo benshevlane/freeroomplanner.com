@@ -40,7 +40,78 @@ export interface RoomLabel {
   background?: boolean; // white pill background
 }
 
-export type EditorTool = "select" | "wall" | "furniture" | "label" | "eraser" | "pan";
+export type EditorTool = "select" | "wall" | "furniture" | "label" | "eraser" | "pan" | "arrow";
+
+// Arrow types
+export type ArrowLineType = "straight" | "curved" | "orthogonal" | "polyline";
+export type ArrowHeadType = "none" | "filled-triangle" | "open-chevron" | "circle" | "diamond-filled" | "diamond-outline" | "square";
+export type ArrowLineStyle = "solid" | "dashed" | "dotted";
+export type ArrowDashPattern = "short" | "long" | "dash-dot";
+
+export interface ArrowAttachment {
+  componentId: string;
+  // Relative position on the component (0-1 range) for center, corners, edge midpoints
+  anchorX: number;
+  anchorY: number;
+}
+
+export interface ArrowItem {
+  id: string;
+  startPoint: Point;
+  endPoint: Point;
+  lineType: ArrowLineType;
+  controlPoints: Point[]; // bezier control point for curved, waypoints for polyline, bend points for orthogonal
+  startHead: ArrowHeadType;
+  endHead: ArrowHeadType;
+  strokeColor: string;
+  strokeWeight: number; // 1-12
+  lineStyle: ArrowLineStyle;
+  dashPattern: ArrowDashPattern;
+  opacity: number; // 0.1 - 1.0
+  label?: string;
+  labelFontSize?: number;
+  labelColor?: string;
+  startAttachment?: ArrowAttachment;
+  endAttachment?: ArrowAttachment;
+}
+
+export type ArrowPresetName = "annotation" | "double-headed" | "dashed-pointer" | "bold-callout";
+
+export const ARROW_PRESETS: Record<ArrowPresetName, Partial<ArrowItem>> = {
+  "annotation": {
+    strokeColor: "#000000",
+    strokeWeight: 2,
+    startHead: "none",
+    endHead: "filled-triangle",
+    lineStyle: "solid",
+    opacity: 1,
+  },
+  "double-headed": {
+    strokeColor: "#888888",
+    strokeWeight: 3,
+    startHead: "filled-triangle",
+    endHead: "filled-triangle",
+    lineStyle: "solid",
+    opacity: 1,
+  },
+  "dashed-pointer": {
+    strokeColor: "#000000",
+    strokeWeight: 2,
+    startHead: "none",
+    endHead: "open-chevron",
+    lineStyle: "dashed",
+    dashPattern: "short",
+    opacity: 1,
+  },
+  "bold-callout": {
+    strokeColor: "#000000",
+    strokeWeight: 6,
+    startHead: "none",
+    endHead: "filled-triangle",
+    lineStyle: "solid",
+    opacity: 1,
+  },
+};
 
 export type UnitSystem = "m" | "cm" | "mm" | "ft";
 
@@ -96,6 +167,7 @@ export interface EditorState {
   walls: Wall[];
   furniture: FurnitureItem[];
   labels: RoomLabel[];
+  arrows: ArrowItem[];
   gridSize: number; // px per meter
   zoom: number;
   panOffset: Point;
@@ -103,6 +175,7 @@ export interface EditorState {
   selectedItemId: string | null;
   wallDrawing: { start: Point } | null;
   wallChainStart: Point | null; // first click of current wall chain (for auto-close)
+  arrowDrawing: { start: Point } | null;
   roomName: string;
   units: UnitSystem;
   // Room name overrides keyed by room vertex signature
@@ -165,4 +238,6 @@ export const FURNITURE_LIBRARY: FurnitureTemplate[] = [
   // Structure
   { type: "door", label: "Door", width: 90, height: 15, category: "Structure", icon: "door-open" },
   { type: "window", label: "Window", width: 100, height: 15, category: "Structure", icon: "square" },
+  // Annotation
+  { type: "arrow", label: "Arrow", width: 150, height: 0, category: "Annotation", icon: "arrow-right" },
 ];
