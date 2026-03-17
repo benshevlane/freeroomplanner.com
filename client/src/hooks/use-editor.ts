@@ -28,24 +28,31 @@ export function useEditor() {
   const redoStack = useRef<EditorState[]>([]);
 
   const pushUndo = useCallback(() => {
-    undoStack.current.push({ ...state, walls: [...state.walls], furniture: [...state.furniture], labels: [...state.labels], roomNames: { ...state.roomNames } });
-    redoStack.current = [];
-    if (undoStack.current.length > 50) undoStack.current.shift();
-  }, [state]);
+    setState((s) => {
+      undoStack.current.push({ ...s, walls: [...s.walls], furniture: [...s.furniture], labels: [...s.labels], roomNames: { ...s.roomNames } });
+      redoStack.current = [];
+      if (undoStack.current.length > 50) undoStack.current.shift();
+      return s;
+    });
+  }, []);
 
   const undo = useCallback(() => {
     if (undoStack.current.length === 0) return;
     const prev = undoStack.current.pop()!;
-    redoStack.current.push({ ...state, walls: [...state.walls], furniture: [...state.furniture], labels: [...state.labels], roomNames: { ...state.roomNames } });
-    setState(prev);
-  }, [state]);
+    setState((s) => {
+      redoStack.current.push({ ...s, walls: [...s.walls], furniture: [...s.furniture], labels: [...s.labels], roomNames: { ...s.roomNames } });
+      return prev;
+    });
+  }, []);
 
   const redo = useCallback(() => {
     if (redoStack.current.length === 0) return;
     const next = redoStack.current.pop()!;
-    undoStack.current.push({ ...state, walls: [...state.walls], furniture: [...state.furniture], labels: [...state.labels], roomNames: { ...state.roomNames } });
-    setState(next);
-  }, [state]);
+    setState((s) => {
+      undoStack.current.push({ ...s, walls: [...s.walls], furniture: [...s.furniture], labels: [...s.labels], roomNames: { ...s.roomNames } });
+      return next;
+    });
+  }, []);
 
   const setTool = useCallback((tool: EditorTool) => {
     setState((s) => ({ ...s, selectedTool: tool, selectedItemId: null, wallDrawing: null, wallChainStart: null }));

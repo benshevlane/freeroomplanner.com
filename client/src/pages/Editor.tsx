@@ -114,7 +114,6 @@ export default function Editor() {
   const handlePaste = useCallback(() => {
     const clip = clipboardRef.current;
     if (!clip) return;
-    editor.pushUndo();
     if (clip.type === "furniture") {
       const newItem: FurnitureItem = {
         ...clip.data,
@@ -149,7 +148,6 @@ export default function Editor() {
     // Then paste immediately
     const clip = clipboardRef.current;
     if (!clip) return;
-    editor.pushUndo();
     if (clip.type === "furniture") {
       const template: FurnitureTemplate = {
         type: clip.data.type,
@@ -563,6 +561,7 @@ export default function Editor() {
                 onDelete={handleDeleteSelected}
                 onDuplicate={handleDuplicate}
                 onUpdateFurniture={handleUpdateFurniture}
+                onUpdateLabel={editor.updateLabel}
               />
             </ScrollArea>
 

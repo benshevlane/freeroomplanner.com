@@ -138,5 +138,5 @@ export async function exportToPdf(state: EditorState, roomName: string) {
   a.href = url;
   a.download = `${roomName.replace(/[^a-zA-Z0-9]/g, "_")}_floorplan.pdf`;
   a.click();
-  URL.revokeObjectURL(url);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }

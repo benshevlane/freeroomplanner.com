@@ -1,5 +1,4 @@
-import { Wall, FurnitureItem, RoomLabel, Point, UnitSystem, MeasureMode, LabelColor } from "./types";
-import { Wall, FurnitureItem, RoomLabel, Point, UnitSystem, MeasureMode, isWallCupboard } from "./types";
+import { Wall, FurnitureItem, RoomLabel, Point, UnitSystem, MeasureMode, LabelColor, isWallCupboard } from "./types";
 import { DetectedRoom } from "./room-detection";
 
 /** Convert cm to display string based on unit system */
@@ -237,15 +236,6 @@ export function drawWalls(
     const displayLengthCm = measureMode === "inside"
       ? Math.max(0, lengthCm - wallThick)
       : lengthCm;
-    // Debug: verify inside measurement calculation
-    if (measureMode === "inside" && lengthCm > 10) {
-      console.log(
-        `[Wall ${wall.id}] full outer length: ${lengthCm.toFixed(1)}cm, ` +
-        `wall thickness: ${wallThick}cm, ` +
-        `calculated inside length: ${displayLengthCm.toFixed(1)}cm, ` +
-        `displayed value: ${formatLength(displayLengthCm, units)}`
-      );
-    }
     if (lengthCm > 10) {
       drawWallDimensionLabel(ctx, sx, sy, ex, ey, displayLengthCm, wall.thickness * pxPerCm, zoom, isDark, units, wall, furniture, gridSize, panOffset);
     }
@@ -2421,6 +2411,8 @@ export function drawWallLabelsWithDiscrepancy(
   }
 
   return { visibleSet, hiddenCount };
+}
+
 export function drawWallCupboardLegend(
   ctx: CanvasRenderingContext2D,
   w: number,

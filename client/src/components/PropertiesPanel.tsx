@@ -1,5 +1,4 @@
-import { Wall, FurnitureItem, RoomLabel, LabelSize, LabelColor } from "../lib/types";
-import { Wall, FurnitureItem, RoomLabel, isWallCupboard } from "../lib/types";
+import { Wall, FurnitureItem, RoomLabel, LabelSize, LabelColor, isWallCupboard } from "../lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { RotateCw, Trash2, Ruler, Copy, Bold, Square } from "lucide-react";
