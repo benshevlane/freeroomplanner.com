@@ -1,5 +1,6 @@
 import { useRef, useEffect, useCallback, useState } from "react";
-import { EditorState, Point, FurnitureTemplate, FurnitureItem, RoomLabel, UnitSystem, MeasureMode } from "../lib/types";
+import { EditorState, Point, FurnitureTemplate, FurnitureItem, RoomLabel, TextBox, UnitSystem, MeasureMode } from "../lib/types";
+import RichTextBoxComponent from "./RichTextBox";
 import {
   drawGrid,
   drawWalls,
@@ -61,6 +62,10 @@ interface FloorPlanCanvasProps {
   onUpdateFurniture: (id: string, updates: Partial<FurnitureItem>) => void;
   onSplitWallAndConnect: (wallId: string, splitPoint: Point, newWallStart: Point) => void;
   onSetRoomName: (roomKey: string, name: string) => void;
+  onMoveTextBox: (id: string, x: number, y: number) => void;
+  onUpdateTextBox: (id: string, updates: Partial<TextBox>) => void;
+  onRemoveTextBox: (id: string) => void;
+  onPushUndoForTextBox: () => void;
 }
 
 export default function FloorPlanCanvas({
@@ -85,6 +90,10 @@ export default function FloorPlanCanvas({
   onUpdateFurniture,
   onSplitWallAndConnect,
   onSetRoomName,
+  onMoveTextBox,
+  onUpdateTextBox,
+  onRemoveTextBox,
+  onPushUndoForTextBox,
 }: FloorPlanCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -120,6 +129,12 @@ export default function FloorPlanCanvas({
 
   // Track selected room key for highlighting
   const [selectedRoomKey, setSelectedRoomKey] = useState<string | null>(null);
+
+  // Text box editing state
+  const [editingTextBoxId, setEditingTextBoxId] = useState<string | null>(null);
+  const [textBoxDragging, setTextBoxDragging] = useState<{ id: string; offsetX: number; offsetY: number } | null>(null);
+  const [textBoxResizing, setTextBoxResizing] = useState<{ id: string; corner: string; startX: number; startY: number; origX: number; origY: number; origW: number; origH: number } | null>(null);
+  const [textBoxRotating, setTextBoxRotating] = useState<{ id: string; startAngle: number; origRotation: number; centerX: number; centerY: number } | null>(null);
 
   // Canvas resize
   useEffect(() => {
@@ -491,6 +506,7 @@ export default function FloorPlanCanvas({
 
         onSelectItem(null);
         setSelectedRoomKey(null);
+        setEditingTextBoxId(null);
       } else if (state.selectedTool === "wall") {
         const world = screenToWorld(pos.x, pos.y, state.gridSize, state.zoom, state.panOffset);
         const gridSnapped = snapToGrid(world, 10);
@@ -995,6 +1011,131 @@ export default function FloorPlanCanvas({
     }
   }, [commitLabel, cancelLabel]);
 
+  // Text box handlers
+  const handleTextBoxSelect = useCallback((id: string) => {
+    onSelectItem(id);
+  }, [onSelectItem]);
+
+  const handleTextBoxStartDrag = useCallback((id: string, offsetX: number, offsetY: number) => {
+    setTextBoxDragging({ id, offsetX, offsetY });
+  }, []);
+
+  const handleTextBoxDoubleClick = useCallback((id: string) => {
+    setEditingTextBoxId(id);
+    onSelectItem(id);
+  }, [onSelectItem]);
+
+  const handleTextBoxExitEdit = useCallback(() => {
+    setEditingTextBoxId(null);
+  }, []);
+
+  const handleTextBoxContentChange = useCallback((id: string, html: string) => {
+    onUpdateTextBox(id, { content: html });
+  }, [onUpdateTextBox]);
+
+  const handleTextBoxStartResize = useCallback((id: string, corner: string, e: React.PointerEvent) => {
+    const tb = state.textBoxes.find((t) => t.id === id);
+    if (!tb) return;
+    onPushUndoForTextBox();
+    setTextBoxResizing({
+      id,
+      corner,
+      startX: e.clientX,
+      startY: e.clientY,
+      origX: tb.x,
+      origY: tb.y,
+      origW: tb.width,
+      origH: tb.height,
+    });
+  }, [state.textBoxes, onPushUndoForTextBox]);
+
+  const handleTextBoxStartRotate = useCallback((id: string, e: React.PointerEvent) => {
+    const tb = state.textBoxes.find((t) => t.id === id);
+    if (!tb) return;
+    onPushUndoForTextBox();
+    const pxPerCm = (state.gridSize * state.zoom) / 100;
+    const centerX = (tb.x + tb.width / 2) * pxPerCm + state.panOffset.x;
+    const centerY = (tb.y + tb.height / 2) * pxPerCm + state.panOffset.y;
+    const canvasRect = containerRef.current?.getBoundingClientRect();
+    const clientCenterX = centerX + (canvasRect?.left || 0);
+    const clientCenterY = centerY + (canvasRect?.top || 0);
+    const startAngle = Math.atan2(e.clientY - clientCenterY, e.clientX - clientCenterX);
+    setTextBoxRotating({ id, startAngle, origRotation: tb.rotation, centerX: clientCenterX, centerY: clientCenterY });
+  }, [state.textBoxes, state.gridSize, state.zoom, state.panOffset, onPushUndoForTextBox]);
+
+  // Global pointer move/up for text box drag/resize/rotate
+  useEffect(() => {
+    if (!textBoxDragging && !textBoxResizing && !textBoxRotating) return;
+
+    const pxPerCm = (state.gridSize * state.zoom) / 100;
+
+    const handleMove = (e: PointerEvent) => {
+      if (textBoxDragging) {
+        const canvasRect = containerRef.current?.getBoundingClientRect();
+        if (!canvasRect) return;
+        const canvasX = e.clientX - canvasRect.left - textBoxDragging.offsetX;
+        const canvasY = e.clientY - canvasRect.top - textBoxDragging.offsetY;
+        const worldX = (canvasX - state.panOffset.x) / pxPerCm;
+        const worldY = (canvasY - state.panOffset.y) / pxPerCm;
+        const snappedX = Math.round(worldX / 5) * 5;
+        const snappedY = Math.round(worldY / 5) * 5;
+        onMoveTextBox(textBoxDragging.id, snappedX, snappedY);
+      }
+
+      if (textBoxResizing) {
+        const dxPx = e.clientX - textBoxResizing.startX;
+        const dyPx = e.clientY - textBoxResizing.startY;
+        const dxCm = dxPx / pxPerCm;
+        const dyCm = dyPx / pxPerCm;
+        const corner = textBoxResizing.corner;
+        const minW = 50;
+        const minH = 30;
+        let newW = textBoxResizing.origW;
+        let newH = textBoxResizing.origH;
+        let newX = textBoxResizing.origX;
+        let newY = textBoxResizing.origY;
+
+        if (corner === "br") { newW = Math.max(minW, textBoxResizing.origW + dxCm); newH = Math.max(minH, textBoxResizing.origH + dyCm); }
+        else if (corner === "bl") { newW = Math.max(minW, textBoxResizing.origW - dxCm); newH = Math.max(minH, textBoxResizing.origH + dyCm); newX = textBoxResizing.origX + textBoxResizing.origW - newW; }
+        else if (corner === "tr") { newW = Math.max(minW, textBoxResizing.origW + dxCm); newH = Math.max(minH, textBoxResizing.origH - dyCm); newY = textBoxResizing.origY + textBoxResizing.origH - newH; }
+        else if (corner === "tl") { newW = Math.max(minW, textBoxResizing.origW - dxCm); newH = Math.max(minH, textBoxResizing.origH - dyCm); newX = textBoxResizing.origX + textBoxResizing.origW - newW; newY = textBoxResizing.origY + textBoxResizing.origH - newH; }
+        else if (corner === "r") { newW = Math.max(minW, textBoxResizing.origW + dxCm); }
+        else if (corner === "l") { newW = Math.max(minW, textBoxResizing.origW - dxCm); newX = textBoxResizing.origX + textBoxResizing.origW - newW; }
+        else if (corner === "b") { newH = Math.max(minH, textBoxResizing.origH + dyCm); }
+        else if (corner === "t") { newH = Math.max(minH, textBoxResizing.origH - dyCm); newY = textBoxResizing.origY + textBoxResizing.origH - newH; }
+
+        onUpdateTextBox(textBoxResizing.id, { width: Math.round(newW), height: Math.round(newH), x: Math.round(newX), y: Math.round(newY) });
+      }
+
+      if (textBoxRotating) {
+        const currentAngle = Math.atan2(e.clientY - textBoxRotating.centerY, e.clientX - textBoxRotating.centerX);
+        let deltaDeg = ((currentAngle - textBoxRotating.startAngle) * 180) / Math.PI;
+        let newRot = textBoxRotating.origRotation + deltaDeg;
+        const snapDeg = 15;
+        const nearestSnap = Math.round(newRot / snapDeg) * snapDeg;
+        if (Math.abs(newRot - nearestSnap) < 3) newRot = nearestSnap;
+        newRot = ((newRot % 360) + 360) % 360;
+        onUpdateTextBox(textBoxRotating.id, { rotation: Math.round(newRot) });
+      }
+    };
+
+    const handleUp = () => {
+      if (textBoxDragging) {
+        onPushUndoForTextBox();
+      }
+      setTextBoxDragging(null);
+      setTextBoxResizing(null);
+      setTextBoxRotating(null);
+    };
+
+    window.addEventListener("pointermove", handleMove);
+    window.addEventListener("pointerup", handleUp);
+    return () => {
+      window.removeEventListener("pointermove", handleMove);
+      window.removeEventListener("pointerup", handleUp);
+    };
+  }, [textBoxDragging, textBoxResizing, textBoxRotating, state.gridSize, state.zoom, state.panOffset, onMoveTextBox, onUpdateTextBox, onPushUndoForTextBox]);
+
   // Handle furniture drop from library
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -1034,8 +1175,15 @@ export default function FloorPlanCanvas({
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      // Skip shortcuts when editing a contenteditable text box (except Escape)
+      const isContentEditable = e.target instanceof HTMLElement && e.target.isContentEditable;
+      if (isContentEditable && e.key !== "Escape") return;
 
       if (e.key === "Escape") {
+        if (editingTextBoxId) {
+          setEditingTextBoxId(null);
+          return;
+        }
         onSetWallDrawing(null);
         wallDrawingRef.current = null;
         wallPendingCommitRef.current = false;
@@ -1043,6 +1191,7 @@ export default function FloorPlanCanvas({
         setSelectedRoomKey(null);
       }
       if (e.key === "Delete" || e.key === "Backspace") {
+        if (editingTextBoxId) return; // Don't delete while editing text
         if (state.selectedItemId) {
           const furn = state.furniture.find((f) => f.id === state.selectedItemId);
           if (furn) onRemoveFurniture(state.selectedItemId);
@@ -1050,12 +1199,14 @@ export default function FloorPlanCanvas({
           if (wall) onRemoveWall(state.selectedItemId);
           const lbl = state.labels.find((l) => l.id === state.selectedItemId);
           if (lbl) onRemoveLabel(state.selectedItemId);
+          const tb = state.textBoxes.find((t) => t.id === state.selectedItemId);
+          if (tb) onRemoveTextBox(state.selectedItemId);
         }
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [state.selectedItemId, state.furniture, state.walls, state.labels, onRemoveFurniture, onRemoveWall, onRemoveLabel, onSetWallDrawing, onSelectItem]);
+  }, [state.selectedItemId, state.furniture, state.walls, state.labels, state.textBoxes, editingTextBoxId, onRemoveFurniture, onRemoveWall, onRemoveLabel, onRemoveTextBox, onSetWallDrawing, onSelectItem]);
 
   // Prevent native context menu so right-click can pan
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
@@ -1102,6 +1253,26 @@ export default function FloorPlanCanvas({
         onContextMenu={handleContextMenu}
         data-testid="floor-plan-canvas"
       />
+      {/* Text box overlays */}
+      {state.textBoxes.map((tb) => (
+        <RichTextBoxComponent
+          key={tb.id}
+          textBox={tb}
+          isSelected={state.selectedItemId === tb.id}
+          isEditMode={editingTextBoxId === tb.id}
+          pxPerCm={(state.gridSize * state.zoom) / 100}
+          panOffset={state.panOffset}
+          zoom={state.zoom}
+          containerRef={containerRef}
+          onSelect={handleTextBoxSelect}
+          onStartDrag={handleTextBoxStartDrag}
+          onDoubleClick={handleTextBoxDoubleClick}
+          onExitEdit={handleTextBoxExitEdit}
+          onContentChange={handleTextBoxContentChange}
+          onStartResize={handleTextBoxStartResize}
+          onStartRotate={handleTextBoxStartRotate}
+        />
+      ))}
       {/* Inline label editing overlay */}
       {isEditingLabel && (
         <input
