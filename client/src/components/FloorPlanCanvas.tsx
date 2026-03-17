@@ -212,7 +212,7 @@ export default function FloorPlanCanvas({
         // Near-zero length: show only start point indicator (e.g. after first tap on mobile)
         drawSnapIndicator(ctx, state.wallDrawing.start, state.gridSize, state.zoom, state.panOffset);
       } else {
-        drawWallPreview(ctx, state.wallDrawing.start, finalPoint, state.gridSize, state.zoom, state.panOffset, isDark, angleDeg, state.units);
+        drawWallPreview(ctx, state.wallDrawing.start, finalPoint, state.gridSize, state.zoom, state.panOffset, isDark, angleDeg, state.units, measureMode);
         if (didSnap) {
           drawSnapIndicator(ctx, finalPoint, state.gridSize, state.zoom, state.panOffset);
         }

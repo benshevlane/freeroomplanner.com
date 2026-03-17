@@ -1077,7 +1077,8 @@ export function drawWallPreview(
   panOffset: Point,
   isDark: boolean,
   angleDeg?: number,
-  units: UnitSystem = "metric"
+  units: UnitSystem = "metric",
+  measureMode: MeasureMode = "inside"
 ) {
   const pxPerCm = (gridSize * zoom) / 100;
   const sx = start.x * pxPerCm + panOffset.x;
@@ -1099,12 +1100,29 @@ export function drawWallPreview(
   const dx = end.x - start.x;
   const dy = end.y - start.y;
   const lengthCm = Math.sqrt(dx * dx + dy * dy);
+  const wallThick = 15;
+  const displayLengthCm = measureMode === "inside"
+    ? Math.max(0, lengthCm - wallThick)
+    : lengthCm;
   if (lengthCm > 5) {
-    const lengthText = formatLength(lengthCm, units);
+    const lengthText = formatLength(displayLengthCm, units);
     const mx = (sx + ex) / 2;
     const my = (sy + ey) / 2;
 
-    ctx.font = `600 ${Math.max(12, 13 * zoom)}px 'General Sans', 'DM Sans', sans-serif`;
+    const fontSize = Math.max(12, 13 * zoom);
+    ctx.font = `600 ${fontSize}px 'General Sans', 'DM Sans', sans-serif`;
+    const textWidth = ctx.measureText(lengthText).width;
+    const pad = 4;
+
+    // Draw background pill for contrast against the wall
+    ctx.fillStyle = isDark ? "#1c1b19" : "#f9f8f5";
+    ctx.fillRect(
+      mx - textWidth / 2 - pad,
+      my - 10 - fontSize - pad,
+      textWidth + pad * 2,
+      fontSize + pad * 2
+    );
+
     ctx.fillStyle = isDark ? DIMENSION_COLOR_DARK : DIMENSION_COLOR_LIGHT;
     ctx.textAlign = "center";
     ctx.textBaseline = "bottom";
