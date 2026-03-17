@@ -3901,18 +3901,30 @@ export function snapArrowToComponents(
   for (const item of furniture) {
     const cx = item.x + item.width / 2;
     const cy = item.y + item.height / 2;
-    // Anchor points: center + 4 corners + 4 edge midpoints
-    const anchors = [
-      { x: cx, y: cy, ax: 0.5, ay: 0.5 },
-      { x: item.x, y: item.y, ax: 0, ay: 0 },
-      { x: item.x + item.width, y: item.y, ax: 1, ay: 0 },
-      { x: item.x, y: item.y + item.height, ax: 0, ay: 1 },
-      { x: item.x + item.width, y: item.y + item.height, ax: 1, ay: 1 },
-      { x: cx, y: item.y, ax: 0.5, ay: 0 },
-      { x: cx, y: item.y + item.height, ax: 0.5, ay: 1 },
-      { x: item.x, y: cy, ax: 0, ay: 0.5 },
-      { x: item.x + item.width, y: cy, ax: 1, ay: 0.5 },
+    const rad = ((item.rotation || 0) * Math.PI) / 180;
+    const cosR = Math.cos(rad);
+    const sinR = Math.sin(rad);
+    // Helper to rotate a local offset around the item center
+    const rotateAnchor = (lx: number, ly: number) => ({
+      x: cx + (lx - cx) * cosR - (ly - cy) * sinR,
+      y: cy + (lx - cx) * sinR + (ly - cy) * cosR,
+    });
+    // Anchor points: center + 4 corners + 4 edge midpoints (rotation-aware)
+    const rawAnchors = [
+      { lx: cx, ly: cy, ax: 0.5, ay: 0.5 },
+      { lx: item.x, ly: item.y, ax: 0, ay: 0 },
+      { lx: item.x + item.width, ly: item.y, ax: 1, ay: 0 },
+      { lx: item.x, ly: item.y + item.height, ax: 0, ay: 1 },
+      { lx: item.x + item.width, ly: item.y + item.height, ax: 1, ay: 1 },
+      { lx: cx, ly: item.y, ax: 0.5, ay: 0 },
+      { lx: cx, ly: item.y + item.height, ax: 0.5, ay: 1 },
+      { lx: item.x, ly: cy, ax: 0, ay: 0.5 },
+      { lx: item.x + item.width, ly: cy, ax: 1, ay: 0.5 },
     ];
+    const anchors = rawAnchors.map((a) => {
+      const rp = rotateAnchor(a.lx, a.ly);
+      return { x: rp.x, y: rp.y, ax: a.ax, ay: a.ay };
+    });
     for (const a of anchors) {
       const d = Math.sqrt((point.x - a.x) ** 2 + (point.y - a.y) ** 2);
       if (d < bestDist) {
@@ -3936,9 +3948,14 @@ export function resolveArrowAttachment(
 ): Point | null {
   const item = furniture.find((f) => f.id === attachment.componentId);
   if (!item) return null;
+  const lx = item.x + item.width * attachment.anchorX;
+  const ly = item.y + item.height * attachment.anchorY;
+  const rad = ((item.rotation || 0) * Math.PI) / 180;
+  const cx = item.x + item.width / 2;
+  const cy = item.y + item.height / 2;
   return {
-    x: item.x + item.width * attachment.anchorX,
-    y: item.y + item.height * attachment.anchorY,
+    x: cx + (lx - cx) * Math.cos(rad) - (ly - cy) * Math.sin(rad),
+    y: cy + (lx - cx) * Math.sin(rad) + (ly - cy) * Math.cos(rad),
   };
 }
 

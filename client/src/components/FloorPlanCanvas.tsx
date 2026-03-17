@@ -282,11 +282,19 @@ export default function FloorPlanCanvas({
       let resolved = arrow;
       if (arrow.startAttachment) {
         const pt = resolveArrowAttachment(arrow.startAttachment, state.furniture);
-        if (pt) resolved = { ...resolved, startPoint: pt };
+        if (pt) {
+          resolved = { ...resolved, startPoint: pt };
+        } else {
+          resolved = { ...resolved, startAttachment: undefined };
+        }
       }
       if (arrow.endAttachment) {
         const pt = resolveArrowAttachment(arrow.endAttachment, state.furniture);
-        if (pt) resolved = { ...resolved, endPoint: pt };
+        if (pt) {
+          resolved = { ...resolved, endPoint: pt };
+        } else {
+          resolved = { ...resolved, endAttachment: undefined };
+        }
       }
       return resolved;
     });
