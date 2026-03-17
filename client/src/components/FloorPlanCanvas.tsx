@@ -621,52 +621,84 @@ export default function FloorPlanCanvas({
         const pxPerCm = (state.gridSize * state.zoom) / 100;
         const dxPx = pos.x - resizeStart.x;
         const dyPx = pos.y - resizeStart.y;
-        const dxCm = dxPx / pxPerCm;
-        const dyCm = dyPx / pxPerCm;
+
+        // Rotate screen-space delta into the item's local coordinate space
+        // so resize handles work correctly regardless of item rotation
+        const resizingItem = state.furniture.find((f) => f.id === state.selectedItemId);
+        const rotRad = resizingItem ? (resizingItem.rotation * Math.PI) / 180 : 0;
+        const cosR = Math.cos(rotRad);
+        const sinR = Math.sin(rotRad);
+        const localDxPx = dxPx * cosR + dyPx * sinR;
+        const localDyPx = -dxPx * sinR + dyPx * cosR;
+        const dxCm = localDxPx / pxPerCm;
+        const dyCm = localDyPx / pxPerCm;
 
         // Doors/windows allow smaller height (thickness) than regular furniture
-        const resizingItem = state.furniture.find((f) => f.id === state.selectedItemId);
         const isStructural = resizingItem && (resizingItem.type === "door" || resizingItem.type === "window");
         const minW = 20;
         const minH = isStructural ? 5 : 20;
 
         let newW = resizeStart.itemW;
         let newH = resizeStart.itemH;
-        let newX = resizeStart.itemX;
-        let newY = resizeStart.itemY;
 
+        // Compute new dimensions based on which handle is dragged
         if (resizeCorner === "br") {
           newW = Math.max(minW, resizeStart.itemW + dxCm);
           newH = Math.max(minH, resizeStart.itemH + dyCm);
         } else if (resizeCorner === "bl") {
           newW = Math.max(minW, resizeStart.itemW - dxCm);
           newH = Math.max(minH, resizeStart.itemH + dyCm);
-          newX = resizeStart.itemX + resizeStart.itemW - newW;
         } else if (resizeCorner === "tr") {
           newW = Math.max(minW, resizeStart.itemW + dxCm);
           newH = Math.max(minH, resizeStart.itemH - dyCm);
-          newY = resizeStart.itemY + resizeStart.itemH - newH;
         } else if (resizeCorner === "tl") {
           newW = Math.max(minW, resizeStart.itemW - dxCm);
           newH = Math.max(minH, resizeStart.itemH - dyCm);
-          newX = resizeStart.itemX + resizeStart.itemW - newW;
-          newY = resizeStart.itemY + resizeStart.itemH - newH;
         } else if (resizeCorner === "r") {
           newW = Math.max(minW, resizeStart.itemW + dxCm);
         } else if (resizeCorner === "l") {
           newW = Math.max(minW, resizeStart.itemW - dxCm);
-          newX = resizeStart.itemX + resizeStart.itemW - newW;
         } else if (resizeCorner === "b") {
           newH = Math.max(minH, resizeStart.itemH + dyCm);
         } else if (resizeCorner === "t") {
           newH = Math.max(minH, resizeStart.itemH - dyCm);
-          newY = resizeStart.itemY + resizeStart.itemH - newH;
         }
 
         newW = Math.round(newW);
         newH = Math.round(newH);
-        newX = Math.round(newX);
-        newY = Math.round(newY);
+
+        // Anchor the opposite corner/edge in world space, accounting for rotation.
+        // Anchor local offsets (from item center) for the fixed point:
+        let aOldX = 0, aOldY = 0; // old anchor local offset
+        let aNewX = 0, aNewY = 0; // new anchor local offset
+        const ow = resizeStart.itemW, oh = resizeStart.itemH;
+        if (resizeCorner === "br") {
+          aOldX = -ow / 2; aOldY = -oh / 2; aNewX = -newW / 2; aNewY = -newH / 2;
+        } else if (resizeCorner === "bl") {
+          aOldX = ow / 2; aOldY = -oh / 2; aNewX = newW / 2; aNewY = -newH / 2;
+        } else if (resizeCorner === "tr") {
+          aOldX = -ow / 2; aOldY = oh / 2; aNewX = -newW / 2; aNewY = newH / 2;
+        } else if (resizeCorner === "tl") {
+          aOldX = ow / 2; aOldY = oh / 2; aNewX = newW / 2; aNewY = newH / 2;
+        } else if (resizeCorner === "r") {
+          aOldX = -ow / 2; aOldY = 0; aNewX = -newW / 2; aNewY = 0;
+        } else if (resizeCorner === "l") {
+          aOldX = ow / 2; aOldY = 0; aNewX = newW / 2; aNewY = 0;
+        } else if (resizeCorner === "b") {
+          aOldX = 0; aOldY = -oh / 2; aNewX = 0; aNewY = -newH / 2;
+        } else if (resizeCorner === "t") {
+          aOldX = 0; aOldY = oh / 2; aNewX = 0; aNewY = newH / 2;
+        }
+
+        // Old anchor world position
+        const oldCx = resizeStart.itemX + ow / 2;
+        const oldCy = resizeStart.itemY + oh / 2;
+        const anchorWx = oldCx + aOldX * cosR - aOldY * sinR;
+        const anchorWy = oldCy + aOldX * sinR + aOldY * cosR;
+
+        // Solve for newX, newY so new anchor stays at same world position
+        const newX = Math.round(anchorWx - newW / 2 - aNewX * cosR + aNewY * sinR);
+        const newY = Math.round(anchorWy - newH / 2 - aNewX * sinR - aNewY * cosR);
 
         onUpdateFurniture(state.selectedItemId, { width: newW, height: newH, x: newX, y: newY });
         return;

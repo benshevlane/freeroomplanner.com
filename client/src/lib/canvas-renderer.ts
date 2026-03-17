@@ -1840,16 +1840,6 @@ export function hitTestResizeHandle(
     { cx: w / 2, cy: h / 2, corner: "br" },
   ];
 
-  for (const c of corners) {
-    if (
-      Math.abs(localX - c.cx) <= handleSize &&
-      Math.abs(localY - c.cy) <= handleSize
-    ) {
-      return c.corner;
-    }
-  }
-
-  // Edge handles at midpoints (tested after corners so corners take priority)
   const edgeHandles: { cx: number; cy: number; corner: ResizeCorner }[] = [
     { cx: 0, cy: -h / 2, corner: "t" },
     { cx: 0, cy: h / 2, corner: "b" },
@@ -1857,12 +1847,27 @@ export function hitTestResizeHandle(
     { cx: w / 2, cy: 0, corner: "r" },
   ];
 
-  for (const e of edgeHandles) {
+  // For structural items (doors/windows), test edge handles first so
+  // single-dimension resizing is easier to grab on thin items
+  const isStructural = item.type === "door" || item.type === "window";
+  const first = isStructural ? edgeHandles : corners;
+  const second = isStructural ? corners : edgeHandles;
+
+  for (const h of first) {
     if (
-      Math.abs(localX - e.cx) <= handleSize &&
-      Math.abs(localY - e.cy) <= handleSize
+      Math.abs(localX - h.cx) <= handleSize &&
+      Math.abs(localY - h.cy) <= handleSize
     ) {
-      return e.corner;
+      return h.corner;
+    }
+  }
+
+  for (const h of second) {
+    if (
+      Math.abs(localX - h.cx) <= handleSize &&
+      Math.abs(localY - h.cy) <= handleSize
+    ) {
+      return h.corner;
     }
   }
 
