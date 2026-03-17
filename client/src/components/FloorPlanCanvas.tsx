@@ -183,7 +183,7 @@ export default function FloorPlanCanvas({
     }
 
     // Walls
-    drawWalls(ctx, state.walls, state.gridSize, state.zoom, state.panOffset, isDark, state.selectedItemId, state.units, measureMode, state.furniture);
+    drawWalls(ctx, state.walls, state.gridSize, state.zoom, state.panOffset, isDark, state.selectedItemId, state.units, measureMode, state.furniture, rooms);
 
     // Segment measurements for walls with doors/windows
     drawWallSegmentMeasurements(ctx, state.walls, state.furniture, state.gridSize, state.zoom, state.panOffset, isDark, state.units, measureMode);

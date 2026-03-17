@@ -412,7 +412,8 @@ export function drawWalls(
   selectedId: string | null,
   units: UnitSystem = "m",
   measureMode: MeasureMode = "inside",
-  furniture: FurnitureItem[] = []
+  furniture: FurnitureItem[] = [],
+  rooms: DetectedRoom[] = []
 ) {
   const pxPerCm = (gridSize * zoom) / 100;
 
@@ -463,7 +464,7 @@ export function drawWalls(
       ? Math.max(0, lengthCm - wallThick)
       : lengthCm;
     if (lengthCm > 10) {
-      drawWallDimensionLabel(ctx, sx, sy, ex, ey, displayLengthCm, wall.thickness * pxPerCm, zoom, isDark, units, wall, furniture, gridSize, panOffset);
+      drawWallDimensionLabel(ctx, sx, sy, ex, ey, displayLengthCm, wall.thickness * pxPerCm, zoom, isDark, units, wall, furniture, gridSize, panOffset, rooms, walls, measureMode);
     }
   });
 
@@ -481,7 +482,7 @@ export function drawWalls(
     // Find the actual wall for collision detection
     const groupWallIds = group.wallIds;
     const representativeWall = walls.find((w) => groupWallIds.has(w.id)) || walls[0];
-    drawWallDimensionLabel(ctx, sx, sy, ex, ey, displayLengthCm, thickness * pxPerCm, zoom, isDark, units, representativeWall, furniture, gridSize, panOffset);
+    drawWallDimensionLabel(ctx, sx, sy, ex, ey, displayLengthCm, thickness * pxPerCm, zoom, isDark, units, representativeWall, furniture, gridSize, panOffset, rooms, walls, measureMode);
   }
 }
 
@@ -1001,7 +1002,10 @@ function drawWallDimensionLabel(
   wall?: Wall,
   furniture?: FurnitureItem[],
   gridSize?: number,
-  panOffset?: Point
+  panOffset?: Point,
+  rooms: DetectedRoom[] = [],
+  allWalls: Wall[] = [],
+  measureMode: MeasureMode = "inside"
 ) {
   const angle = Math.atan2(ey - sy, ex - sx);
   const wallLengthPx = Math.sqrt((ex - sx) ** 2 + (ey - sy) ** 2);
@@ -1014,14 +1018,12 @@ function drawWallDimensionLabel(
 
   // Collision avoidance: find optimal position along wall
   let labelFrac = 0.5;
-  let offsetPerp = false;
   if (wall && furniture && gridSize && panOffset) {
     const occupants = findComponentsOnWall(wall, furniture, gridSize, zoom, panOffset);
     if (occupants.length > 0) {
       const textFrac = wallLengthPx > 0 ? (textWidth + pad * 2) / wallLengthPx : 1;
       const result = findOptimalLabelPosition(occupants, textFrac);
       labelFrac = result.position;
-      offsetPerp = result.offsetPerp;
     }
   }
 
@@ -1029,12 +1031,64 @@ function drawWallDimensionLabel(
   const mx = sx + (ex - sx) * labelFrac;
   const my = sy + (ey - sy) * labelFrac;
 
-  // Perpendicular offset for collision avoidance
-  const perpOffsetPx = offsetPerp ? -(wallThicknessPx / 2 + baseFontSize + 8) : 0;
+  // Determine inside normal direction using room centroid (same logic as drawMeasurementIndicatorLines)
   const normX = -Math.sin(angle);
   const normY = Math.cos(angle);
-  const finalX = mx + normX * perpOffsetPx;
-  const finalY = my + normY * perpOffsetPx;
+  let insideNormX = normX;
+  let insideNormY = normY;
+
+  if (wall) {
+    const wallMid = { x: (wall.start.x + wall.end.x) / 2, y: (wall.start.y + wall.end.y) / 2 };
+    const wdx = wall.end.x - wall.start.x;
+    const wdy = wall.end.y - wall.start.y;
+    const wlen = Math.sqrt(wdx * wdx + wdy * wdy);
+    if (wlen > 0) {
+      const wnx = -wdy / wlen;
+      const wny = wdx / wlen;
+
+      let foundRoom = false;
+      for (const room of rooms) {
+        const hasStart = room.vertices.some(v =>
+          Math.sqrt((v.x - wall.start.x) ** 2 + (v.y - wall.start.y) ** 2) < 15
+        );
+        const hasEnd = room.vertices.some(v =>
+          Math.sqrt((v.x - wall.end.x) ** 2 + (v.y - wall.end.y) ** 2) < 15
+        );
+        if (hasStart && hasEnd) {
+          const toCentroid = { x: room.centroid.x - wallMid.x, y: room.centroid.y - wallMid.y };
+          const dot = toCentroid.x * wnx + toCentroid.y * wny;
+          insideNormX = dot >= 0 ? normX : -normX;
+          insideNormY = dot >= 0 ? normY : -normY;
+          foundRoom = true;
+          break;
+        }
+      }
+
+      if (!foundRoom && allWalls.length > 0) {
+        // Fallback: use center of all wall endpoints
+        let cx = 0, cy = 0, cnt = 0;
+        for (const w of allWalls) {
+          cx += w.start.x + w.end.x;
+          cy += w.start.y + w.end.y;
+          cnt += 2;
+        }
+        if (cnt > 0) {
+          cx /= cnt;
+          cy /= cnt;
+          const toCentroid = { x: cx - wallMid.x, y: cy - wallMid.y };
+          const dot = toCentroid.x * wnx + toCentroid.y * wny;
+          insideNormX = dot >= 0 ? normX : -normX;
+          insideNormY = dot >= 0 ? normY : -normY;
+        }
+      }
+    }
+  }
+
+  // Offset label perpendicular to wall: inside mode → toward room, full → away from room
+  const dirSign = measureMode === "inside" ? 1 : -1;
+  const perpOffsetPx = dirSign * (wallThicknessPx / 2 + baseFontSize * 0.6 + 4);
+  const finalX = mx + insideNormX * perpOffsetPx;
+  const finalY = my + insideNormY * perpOffsetPx;
 
   ctx.save();
   ctx.translate(finalX, finalY);
@@ -1044,32 +1098,17 @@ function drawWallDimensionLabel(
   }
   ctx.rotate(textAngle);
 
-  if (textWidth + pad * 2 < wallLengthPx - 4) {
-    ctx.fillStyle = isDark ? "#1c1b19" : "#f9f8f5";
-    ctx.fillRect(
-      -textWidth / 2 - pad,
-      -8 * zoom - pad,
-      textWidth + pad * 2,
-      16 * zoom + pad
-    );
-    ctx.fillStyle = isDark ? DIMENSION_COLOR_DARK : DIMENSION_COLOR_LIGHT;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(text, 0, 0);
-  } else if (wallLengthPx > 15) {
-    const offsetY = -(wallThicknessPx / 2) - baseFontSize - 2;
-    ctx.fillStyle = isDark ? "#1c1b19" : "#f9f8f5";
-    ctx.fillRect(
-      -textWidth / 2 - pad,
-      offsetY - baseFontSize * 0.4 - pad,
-      textWidth + pad * 2,
-      baseFontSize + pad * 2
-    );
-    ctx.fillStyle = isDark ? DIMENSION_COLOR_DARK : DIMENSION_COLOR_LIGHT;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(text, 0, offsetY);
-  }
+  ctx.fillStyle = isDark ? "#1c1b19" : "#f9f8f5";
+  ctx.fillRect(
+    -textWidth / 2 - pad,
+    -baseFontSize * 0.5 - pad,
+    textWidth + pad * 2,
+    baseFontSize + pad * 2
+  );
+  ctx.fillStyle = isDark ? DIMENSION_COLOR_DARK : DIMENSION_COLOR_LIGHT;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(text, 0, 0);
 
   ctx.restore();
 }
