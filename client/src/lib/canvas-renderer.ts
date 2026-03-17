@@ -1627,8 +1627,8 @@ export function drawWallPreview(
     const newWallAngle = Math.atan2(ey - sy, ex - sx);
 
     if (adjWallAngleRad !== undefined && arcRadius > 8) {
-      // Draw arc between the adjoining wall's incoming direction and the new wall
-      const adjIncoming = adjWallAngleRad + Math.PI;
+      // Draw arc between the adjoining wall's outward direction and the new wall (interior side)
+      const adjIncoming = adjWallAngleRad;
       let sweep = newWallAngle - adjIncoming;
       sweep = ((sweep % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
       const ccw = sweep > Math.PI;
