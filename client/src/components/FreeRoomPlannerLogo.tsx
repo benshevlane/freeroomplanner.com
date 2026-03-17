@@ -3,7 +3,7 @@ interface LogoProps {
   size?: number;
 }
 
-export default function RoomSketchLogo({ className = "", size = 28 }: LogoProps) {
+export default function FreeRoomPlannerLogo({ className = "", size = 28 }: LogoProps) {
   return (
     <svg
       width={size}
@@ -11,7 +11,7 @@ export default function RoomSketchLogo({ className = "", size = 28 }: LogoProps)
       viewBox="0 0 32 32"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
-      aria-label="RoomSketch"
+      aria-label="Free Room Planner"
       className={className}
     >
       {/* Outer room outline */}

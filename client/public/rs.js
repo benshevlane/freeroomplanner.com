@@ -1,4 +1,4 @@
-/* RoomSketch — shared JS for all static SEO pages */
+/* Free Room Planner — shared JS for all static SEO pages */
 
 // ── Dark mode ────────────────────────────────────────────────────────────────
 var __rsStore = {};

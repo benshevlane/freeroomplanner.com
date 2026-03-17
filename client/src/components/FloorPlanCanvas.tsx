@@ -17,6 +17,7 @@ import {
   resolveAndDrawLabelCollisions,
   findParallelWallDiscrepancies,
   drawWallLabelsWithDiscrepancy,
+  drawWallCupboardLegend,
   hitTestRotateHandle,
   hitTestRoomLabel,
   getRoomKey,
@@ -33,6 +34,7 @@ import {
   hitTestResizeHandle,
   ResizeCorner,
 } from "../lib/canvas-renderer";
+import { isWallCupboard } from "../lib/types";
 import { detectRooms } from "../lib/room-detection";
 
 interface FloorPlanCanvasProps {
@@ -217,9 +219,13 @@ export default function FloorPlanCanvas({
       }
     }
 
-    // Furniture — draw non-door/window items first
-    const regularFurniture = state.furniture.filter((f) => f.type !== "door" && f.type !== "window");
-    drawFurniture(ctx, regularFurniture, state.gridSize, state.zoom, state.panOffset, isDark, state.selectedItemId);
+    // Furniture — draw floor items first, then wall cupboards on top, then doors/windows
+    const floorFurniture = state.furniture.filter((f) => f.type !== "door" && f.type !== "window" && !isWallCupboard(f.type));
+    drawFurniture(ctx, floorFurniture, state.gridSize, state.zoom, state.panOffset, isDark, state.selectedItemId);
+
+    // Wall cupboards render above floor units
+    const wallCupboards = state.furniture.filter((f) => isWallCupboard(f.type));
+    drawFurniture(ctx, wallCupboards, state.gridSize, state.zoom, state.panOffset, isDark, state.selectedItemId);
 
     // Doors & windows render on top of walls so they overlay correctly
     const doorWindowItems = state.furniture.filter((f) => f.type === "door" || f.type === "window");
@@ -274,6 +280,11 @@ export default function FloorPlanCanvas({
 
     // Scale indicator
     drawScaleIndicator(ctx, w, h, state.gridSize, state.zoom, isDark, state.units);
+
+    // Wall cupboard legend (only show if there are wall cupboards on the canvas)
+    if (wallCupboards.length > 0) {
+      drawWallCupboardLegend(ctx, w, h, isDark);
+    }
   });
 
   function drawScaleIndicator(
@@ -627,6 +638,16 @@ export default function FloorPlanCanvas({
           newH = Math.max(minH, resizeStart.itemH - dyCm);
           newX = resizeStart.itemX + resizeStart.itemW - newW;
           newY = resizeStart.itemY + resizeStart.itemH - newH;
+        } else if (resizeCorner === "r") {
+          newW = Math.max(minW, resizeStart.itemW + dxCm);
+        } else if (resizeCorner === "l") {
+          newW = Math.max(minW, resizeStart.itemW - dxCm);
+          newX = resizeStart.itemX + resizeStart.itemW - newW;
+        } else if (resizeCorner === "b") {
+          newH = Math.max(minH, resizeStart.itemH + dyCm);
+        } else if (resizeCorner === "t") {
+          newH = Math.max(minH, resizeStart.itemH - dyCm);
+          newY = resizeStart.itemY + resizeStart.itemH - newH;
         }
 
         newW = Math.round(newW);
@@ -958,7 +979,12 @@ export default function FloorPlanCanvas({
   const cursorStyle = (() => {
     if (isPanning) return "grabbing";
     if (isRotating) return "grab";
-    if (isResizing) return "nwse-resize";
+    if (isResizing) {
+      if (resizeCorner === "t" || resizeCorner === "b") return "ns-resize";
+      if (resizeCorner === "l" || resizeCorner === "r") return "ew-resize";
+      if (resizeCorner === "tr" || resizeCorner === "bl") return "nesw-resize";
+      return "nwse-resize";
+    }
     if (state.selectedTool === "pan") return "grab";
     if (state.selectedTool === "wall") return "crosshair";
     if (state.selectedTool === "eraser") return "crosshair";

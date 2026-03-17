@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/drawer";
 import { Monitor, Pencil, ZoomIn, HelpCircle } from "lucide-react";
 
-const WIZARD_STORAGE_KEY = "roomsketch-mobile-wizard-shown";
+const WIZARD_STORAGE_KEY = "freeroomplanner-mobile-wizard-shown";
 
 interface MobileWizardProps {
   open: boolean;
@@ -20,7 +20,7 @@ interface MobileWizardProps {
 const steps = [
   {
     icon: Monitor,
-    title: "Welcome to RoomSketch",
+    title: "Welcome to Free Room Planner",
     description:
       "This tool works best on desktop, but you can absolutely draw floor plans on mobile too. Here's a quick guide.",
   },
