@@ -1,17 +1,21 @@
-import { Wall, FurnitureItem, RoomLabel, LabelSize, LabelColor, UnitSystem, isWallCupboard, cmToDisplay, displayToCm, dimensionSuffix } from "../lib/types";
+import { Wall, FurnitureItem, RoomLabel, TextBox, LabelSize, LabelColor, UnitSystem, isWallCupboard, cmToDisplay, displayToCm, dimensionSuffix } from "../lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
 import { RotateCw, Trash2, Ruler, Copy, Bold, Square } from "lucide-react";
 
 interface PropertiesPanelProps {
   selectedWall: Wall | null;
   selectedFurniture: FurnitureItem | null;
   selectedLabel: RoomLabel | null;
+  selectedTextBox: TextBox | null;
   onRotate: () => void;
   onDelete: () => void;
   onDuplicate: () => void;
   onUpdateFurniture: (id: string, updates: Partial<FurnitureItem>) => void;
   onUpdateLabel: (id: string, updates: Partial<RoomLabel>) => void;
+  onUpdateTextBox?: (id: string, updates: Partial<TextBox>) => void;
   units: UnitSystem;
 }
 
@@ -49,14 +53,16 @@ export default function PropertiesPanel({
   selectedWall,
   selectedFurniture,
   selectedLabel,
+  selectedTextBox,
   onRotate,
   onDelete,
   onDuplicate,
   onUpdateFurniture,
   onUpdateLabel,
+  onUpdateTextBox,
   units,
 }: PropertiesPanelProps) {
-  if (!selectedWall && !selectedFurniture && !selectedLabel) {
+  if (!selectedWall && !selectedFurniture && !selectedLabel && !selectedTextBox) {
     return (
       <div className="p-4 text-sm text-muted-foreground" data-testid="properties-empty">
         <p className="font-medium text-foreground mb-1">Properties</p>
@@ -198,6 +204,185 @@ export default function PropertiesPanel({
           </Button>
           <Button size="sm" variant="ghost" onClick={onDelete} className="text-destructive min-h-[44px] md:min-h-0" data-testid="btn-delete-furniture">
             <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (selectedTextBox && onUpdateTextBox) {
+    const tb = selectedTextBox;
+    return (
+      <div className="p-4 space-y-3" data-testid="properties-textbox">
+        <p className="text-sm font-semibold">Text Box</p>
+
+        {/* Name */}
+        <div className="space-y-1.5">
+          <p className="text-xs text-muted-foreground">Name</p>
+          <Input
+            type="text"
+            value={tb.customName || ""}
+            onChange={(e) => onUpdateTextBox(tb.id, { customName: e.target.value })}
+            className="h-7 text-sm"
+            placeholder="Text Box"
+          />
+        </div>
+
+        {/* Rotation */}
+        <div className="flex items-center gap-2 text-sm">
+          <span className="text-muted-foreground">Rotation:</span>
+          <span className="font-medium">{tb.rotation}°</span>
+        </div>
+
+        {/* Border */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-muted-foreground">Border</p>
+            <Switch
+              checked={tb.borderEnabled}
+              onCheckedChange={(v) => onUpdateTextBox(tb.id, { borderEnabled: v })}
+            />
+          </div>
+          {tb.borderEnabled && (
+            <div className="space-y-2 pl-1">
+              <div className="flex items-center gap-2">
+                <label className="relative cursor-pointer">
+                  <span className="block w-6 h-6 rounded border border-border" style={{ backgroundColor: tb.borderColor }} />
+                  <input
+                    type="color"
+                    className="absolute inset-0 opacity-0 cursor-pointer"
+                    value={tb.borderColor}
+                    onChange={(e) => onUpdateTextBox(tb.id, { borderColor: e.target.value })}
+                  />
+                </label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={10}
+                  value={tb.borderWidth}
+                  onChange={(e) => onUpdateTextBox(tb.id, { borderWidth: Math.max(1, parseInt(e.target.value) || 1) })}
+                  className="h-7 w-14 text-xs"
+                />
+                <span className="text-xs text-muted-foreground">px</span>
+              </div>
+              <div className="flex gap-1">
+                {(["solid", "dashed", "dotted"] as const).map((style) => (
+                  <Button
+                    key={style}
+                    size="sm"
+                    variant={tb.borderStyle === style ? "default" : "outline"}
+                    className="flex-1 text-xs h-7"
+                    onClick={() => onUpdateTextBox(tb.id, { borderStyle: style })}
+                  >
+                    {style}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Corner Radius */}
+        <div className="space-y-1.5">
+          <p className="text-xs text-muted-foreground">Corner Radius: {tb.cornerRadius}px</p>
+          <Slider
+            value={[tb.cornerRadius]}
+            min={0}
+            max={40}
+            step={1}
+            onValueChange={([v]) => onUpdateTextBox(tb.id, { cornerRadius: v })}
+          />
+        </div>
+
+        {/* Background */}
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-2">
+            <p className="text-xs text-muted-foreground">Background</p>
+            <label className="relative cursor-pointer">
+              <span className="block w-6 h-6 rounded border border-border" style={{ backgroundColor: tb.backgroundColor }} />
+              <input
+                type="color"
+                className="absolute inset-0 opacity-0 cursor-pointer"
+                value={tb.backgroundColor}
+                onChange={(e) => onUpdateTextBox(tb.id, { backgroundColor: e.target.value })}
+              />
+            </label>
+          </div>
+          <p className="text-xs text-muted-foreground">Opacity: {Math.round(tb.backgroundOpacity * 100)}%</p>
+          <Slider
+            value={[tb.backgroundOpacity * 100]}
+            min={0}
+            max={100}
+            step={1}
+            onValueChange={([v]) => onUpdateTextBox(tb.id, { backgroundOpacity: v / 100 })}
+          />
+        </div>
+
+        {/* Padding */}
+        <div className="space-y-1.5">
+          <p className="text-xs text-muted-foreground">Padding: {tb.padding}px</p>
+          <Slider
+            value={[tb.padding]}
+            min={4}
+            max={40}
+            step={1}
+            onValueChange={([v]) => onUpdateTextBox(tb.id, { padding: v })}
+          />
+        </div>
+
+        {/* Shadow */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-muted-foreground">Shadow</p>
+            <Switch
+              checked={tb.shadowEnabled}
+              onCheckedChange={(v) => onUpdateTextBox(tb.id, { shadowEnabled: v })}
+            />
+          </div>
+          {tb.shadowEnabled && (
+            <div className="space-y-1.5 pl-1">
+              <p className="text-xs text-muted-foreground">Blur: {tb.shadowBlur}px</p>
+              <Slider
+                value={[tb.shadowBlur]}
+                min={0}
+                max={30}
+                step={1}
+                onValueChange={([v]) => onUpdateTextBox(tb.id, { shadowBlur: v })}
+              />
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <p className="text-xs text-muted-foreground">X: {tb.shadowOffsetX}</p>
+                  <Slider
+                    value={[tb.shadowOffsetX]}
+                    min={-20}
+                    max={20}
+                    step={1}
+                    onValueChange={([v]) => onUpdateTextBox(tb.id, { shadowOffsetX: v })}
+                  />
+                </div>
+                <div className="flex-1">
+                  <p className="text-xs text-muted-foreground">Y: {tb.shadowOffsetY}</p>
+                  <Slider
+                    value={[tb.shadowOffsetY]}
+                    min={-20}
+                    max={20}
+                    step={1}
+                    onValueChange={([v]) => onUpdateTextBox(tb.id, { shadowOffsetY: v })}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="flex gap-1 pt-1">
+          <Button size="sm" variant="secondary" onClick={onDuplicate} className="flex-1 min-h-[44px] md:min-h-0" data-testid="btn-duplicate-textbox">
+            <Copy className="h-3.5 w-3.5 mr-1" />
+            Duplicate
+          </Button>
+          <Button size="sm" variant="ghost" onClick={onDelete} className="text-destructive min-h-[44px] md:min-h-0" data-testid="btn-delete-textbox">
+            <Trash2 className="h-3.5 w-3.5 mr-1" />
+            Delete
           </Button>
         </div>
       </div>

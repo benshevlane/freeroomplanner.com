@@ -40,6 +40,56 @@ export interface RoomLabel {
   background?: boolean; // white pill background
 }
 
+export interface TextBox {
+  id: string;
+  x: number; // world cm
+  y: number; // world cm
+  width: number; // world cm
+  height: number; // world cm
+  rotation: number; // degrees
+  content: string; // HTML string
+  customName?: string; // editable name for layers panel
+  // Box styling
+  borderEnabled: boolean;
+  borderColor: string;
+  borderWidth: number; // px
+  borderStyle: "solid" | "dashed" | "dotted";
+  cornerRadius: number; // px 0–40
+  backgroundColor: string;
+  backgroundOpacity: number; // 0–1
+  padding: number; // px 4–40
+  shadowEnabled: boolean;
+  shadowBlur: number; // px
+  shadowOffsetX: number; // px
+  shadowOffsetY: number; // px
+  // Text defaults
+  fontSize: number; // px
+  fontFamily: string;
+  zIndex: number;
+}
+
+export const DEFAULT_TEXT_BOX: Omit<TextBox, "id" | "x" | "y"> = {
+  width: 200,
+  height: 100,
+  rotation: 0,
+  content: "",
+  borderEnabled: false,
+  borderColor: "#000000",
+  borderWidth: 1,
+  borderStyle: "solid",
+  cornerRadius: 0,
+  backgroundColor: "#ffffff",
+  backgroundOpacity: 1,
+  padding: 12,
+  shadowEnabled: false,
+  shadowBlur: 8,
+  shadowOffsetX: 2,
+  shadowOffsetY: 2,
+  fontSize: 14,
+  fontFamily: "sans-serif",
+  zIndex: 0,
+};
+
 export type EditorTool = "select" | "wall" | "furniture" | "label" | "eraser" | "pan";
 
 export type UnitSystem = "m" | "cm" | "mm" | "ft";
@@ -96,6 +146,7 @@ export interface EditorState {
   walls: Wall[];
   furniture: FurnitureItem[];
   labels: RoomLabel[];
+  textBoxes: TextBox[];
   gridSize: number; // px per meter
   zoom: number;
   panOffset: Point;

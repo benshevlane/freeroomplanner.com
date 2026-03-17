@@ -12,7 +12,7 @@ import DesktopWizard from "../components/DesktopWizard";
 import RoomGeneratorWizard from "../components/RoomGeneratorWizard";
 import { PerplexityAttribution } from "../components/PerplexityAttribution";
 import IntentCapture from "../components/IntentCapture";
-import { FurnitureTemplate, FurnitureItem, RoomLabel, Point, UnitSystem, MeasureMode } from "../lib/types";
+import { FurnitureTemplate, FurnitureItem, RoomLabel, TextBox, Point, UnitSystem, MeasureMode } from "../lib/types";
 import html2canvas from "html2canvas";
 import { trackEvent } from "@/lib/analytics";
 import { Input } from "@/components/ui/input";
@@ -93,7 +93,7 @@ export default function Editor() {
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Clipboard for copy/paste
-  const clipboardRef = useRef<{ type: "furniture"; data: FurnitureItem } | { type: "label"; data: RoomLabel } | null>(null);
+  const clipboardRef = useRef<{ type: "furniture"; data: FurnitureItem } | { type: "label"; data: RoomLabel } | { type: "textbox"; data: TextBox } | null>(null);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", isDark);
@@ -110,7 +110,8 @@ export default function Editor() {
   const selectedWall = state.walls.find((w) => w.id === state.selectedItemId) || null;
   const selectedFurniture = state.furniture.find((f) => f.id === state.selectedItemId) || null;
   const selectedLabel = state.labels.find((l) => l.id === state.selectedItemId) || null;
-  const hasSelection = !!(selectedWall || selectedFurniture || selectedLabel);
+  const selectedTextBox = state.textBoxes.find((t) => t.id === state.selectedItemId) || null;
+  const hasSelection = !!(selectedWall || selectedFurniture || selectedLabel || selectedTextBox);
 
   // Auto-open properties sheet on mobile when something is selected
   useEffect(() => {
@@ -126,8 +127,10 @@ export default function Editor() {
       clipboardRef.current = { type: "furniture", data: { ...selectedFurniture } };
     } else if (selectedLabel) {
       clipboardRef.current = { type: "label", data: { ...selectedLabel } };
+    } else if (selectedTextBox) {
+      clipboardRef.current = { type: "textbox", data: { ...selectedTextBox } };
     }
-  }, [selectedFurniture, selectedLabel]);
+  }, [selectedFurniture, selectedLabel, selectedTextBox]);
 
   const handlePaste = useCallback(() => {
     const clip = clipboardRef.current;
@@ -139,10 +142,6 @@ export default function Editor() {
         x: clip.data.x + 20,
         y: clip.data.y + 20,
       };
-      // Use addFurniture-like approach via state
-      editor.state.furniture; // just to reference
-      // We need to directly set state — use importState-like approach
-      // Actually let's use addFurniture with a template-like approach
       const template: FurnitureTemplate = {
         type: newItem.type,
         label: newItem.label,
@@ -154,6 +153,10 @@ export default function Editor() {
       editor.addFurniture(template, { x: newItem.x + newItem.width / 2, y: newItem.y + newItem.height / 2 });
     } else if (clip.type === "label") {
       editor.addLabel(clip.data.text, { x: clip.data.x + 20, y: clip.data.y + 20 });
+    } else if (clip.type === "textbox") {
+      const tbData = clip.data as TextBox;
+      const newId = editor.addTextBox({ x: tbData.x + tbData.width / 2 + 20, y: tbData.y + tbData.height / 2 + 20 });
+      editor.updateTextBox(newId, { ...tbData, id: newId, x: tbData.x + 20, y: tbData.y + 20 });
     }
   }, [editor]);
 
@@ -162,6 +165,8 @@ export default function Editor() {
       clipboardRef.current = { type: "furniture", data: { ...selectedFurniture } };
     } else if (selectedLabel) {
       clipboardRef.current = { type: "label", data: { ...selectedLabel } };
+    } else if (selectedTextBox) {
+      clipboardRef.current = { type: "textbox", data: { ...selectedTextBox } };
     }
     // Then paste immediately
     const clip = clipboardRef.current;
@@ -184,13 +189,18 @@ export default function Editor() {
         x: (clip.data as RoomLabel).x + 20,
         y: (clip.data as RoomLabel).y + 20,
       });
+    } else if (clip.type === "textbox") {
+      const tbData = clip.data as TextBox;
+      const newId = editor.addTextBox({ x: tbData.x + tbData.width / 2 + 20, y: tbData.y + tbData.height / 2 + 20 });
+      editor.updateTextBox(newId, { ...tbData, id: newId, x: tbData.x + 20, y: tbData.y + 20 });
     }
-  }, [selectedFurniture, selectedLabel, editor]);
+  }, [selectedFurniture, selectedLabel, selectedTextBox, editor]);
 
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (e.target instanceof HTMLElement && e.target.isContentEditable) return;
 
       if (e.key === "v" || e.key === "V") {
         if (!e.ctrlKey && !e.metaKey) editor.setTool("select");
@@ -245,7 +255,8 @@ export default function Editor() {
     if (selectedWall) editor.removeWall(selectedWall.id);
     if (selectedFurniture) editor.removeFurniture(selectedFurniture.id);
     if (selectedLabel) editor.removeLabel(selectedLabel.id);
-  }, [selectedWall, selectedFurniture, selectedLabel, editor]);
+    if (selectedTextBox) editor.removeTextBox(selectedTextBox.id);
+  }, [selectedWall, selectedFurniture, selectedLabel, selectedTextBox, editor]);
 
   const handleSavePlan = useCallback(async () => {
     try {
@@ -339,7 +350,7 @@ export default function Editor() {
       reader.onload = (ev) => {
         try {
           const plan = JSON.parse(ev.target?.result as string);
-          if (plan.version && plan.walls && plan.furniture && plan.labels) {
+          if (plan.version && plan.walls && plan.furniture) {
             editor.importState(plan);
           }
         } catch {}
@@ -379,6 +390,15 @@ export default function Editor() {
     },
     [editor, state]
   );
+
+  const handleAddTextBox = useCallback(() => {
+    const centerWorld = {
+      x: (400 - state.panOffset.x) / ((state.gridSize * state.zoom) / 100),
+      y: (300 - state.panOffset.y) / ((state.gridSize * state.zoom) / 100),
+    };
+    editor.addTextBox(centerWorld);
+    editor.setTool("select");
+  }, [editor, state]);
 
   const handleDropFurniture = useCallback(
     (template: FurnitureTemplate, position: Point) => {
@@ -550,6 +570,7 @@ export default function Editor() {
                   className="w-full border-r-0"
                   onSelectFurniture={(t) => { handleSelectFurniture(t); setFurniturePanelOpen(false); }}
                   onSwitchToSelect={() => editor.setTool("select")}
+                  onAddTextBox={() => { handleAddTextBox(); setFurniturePanelOpen(false); }}
                 />
               </SheetContent>
             </Sheet>
@@ -564,11 +585,13 @@ export default function Editor() {
                       selectedWall={selectedWall}
                       selectedFurniture={selectedFurniture}
                       selectedLabel={selectedLabel}
+                      selectedTextBox={selectedTextBox}
                       onRotate={handleRotateSelected}
                       onDelete={handleDeleteSelected}
                       onDuplicate={handleDuplicate}
                       onUpdateFurniture={handleUpdateFurniture}
                       onUpdateLabel={editor.updateLabel}
+                      onUpdateTextBox={editor.updateTextBox}
                       units={state.units}
                     />
                   </ScrollArea>
@@ -578,7 +601,7 @@ export default function Editor() {
           </>
         ) : (
           /* Desktop: Furniture panel inline */
-          <FurniturePanel onSelectFurniture={handleSelectFurniture} onSwitchToSelect={() => editor.setTool("select")} />
+          <FurniturePanel onSelectFurniture={handleSelectFurniture} onSwitchToSelect={() => editor.setTool("select")} onAddTextBox={handleAddTextBox} />
         )}
 
         {/* Canvas */}
@@ -604,6 +627,10 @@ export default function Editor() {
           onUpdateFurniture={handleUpdateFurniture}
           onSplitWallAndConnect={editor.splitWallAndConnect}
           onSetRoomName={editor.setRoomNameForRoom}
+          onMoveTextBox={editor.moveTextBox}
+          onUpdateTextBox={editor.updateTextBox}
+          onRemoveTextBox={editor.removeTextBox}
+          onPushUndoForTextBox={editor.pushUndo}
         />
 
         {/* Desktop: Properties sidebar */}
@@ -614,11 +641,13 @@ export default function Editor() {
                 selectedWall={selectedWall}
                 selectedFurniture={selectedFurniture}
                 selectedLabel={selectedLabel}
+                selectedTextBox={selectedTextBox}
                 onRotate={handleRotateSelected}
                 onDelete={handleDeleteSelected}
                 onDuplicate={handleDuplicate}
                 onUpdateFurniture={handleUpdateFurniture}
                 onUpdateLabel={editor.updateLabel}
+                onUpdateTextBox={editor.updateTextBox}
                 units={state.units}
               />
             </ScrollArea>
@@ -637,6 +666,12 @@ export default function Editor() {
                 <span>Labels</span>
                 <span className="font-medium tabular-nums">{state.labels.length}</span>
               </div>
+              {state.textBoxes.length > 0 && (
+                <div className="flex justify-between">
+                  <span>Text Boxes</span>
+                  <span className="font-medium tabular-nums">{state.textBoxes.length}</span>
+                </div>
+              )}
             </div>
 
             {/* Attribution */}
