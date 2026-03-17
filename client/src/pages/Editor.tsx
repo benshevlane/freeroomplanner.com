@@ -12,6 +12,7 @@ import { PerplexityAttribution } from "../components/PerplexityAttribution";
 import IntentCapture from "../components/IntentCapture";
 import { FurnitureTemplate, FurnitureItem, RoomLabel, Point, UnitSystem, MeasureMode } from "../lib/types";
 import html2canvas from "html2canvas";
+import { trackEvent } from "@/lib/analytics";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -300,6 +301,15 @@ export default function Editor() {
         a.click();
         URL.revokeObjectURL(url);
         showToast("Plan saved as PNG image");
+        try {
+          const intent = localStorage.getItem("freeroomplanner-intent");
+          const planType = intent ? JSON.parse(intent)?.intent ?? "room" : "room";
+          trackEvent('room_plan_saved', {
+            plan_type: planType,
+            room_name: state.roomName,
+            timestamp: new Date().toISOString(),
+          });
+        } catch { /* analytics should never break the app */ }
       }, "image/png");
     } catch {
       showToast("Failed to save image");
