@@ -8,6 +8,7 @@ import FurniturePanel from "../components/FurniturePanel";
 import PropertiesPanel from "../components/PropertiesPanel";
 import FreeRoomPlannerLogo from "../components/FreeRoomPlannerLogo";
 import MobileWizard from "../components/MobileWizard";
+import DesktopWizard from "../components/DesktopWizard";
 import { PerplexityAttribution } from "../components/PerplexityAttribution";
 import IntentCapture from "../components/IntentCapture";
 import { FurnitureTemplate, FurnitureItem, RoomLabel, Point, UnitSystem, MeasureMode } from "../lib/types";
@@ -70,6 +71,14 @@ export default function Editor() {
   useEffect(() => {
     if (isMobile && !localStorage.getItem("freeroomplanner-mobile-wizard-shown")) {
       setShowMobileWizard(true);
+    }
+  }, [isMobile]);
+
+  // Desktop onboarding wizard
+  const [showDesktopWizard, setShowDesktopWizard] = useState(false);
+  useEffect(() => {
+    if (!isMobile && !localStorage.getItem("freeroomplanner-desktop-wizard-shown")) {
+      setShowDesktopWizard(true);
     }
   }, [isMobile]);
 
@@ -629,6 +638,9 @@ export default function Editor() {
 
       {/* Mobile onboarding wizard */}
       <MobileWizard open={showMobileWizard} onClose={() => setShowMobileWizard(false)} />
+
+      {/* Desktop onboarding wizard */}
+      {!isMobile && <DesktopWizard open={showDesktopWizard} onClose={() => setShowDesktopWizard(false)} />}
     </div>
   );
 }
