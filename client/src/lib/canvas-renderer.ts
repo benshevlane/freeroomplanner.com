@@ -2421,6 +2421,8 @@ export function drawWallLabelsWithDiscrepancy(
   }
 
   return { visibleSet, hiddenCount };
+}
+
 export function drawWallCupboardLegend(
   ctx: CanvasRenderingContext2D,
   w: number,
