@@ -606,6 +606,16 @@ export default function FloorPlanCanvas({
           newH = Math.max(minH, resizeStart.itemH - dyCm);
           newX = resizeStart.itemX + resizeStart.itemW - newW;
           newY = resizeStart.itemY + resizeStart.itemH - newH;
+        } else if (resizeCorner === "r") {
+          newW = Math.max(minW, resizeStart.itemW + dxCm);
+        } else if (resizeCorner === "l") {
+          newW = Math.max(minW, resizeStart.itemW - dxCm);
+          newX = resizeStart.itemX + resizeStart.itemW - newW;
+        } else if (resizeCorner === "b") {
+          newH = Math.max(minH, resizeStart.itemH + dyCm);
+        } else if (resizeCorner === "t") {
+          newH = Math.max(minH, resizeStart.itemH - dyCm);
+          newY = resizeStart.itemY + resizeStart.itemH - newH;
         }
 
         newW = Math.round(newW);
@@ -885,7 +895,12 @@ export default function FloorPlanCanvas({
   const cursorStyle = (() => {
     if (isPanning) return "grabbing";
     if (isRotating) return "grab";
-    if (isResizing) return "nwse-resize";
+    if (isResizing) {
+      if (resizeCorner === "t" || resizeCorner === "b") return "ns-resize";
+      if (resizeCorner === "l" || resizeCorner === "r") return "ew-resize";
+      if (resizeCorner === "tr" || resizeCorner === "bl") return "nesw-resize";
+      return "nwse-resize";
+    }
     if (state.selectedTool === "pan") return "grab";
     if (state.selectedTool === "wall") return "crosshair";
     if (state.selectedTool === "eraser") return "crosshair";
