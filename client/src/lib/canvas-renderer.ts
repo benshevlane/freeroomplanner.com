@@ -258,6 +258,200 @@ export function drawWalls(
   }
 }
 
+/** Draw segment measurements for walls that have doors/windows on them.
+ *  Shows distances from each door/window edge to the wall endpoints using dashed lines.
+ */
+export function drawWallSegmentMeasurements(
+  ctx: CanvasRenderingContext2D,
+  walls: Wall[],
+  furniture: FurnitureItem[],
+  gridSize: number,
+  zoom: number,
+  panOffset: Point,
+  isDark: boolean,
+  units: UnitSystem = "metric",
+  measureMode: MeasureMode = "inside"
+) {
+  const pxPerCm = (gridSize * zoom) / 100;
+  const color = isDark ? DIMENSION_COLOR_DARK : DIMENSION_COLOR_LIGHT;
+  const doorsWindows = furniture.filter((f) => f.type === "door" || f.type === "window");
+  if (doorsWindows.length === 0) return;
+
+  // Find collinear wall groups so we measure segments against the full merged wall
+  const collinearGroups = findCollinearGroups(walls);
+  const mergedWallIds = new Set<string>();
+  for (const group of collinearGroups.values()) {
+    for (const id of group.wallIds) mergedWallIds.add(id);
+  }
+
+  // Helper: draw a segment measurement along a wall between two points
+  function drawSegment(
+    startPt: Point, endPt: Point, wallThicknessCm: number
+  ) {
+    const dx = endPt.x - startPt.x;
+    const dy = endPt.y - startPt.y;
+    const distCm = Math.sqrt(dx * dx + dy * dy);
+    if (distCm < 5) return; // too short to label
+
+    const sx = startPt.x * pxPerCm + panOffset.x;
+    const sy = startPt.y * pxPerCm + panOffset.y;
+    const ex = endPt.x * pxPerCm + panOffset.x;
+    const ey = endPt.y * pxPerCm + panOffset.y;
+    const segLenPx = Math.sqrt((ex - sx) ** 2 + (ey - sy) ** 2);
+
+    // Draw dashed line along the wall (offset perpendicular so it doesn't overlap the wall label)
+    const angle = Math.atan2(ey - sy, ex - sx);
+    const wallThickPx = wallThicknessCm * pxPerCm;
+    const offsetDist = wallThickPx / 2 + 8 * zoom;
+    const normX = -Math.sin(angle);
+    const normY = Math.cos(angle);
+
+    const osx = sx + normX * offsetDist;
+    const osy = sy + normY * offsetDist;
+    const oex = ex + normX * offsetDist;
+    const oey = ey + normY * offsetDist;
+
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 3]);
+    ctx.beginPath();
+    ctx.moveTo(osx, osy);
+    ctx.lineTo(oex, oey);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // End ticks perpendicular to segment
+    const tickLen = 4;
+    ctx.beginPath();
+    ctx.moveTo(osx - normX * tickLen, osy - normY * tickLen);
+    ctx.lineTo(osx + normX * tickLen, osy + normY * tickLen);
+    ctx.moveTo(oex - normX * tickLen, oey - normY * tickLen);
+    ctx.lineTo(oex + normX * tickLen, oey + normY * tickLen);
+    ctx.stroke();
+
+    // Label
+    const text = formatLength(distCm, units);
+    const baseFontSize = Math.max(10, 11 * zoom);
+    ctx.font = `500 ${baseFontSize}px 'General Sans', 'DM Sans', sans-serif`;
+    const textW = ctx.measureText(text).width;
+    const pad = 3;
+
+    // Only draw if text fits reasonably
+    if (textW + pad * 2 < segLenPx + 10) {
+      const mx = (osx + oex) / 2;
+      const my = (osy + oey) / 2;
+
+      ctx.save();
+      ctx.translate(mx, my);
+      let textAngle = angle;
+      if (textAngle > Math.PI / 2 || textAngle < -Math.PI / 2) {
+        textAngle += Math.PI;
+      }
+      ctx.rotate(textAngle);
+
+      ctx.fillStyle = isDark ? "rgba(28, 27, 25, 0.85)" : "rgba(249, 248, 245, 0.85)";
+      ctx.fillRect(-textW / 2 - pad, -baseFontSize / 2 - pad, textW + pad * 2, baseFontSize + pad * 2);
+      ctx.fillStyle = color;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(text, 0, 0);
+      ctx.restore();
+    }
+
+    ctx.restore();
+  }
+
+  // Process each effective wall (individual or merged group)
+  const processedGroupKeys = new Set<string>();
+
+  for (const wall of walls) {
+    let wallStart: Point;
+    let wallEnd: Point;
+    let wallThick: number;
+
+    if (mergedWallIds.has(wall.id)) {
+      // Find the group for this wall
+      let groupKey: string | null = null;
+      for (const [key, group] of collinearGroups.entries()) {
+        if (group.wallIds.has(wall.id)) {
+          groupKey = key;
+          break;
+        }
+      }
+      if (!groupKey || processedGroupKeys.has(groupKey)) continue;
+      processedGroupKeys.add(groupKey);
+      const group = collinearGroups.get(groupKey)!;
+      wallStart = group.minP;
+      wallEnd = group.maxP;
+      wallThick = wall.thickness || 15;
+    } else {
+      wallStart = wall.start;
+      wallEnd = wall.end;
+      wallThick = wall.thickness || 15;
+    }
+
+    const wdx = wallEnd.x - wallStart.x;
+    const wdy = wallEnd.y - wallStart.y;
+    const wallLen = Math.sqrt(wdx * wdx + wdy * wdy);
+    if (wallLen < 10) continue;
+    const wallDirX = wdx / wallLen;
+    const wallDirY = wdy / wallLen;
+    const wallNormX = -wallDirY;
+    const wallNormY = wallDirX;
+
+    // Find doors/windows on this effective wall
+    const occupants: { along: number; halfExtent: number }[] = [];
+    for (const item of doorsWindows) {
+      const cx = item.x + item.width / 2;
+      const cy = item.y + item.height / 2;
+      const relX = cx - wallStart.x;
+      const relY = cy - wallStart.y;
+      const along = relX * wallDirX + relY * wallDirY;
+      const perp = Math.abs(relX * wallNormX + relY * wallNormY);
+      const threshold = wallThick + Math.max(item.width, item.height);
+      if (perp > threshold) continue;
+      const halfExtent = Math.max(item.width, item.height) / 2;
+      if (along + halfExtent > 0 && along - halfExtent < wallLen) {
+        occupants.push({ along, halfExtent });
+      }
+    }
+
+    if (occupants.length === 0) continue;
+
+    // Sort occupants by position along wall
+    occupants.sort((a, b) => a.along - b.along);
+
+    // Compute segments: wall start -> first door edge, between doors, last door edge -> wall end
+    const segments: { startAlong: number; endAlong: number }[] = [];
+    let prevEnd = 0;
+    for (const occ of occupants) {
+      const edgeStart = occ.along - occ.halfExtent;
+      const edgeEnd = occ.along + occ.halfExtent;
+      if (edgeStart > prevEnd + 1) {
+        segments.push({ startAlong: prevEnd, endAlong: edgeStart });
+      }
+      prevEnd = Math.max(prevEnd, edgeEnd);
+    }
+    if (wallLen - prevEnd > 1) {
+      segments.push({ startAlong: prevEnd, endAlong: wallLen });
+    }
+
+    // Draw each segment
+    for (const seg of segments) {
+      const startPt: Point = {
+        x: wallStart.x + wallDirX * seg.startAlong,
+        y: wallStart.y + wallDirY * seg.startAlong,
+      };
+      const endPt: Point = {
+        x: wallStart.x + wallDirX * seg.endAlong,
+        y: wallStart.y + wallDirY * seg.endAlong,
+      };
+      drawSegment(startPt, endPt, wallThick);
+    }
+  }
+}
+
 /** Draw thin green indicator lines showing which wall face is being measured */
 export function drawMeasurementIndicatorLines(
   ctx: CanvasRenderingContext2D,

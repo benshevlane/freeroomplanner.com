@@ -3,6 +3,7 @@ import { EditorState, Point, FurnitureTemplate, FurnitureItem, RoomLabel, UnitSy
 import {
   drawGrid,
   drawWalls,
+  drawWallSegmentMeasurements,
   drawMeasurementIndicatorLines,
   drawFurniture,
   drawWallPreview,
@@ -164,6 +165,9 @@ export default function FloorPlanCanvas({
 
     // Walls
     drawWalls(ctx, state.walls, state.gridSize, state.zoom, state.panOffset, isDark, state.selectedItemId, state.units, measureMode, state.furniture);
+
+    // Segment measurements for walls with doors/windows
+    drawWallSegmentMeasurements(ctx, state.walls, state.furniture, state.gridSize, state.zoom, state.panOffset, isDark, state.units, measureMode);
 
     // Measurement indicator lines (on top of walls, below labels/furniture)
     drawMeasurementIndicatorLines(ctx, state.walls, rooms, state.gridSize, state.zoom, state.panOffset, measureMode);
