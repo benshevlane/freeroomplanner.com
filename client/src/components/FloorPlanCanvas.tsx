@@ -20,6 +20,7 @@ import {
   drawWallCupboardLegend,
   hitTestRotateHandle,
   hitTestRoomLabel,
+  computeRoomLabelPositions,
   getRoomKey,
   snapAngle,
   computeWallAngle,
@@ -159,8 +160,11 @@ export default function FloorPlanCanvas({
 
     // Room areas with names
     const rooms = detectRooms(state.walls);
+    const roomLabelPositions = rooms.length > 0
+      ? computeRoomLabelPositions(ctx, rooms, state.furniture, state.gridSize, state.zoom, state.roomNames)
+      : new Map<string, Point>();
     if (rooms.length > 0) {
-      drawRoomAreas(ctx, rooms, state.gridSize, state.zoom, state.panOffset, isDark, state.units, state.roomNames, selectedRoomKey);
+      drawRoomAreas(ctx, rooms, state.gridSize, state.zoom, state.panOffset, isDark, state.units, state.roomNames, selectedRoomKey, roomLabelPositions);
     }
 
     // Walls
@@ -263,7 +267,8 @@ export default function FloorPlanCanvas({
     resolveAndDrawLabelCollisions(
       ctx, rooms, state.walls, componentLabelInfos, state.labels,
       state.gridSize, state.zoom, state.panOffset, isDark,
-      state.roomNames, state.componentLabelsVisible, state.selectedItemId
+      state.roomNames, state.componentLabelsVisible, state.selectedItemId,
+      roomLabelPositions
     );
 
     // Snap indicator and alignment guides when wall tool is active but not drawing yet
@@ -882,7 +887,10 @@ export default function FloorPlanCanvas({
 
         // Check room labels first
         const rooms = detectRooms(state.walls);
-        const hitRoom = hitTestRoomLabel(pos.x, pos.y, rooms, state.gridSize, state.zoom, state.panOffset, state.roomNames);
+        const roomLabelPos = rooms.length > 0
+          ? computeRoomLabelPositions(ctx, rooms, state.furniture, state.gridSize, state.zoom, state.roomNames)
+          : new Map<string, Point>();
+        const hitRoom = hitTestRoomLabel(pos.x, pos.y, rooms, state.gridSize, state.zoom, state.panOffset, state.roomNames, roomLabelPos);
         if (hitRoom) {
           const pxPerCm = (state.gridSize * state.zoom) / 100;
           const screenX = hitRoom.centroid.x * pxPerCm + state.panOffset.x;

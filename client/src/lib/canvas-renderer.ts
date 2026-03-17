@@ -37,6 +37,175 @@ const DIMENSION_COLOR_LIGHT = "#01696f";
 const DIMENSION_COLOR_DARK = "#4f98a3";
 const SELECT_COLOR = "#01696f";
 
+/** Ray-casting point-in-polygon test (works for convex and concave polygons) */
+function pointInPolygon(p: Point, vertices: Point[]): boolean {
+  let inside = false;
+  for (let i = 0, j = vertices.length - 1; i < vertices.length; j = i++) {
+    const xi = vertices[i].x, yi = vertices[i].y;
+    const xj = vertices[j].x, yj = vertices[j].y;
+    if ((yi > p.y) !== (yj > p.y) && p.x < ((xj - xi) * (p.y - yi)) / (yj - yi) + xi) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
+/** Compute axis-aligned bounding box for a furniture item (world cm), accounting for rotation */
+function getFurnitureAABB(item: FurnitureItem): { minX: number; minY: number; maxX: number; maxY: number } {
+  const cx = item.x + item.width / 2;
+  const cy = item.y + item.height / 2;
+  const hw = item.width / 2;
+  const hh = item.height / 2;
+  const rad = (item.rotation * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  // Rotate the 4 corners and find enclosing AABB
+  const corners = [
+    { x: -hw, y: -hh }, { x: hw, y: -hh },
+    { x: hw, y: hh }, { x: -hw, y: hh },
+  ];
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const c of corners) {
+    const rx = cx + c.x * cos - c.y * sin;
+    const ry = cy + c.x * sin + c.y * cos;
+    if (rx < minX) minX = rx;
+    if (rx > maxX) maxX = rx;
+    if (ry < minY) minY = ry;
+    if (ry > maxY) maxY = ry;
+  }
+  return { minX, minY, maxX, maxY };
+}
+
+/** Check if two AABBs overlap */
+function aabbOverlap(
+  aMinX: number, aMinY: number, aMaxX: number, aMaxY: number,
+  bMinX: number, bMinY: number, bMaxX: number, bMaxY: number
+): boolean {
+  return aMinX < bMaxX && aMaxX > bMinX && aMinY < bMaxY && aMaxY > bMinY;
+}
+
+/**
+ * Pre-compute optimal room label positions that avoid furniture.
+ * Returns a Map from roomKey to world-coordinate position (cm).
+ */
+export function computeRoomLabelPositions(
+  ctx: CanvasRenderingContext2D,
+  rooms: DetectedRoom[],
+  furniture: FurnitureItem[],
+  gridSize: number,
+  zoom: number,
+  roomNames: Record<string, string>
+): Map<string, Point> {
+  const result = new Map<string, Point>();
+  const pxPerCm = (gridSize * zoom) / 100;
+
+  // Pre-compute all furniture AABBs
+  const furnitureAABBs = furniture.map(getFurnitureAABB);
+
+  for (const room of rooms) {
+    const roomKey = getRoomKey(room);
+    const roomName = roomNames[roomKey] || "Room";
+
+    // Compute room bounding box (world cm)
+    let rMinX = Infinity, rMaxX = -Infinity, rMinY = Infinity, rMaxY = -Infinity;
+    for (const v of room.vertices) {
+      if (v.x < rMinX) rMinX = v.x;
+      if (v.x > rMaxX) rMaxX = v.x;
+      if (v.y < rMinY) rMinY = v.y;
+      if (v.y > rMaxY) rMaxY = v.y;
+    }
+
+    // Compute label dimensions in world cm (mirror the adaptive sizing in drawRoomAreas)
+    let nameFontSize = Math.max(11, 14 * zoom);
+    let areaFontSize = Math.max(9, 11 * zoom);
+    ctx.font = `600 ${nameFontSize}px 'General Sans', 'DM Sans', sans-serif`;
+    const nameWidth = ctx.measureText(roomName).width;
+    ctx.font = `500 ${areaFontSize}px 'General Sans', 'DM Sans', sans-serif`;
+    const areaText = formatArea(room.area, "metric");
+    const areaWidth = ctx.measureText(areaText).width;
+    const maxTextWidth = Math.max(nameWidth, areaWidth);
+    const totalHeight = nameFontSize + areaFontSize + 4;
+
+    const roomWidthPx = (rMaxX - rMinX) * pxPerCm;
+    const roomHeightPx = (rMaxY - rMinY) * pxPerCm;
+    if (maxTextWidth > roomWidthPx * 0.85 || totalHeight > roomHeightPx * 0.7) {
+      const scaleFactor = Math.min(
+        (roomWidthPx * 0.8) / (maxTextWidth || 1),
+        (roomHeightPx * 0.6) / (totalHeight || 1),
+        1
+      );
+      const clampedScale = Math.max(0.4, Math.min(1, scaleFactor));
+      nameFontSize *= clampedScale;
+      areaFontSize *= clampedScale;
+    }
+
+    // Convert label dimensions to world cm (half-extents)
+    const labelHalfW = (Math.max(nameWidth, areaWidth) / pxPerCm) / 2 + 10; // 10cm padding
+    const labelHalfH = ((nameFontSize + areaFontSize + 4) / pxPerCm) / 2 + 5;
+
+    // Filter furniture to those overlapping the room bounding box
+    const relevantAABBs: { minX: number; minY: number; maxX: number; maxY: number }[] = [];
+    for (const aabb of furnitureAABBs) {
+      if (aabbOverlap(rMinX, rMinY, rMaxX, rMaxY, aabb.minX, aabb.minY, aabb.maxX, aabb.maxY)) {
+        relevantAABBs.push(aabb);
+      }
+    }
+
+    // Fast path: test centroid
+    const centroid = room.centroid;
+    const labelAtCentroid = !relevantAABBs.some(aabb =>
+      aabbOverlap(
+        centroid.x - labelHalfW, centroid.y - labelHalfH,
+        centroid.x + labelHalfW, centroid.y + labelHalfH,
+        aabb.minX, aabb.minY, aabb.maxX, aabb.maxY
+      )
+    );
+
+    if (labelAtCentroid || relevantAABBs.length === 0) {
+      result.set(roomKey, centroid);
+      continue;
+    }
+
+    // Slow path: grid-sample candidate positions
+    const STEPS = 15;
+    const stepX = (rMaxX - rMinX) / STEPS;
+    const stepY = (rMaxY - rMinY) / STEPS;
+    let bestCandidate: Point | null = null;
+    let bestDist = Infinity;
+
+    for (let xi = 0; xi <= STEPS; xi++) {
+      for (let yi = 0; yi <= STEPS; yi++) {
+        const px = rMinX + xi * stepX;
+        const py = rMinY + yi * stepY;
+
+        // Must be inside the room polygon
+        if (!pointInPolygon({ x: px, y: py }, room.vertices)) continue;
+
+        // Must not overlap any furniture
+        const overlaps = relevantAABBs.some(aabb =>
+          aabbOverlap(
+            px - labelHalfW, py - labelHalfH,
+            px + labelHalfW, py + labelHalfH,
+            aabb.minX, aabb.minY, aabb.maxX, aabb.maxY
+          )
+        );
+        if (overlaps) continue;
+
+        // Pick candidate closest to centroid
+        const dist = (px - centroid.x) ** 2 + (py - centroid.y) ** 2;
+        if (dist < bestDist) {
+          bestDist = dist;
+          bestCandidate = { x: px, y: py };
+        }
+      }
+    }
+
+    result.set(roomKey, bestCandidate || centroid);
+  }
+
+  return result;
+}
+
 export function drawGrid(
   ctx: CanvasRenderingContext2D,
   width: number,
@@ -1161,7 +1330,8 @@ export function drawRoomAreas(
   isDark: boolean,
   units: UnitSystem = "metric",
   roomNames: Record<string, string> = {},
-  selectedRoomKey: string | null = null
+  selectedRoomKey: string | null = null,
+  labelPositions: Map<string, Point> = new Map()
 ) {
   const pxPerCm = (gridSize * zoom) / 100;
 
@@ -1183,11 +1353,11 @@ export function drawRoomAreas(
     ctx.fillStyle = isDark ? "rgba(79, 152, 163, 0.06)" : "rgba(1, 105, 111, 0.04)";
     ctx.fill();
 
-    // Draw room name + area text at centroid
-    const cx = room.centroid.x * pxPerCm + panOffset.x;
-    const cy = room.centroid.y * pxPerCm + panOffset.y;
-
+    // Draw room name + area text at resolved position (or centroid fallback)
     const roomKey = getRoomKey(room);
+    const labelPos = labelPositions.get(roomKey) || room.centroid;
+    const cx = labelPos.x * pxPerCm + panOffset.x;
+    const cy = labelPos.y * pxPerCm + panOffset.y;
     const roomName = roomNames[roomKey] || "Room";
     const areaText = formatArea(room.area, units);
     const isSelected = roomKey === selectedRoomKey;
@@ -1258,14 +1428,16 @@ export function hitTestRoomLabel(
   gridSize: number,
   zoom: number,
   panOffset: Point,
-  roomNames: Record<string, string>
+  roomNames: Record<string, string>,
+  labelPositions: Map<string, Point> = new Map()
 ): { roomKey: string; centroid: Point } | null {
   const pxPerCm = (gridSize * zoom) / 100;
 
   for (const room of rooms) {
-    const cx = room.centroid.x * pxPerCm + panOffset.x;
-    const cy = room.centroid.y * pxPerCm + panOffset.y;
     const roomKey = getRoomKey(room);
+    const labelPos = labelPositions.get(roomKey) || room.centroid;
+    const cx = labelPos.x * pxPerCm + panOffset.x;
+    const cy = labelPos.y * pxPerCm + panOffset.y;
     const roomName = roomNames[roomKey] || "Room";
 
     const nameFontSize = Math.max(11, 14 * zoom);
@@ -1279,7 +1451,7 @@ export function hitTestRoomLabel(
       screenY >= cy - totalHeight / 2 &&
       screenY <= cy + totalHeight / 2
     ) {
-      return { roomKey, centroid: room.centroid };
+      return { roomKey, centroid: labelPos };
     }
   }
   return null;
@@ -2822,7 +2994,8 @@ export function resolveAndDrawLabelCollisions(
   isDark: boolean,
   roomNames: Record<string, string>,
   componentLabelsVisible: boolean,
-  selectedId: string | null
+  selectedId: string | null,
+  labelPositions: Map<string, Point> = new Map()
 ): void {
   // Collect all label rects with priority
   const allRects: LabelRect[] = [];
@@ -2830,9 +3003,10 @@ export function resolveAndDrawLabelCollisions(
 
   // Room labels (priority 0) — immovable anchors, already drawn by drawRoomAreas
   for (const room of rooms) {
-    const cx = room.centroid.x * pxPerCm + panOffset.x;
-    const cy = room.centroid.y * pxPerCm + panOffset.y;
     const roomKey = getRoomKey(room);
+    const labelPos = labelPositions.get(roomKey) || room.centroid;
+    const cx = labelPos.x * pxPerCm + panOffset.x;
+    const cy = labelPos.y * pxPerCm + panOffset.y;
     const name = roomNames[roomKey] || "Room";
     const nameFontSize = Math.max(11, 14 * zoom);
     const areaFontSize = Math.max(9, 11 * zoom);
