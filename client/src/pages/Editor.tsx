@@ -480,6 +480,8 @@ export default function Editor() {
         isMobile={isMobile}
         onToggleFurniturePanel={() => setFurniturePanelOpen((o) => !o)}
         onTogglePropertiesPanel={() => setPropertiesPanelOpen((o) => !o)}
+        componentLabelsVisible={state.componentLabelsVisible}
+        onToggleComponentLabels={editor.toggleComponentLabels}
       />
 
       {/* Main area */}
@@ -512,6 +514,7 @@ export default function Editor() {
                       onDelete={handleDeleteSelected}
                       onDuplicate={handleDuplicate}
                       onUpdateFurniture={handleUpdateFurniture}
+                      onUpdateLabel={editor.updateLabel}
                     />
                   </ScrollArea>
                 </div>
@@ -545,6 +548,7 @@ export default function Editor() {
           onDropFurniture={handleDropFurniture}
           onUpdateFurniture={handleUpdateFurniture}
           onSplitWallAndConnect={editor.splitWallAndConnect}
+          onSetRoomName={editor.setRoomNameForRoom}
         />
 
         {/* Desktop: Properties sidebar */}

@@ -18,6 +18,8 @@ const INITIAL_STATE: EditorState = {
   wallChainStart: null,
   roomName: "My Room",
   units: "metric" as UnitSystem,
+  roomNames: {},
+  componentLabelsVisible: true,
 };
 
 export function useEditor() {
@@ -26,7 +28,7 @@ export function useEditor() {
   const redoStack = useRef<EditorState[]>([]);
 
   const pushUndo = useCallback(() => {
-    undoStack.current.push({ ...state, walls: [...state.walls], furniture: [...state.furniture], labels: [...state.labels] });
+    undoStack.current.push({ ...state, walls: [...state.walls], furniture: [...state.furniture], labels: [...state.labels], roomNames: { ...state.roomNames } });
     redoStack.current = [];
     if (undoStack.current.length > 50) undoStack.current.shift();
   }, [state]);
@@ -34,14 +36,14 @@ export function useEditor() {
   const undo = useCallback(() => {
     if (undoStack.current.length === 0) return;
     const prev = undoStack.current.pop()!;
-    redoStack.current.push({ ...state, walls: [...state.walls], furniture: [...state.furniture], labels: [...state.labels] });
+    redoStack.current.push({ ...state, walls: [...state.walls], furniture: [...state.furniture], labels: [...state.labels], roomNames: { ...state.roomNames } });
     setState(prev);
   }, [state]);
 
   const redo = useCallback(() => {
     if (redoStack.current.length === 0) return;
     const next = redoStack.current.pop()!;
-    undoStack.current.push({ ...state, walls: [...state.walls], furniture: [...state.furniture], labels: [...state.labels] });
+    undoStack.current.push({ ...state, walls: [...state.walls], furniture: [...state.furniture], labels: [...state.labels], roomNames: { ...state.roomNames } });
     setState(next);
   }, [state]);
 
@@ -175,7 +177,9 @@ export function useEditor() {
       walls: [],
       furniture: [],
       labels: [],
+      roomNames: {},
       selectedItemId: null,
+      wallDrawing: null,
     }));
   }, [pushUndo]);
 
@@ -212,6 +216,18 @@ export function useEditor() {
     }));
   }, []);
 
+  const setRoomNameForRoom = useCallback((roomKey: string, name: string) => {
+    pushUndo();
+    setState((s) => ({
+      ...s,
+      roomNames: { ...s.roomNames, [roomKey]: name },
+    }));
+  }, [pushUndo]);
+
+  const toggleComponentLabels = useCallback(() => {
+    setState((s) => ({ ...s, componentLabelsVisible: !s.componentLabelsVisible }));
+  }, []);
+
   const exportState = useCallback(() => {
     return {
       version: 1,
@@ -219,10 +235,12 @@ export function useEditor() {
       walls: state.walls,
       furniture: state.furniture,
       labels: state.labels,
+      roomNames: state.roomNames,
+      componentLabelsVisible: state.componentLabelsVisible,
     };
-  }, [state.roomName, state.walls, state.furniture, state.labels]);
+  }, [state.roomName, state.walls, state.furniture, state.labels, state.roomNames, state.componentLabelsVisible]);
 
-  const importState = useCallback((plan: { version: number; roomName: string; walls: Wall[]; furniture: FurnitureItem[]; labels: RoomLabel[] }) => {
+  const importState = useCallback((plan: { version: number; roomName: string; walls: Wall[]; furniture: FurnitureItem[]; labels: RoomLabel[]; roomNames?: Record<string, string>; componentLabelsVisible?: boolean }) => {
     pushUndo();
     setState((s) => ({
       ...s,
@@ -230,6 +248,8 @@ export function useEditor() {
       walls: plan.walls,
       furniture: plan.furniture,
       labels: plan.labels,
+      roomNames: plan.roomNames || {},
+      componentLabelsVisible: plan.componentLabelsVisible ?? true,
       selectedItemId: null,
       wallDrawing: null,
     }));
@@ -264,5 +284,7 @@ export function useEditor() {
     exportState,
     importState,
     splitWallAndConnect,
+    setRoomNameForRoom,
+    toggleComponentLabels,
   };
 }

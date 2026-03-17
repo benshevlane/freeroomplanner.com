@@ -13,7 +13,13 @@ import {
   drawAlignmentGuides,
   drawDistanceMeasurements,
   drawEraserHighlight,
+  drawComponentLabels,
+  resolveAndDrawLabelCollisions,
+  findParallelWallDiscrepancies,
+  drawWallLabelsWithDiscrepancy,
   hitTestRotateHandle,
+  hitTestRoomLabel,
+  getRoomKey,
   snapAngle,
   computeWallAngle,
   screenToWorld,
@@ -50,6 +56,7 @@ interface FloorPlanCanvasProps {
   onDropFurniture: (template: FurnitureTemplate, position: Point) => void;
   onUpdateFurniture: (id: string, updates: Partial<FurnitureItem>) => void;
   onSplitWallAndConnect: (wallId: string, splitPoint: Point, newWallStart: Point) => void;
+  onSetRoomName: (roomKey: string, name: string) => void;
 }
 
 export default function FloorPlanCanvas({
@@ -73,6 +80,7 @@ export default function FloorPlanCanvas({
   onDropFurniture,
   onUpdateFurniture,
   onSplitWallAndConnect,
+  onSetRoomName,
 }: FloorPlanCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -91,7 +99,7 @@ export default function FloorPlanCanvas({
   const [rotateItemStartRot, setRotateItemStartRot] = useState(0);
 
   // Inline label editing state
-  const [editingLabel, setEditingLabel] = useState<{ id: string | null; x: number; y: number; text: string; isNew: boolean }>({ id: null, x: 0, y: 0, text: "", isNew: false });
+  const [editingLabel, setEditingLabel] = useState<{ id: string | null; x: number; y: number; text: string; isNew: boolean; isRoomLabel?: boolean; roomKey?: string }>({ id: null, x: 0, y: 0, text: "", isNew: false });
   const labelInputRef = useRef<HTMLInputElement>(null);
 
   // Synchronous wall-drawing state to avoid stale closures on rapid mobile taps
@@ -105,6 +113,9 @@ export default function FloorPlanCanvas({
   const pointerCache = useRef<Map<number, PointerEvent>>(new Map());
   const prevPinchDist = useRef<number | null>(null);
   const prevPinchCenter = useRef<{ x: number; y: number } | null>(null);
+
+  // Track selected room key for highlighting
+  const [selectedRoomKey, setSelectedRoomKey] = useState<string | null>(null);
 
   // Canvas resize
   useEffect(() => {
@@ -143,10 +154,10 @@ export default function FloorPlanCanvas({
     // Grid
     drawGrid(ctx, w, h, state.gridSize, state.zoom, state.panOffset, isDark);
 
-    // Room areas
+    // Room areas with names
     const rooms = detectRooms(state.walls);
     if (rooms.length > 0) {
-      drawRoomAreas(ctx, rooms, state.gridSize, state.zoom, state.panOffset, isDark, state.units);
+      drawRoomAreas(ctx, rooms, state.gridSize, state.zoom, state.panOffset, isDark, state.units, state.roomNames, selectedRoomKey);
     }
 
     // Walls
@@ -154,6 +165,14 @@ export default function FloorPlanCanvas({
 
     // Measurement indicator lines (on top of walls, below labels/furniture)
     drawMeasurementIndicatorLines(ctx, state.walls, rooms, state.gridSize, state.zoom, state.panOffset, measureMode);
+
+    // Parallel wall discrepancy detection
+    const flaggedWalls = findParallelWallDiscrepancies(state.walls);
+
+    // Wall labels with crowding check at low zoom
+    if (flaggedWalls.size > 0 || state.zoom < 0.6) {
+      drawWallLabelsWithDiscrepancy(ctx, state.walls, state.gridSize, state.zoom, state.panOffset, isDark, state.units, measureMode, state.furniture, flaggedWalls, w, h);
+    }
 
     // Wall preview with snapping, angle snap, alignment guides
     if (state.wallDrawing && state.selectedTool === "wall") {
@@ -206,6 +225,11 @@ export default function FloorPlanCanvas({
     const doorWindowItems = state.furniture.filter((f) => f.type === "door" || f.type === "window");
     drawFurniture(ctx, doorWindowItems, state.gridSize, state.zoom, state.panOffset, isDark, state.selectedItemId);
 
+    // Component labels (toggleable)
+    if (state.componentLabelsVisible) {
+      drawComponentLabels(ctx, state.furniture, state.gridSize, state.zoom, state.panOffset, isDark, state.selectedItemId, state.units);
+    }
+
     // Resize handles and distance measurements for selected furniture
     const selectedFurn = state.furniture.find((f) => f.id === state.selectedItemId);
     if (selectedFurn && state.selectedTool === "select") {
@@ -213,8 +237,15 @@ export default function FloorPlanCanvas({
       drawDistanceMeasurements(ctx, selectedFurn, state.walls, state.furniture, state.gridSize, state.zoom, state.panOffset, isDark, state.units);
     }
 
-    // Labels
+    // Freeform Labels
     drawLabels(ctx, state.labels, state.gridSize, state.zoom, state.panOffset, isDark, state.selectedItemId);
+
+    // Label collision avoidance
+    resolveAndDrawLabelCollisions(
+      ctx, rooms, state.walls, state.furniture, state.labels,
+      state.gridSize, state.zoom, state.panOffset, isDark,
+      state.roomNames, state.componentLabelsVisible
+    );
 
     // Snap indicator and alignment guides when wall tool is active but not drawing yet
     if (state.selectedTool === "wall" && !state.wallDrawing) {
@@ -415,6 +446,7 @@ export default function FloorPlanCanvas({
         }
 
         onSelectItem(null);
+        setSelectedRoomKey(null);
       } else if (state.selectedTool === "wall") {
         const world = screenToWorld(pos.x, pos.y, state.gridSize, state.zoom, state.panOffset);
         const gridSnapped = snapToGrid(world, 10);
@@ -777,6 +809,22 @@ export default function FloorPlanCanvas({
         const rect = canvas.getBoundingClientRect();
         const pos = { x: e.clientX - rect.left, y: e.clientY - rect.top };
 
+        // Check room labels first
+        const rooms = detectRooms(state.walls);
+        const hitRoom = hitTestRoomLabel(pos.x, pos.y, rooms, state.gridSize, state.zoom, state.panOffset, state.roomNames);
+        if (hitRoom) {
+          const pxPerCm = (state.gridSize * state.zoom) / 100;
+          const screenX = hitRoom.centroid.x * pxPerCm + state.panOffset.x;
+          const screenY = hitRoom.centroid.y * pxPerCm + state.panOffset.y;
+          const currentName = state.roomNames[hitRoom.roomKey] || "Room";
+          setEditingLabel({ id: null, x: screenX, y: screenY, text: currentName, isNew: false, isRoomLabel: true, roomKey: hitRoom.roomKey });
+          setSelectedRoomKey(hitRoom.roomKey);
+          editingLabelWorldPos.current = hitRoom.centroid;
+          setTimeout(() => labelInputRef.current?.focus(), 0);
+          return;
+        }
+
+        // Check freeform labels
         const hitLbl = hitTestLabel(pos.x, pos.y, state.labels, state.gridSize, state.zoom, state.panOffset, ctx);
         if (hitLbl) {
           const pxPerCm = (state.gridSize * state.zoom) / 100;
@@ -785,27 +833,62 @@ export default function FloorPlanCanvas({
           setEditingLabel({ id: hitLbl.id, x: screenX, y: screenY, text: hitLbl.text, isNew: false });
           editingLabelWorldPos.current = { x: hitLbl.x, y: hitLbl.y };
           setTimeout(() => labelInputRef.current?.focus(), 0);
+          return;
+        }
+
+        // Check component labels (double-click to rename)
+        if (state.componentLabelsVisible) {
+          const hitFurn = hitTestFurniture(pos.x, pos.y, state.furniture, state.gridSize, state.zoom, state.panOffset);
+          if (hitFurn) {
+            const pxPerCm = (state.gridSize * state.zoom) / 100;
+            const centerX = (hitFurn.x + hitFurn.width / 2) * pxPerCm + state.panOffset.x;
+            const labelY = (hitFurn.y + hitFurn.height) * pxPerCm + state.panOffset.y + 14 * state.zoom;
+            const displayName = hitFurn.customName || hitFurn.label;
+            setEditingLabel({ id: hitFurn.id, x: centerX, y: labelY, text: displayName, isNew: false });
+            editingLabelWorldPos.current = { x: hitFurn.x + hitFurn.width / 2, y: hitFurn.y + hitFurn.height };
+            setTimeout(() => labelInputRef.current?.focus(), 0);
+            return;
+          }
         }
       }
     },
-    [state.selectedTool, state.wallDrawing, state.labels, state.gridSize, state.zoom, state.panOffset, onSetWallDrawing]
+    [state.selectedTool, state.wallDrawing, state.labels, state.walls, state.gridSize, state.zoom, state.panOffset, state.roomNames, state.componentLabelsVisible, state.furniture, onSetWallDrawing]
   );
 
   // Inline label editing handlers
   const commitLabel = useCallback(() => {
     const text = editingLabel.text.trim();
-    if (text) {
-      if (editingLabel.isNew) {
+    if (editingLabel.isRoomLabel && editingLabel.roomKey) {
+      // Renaming a room label
+      if (text) {
+        onSetRoomName(editingLabel.roomKey, text);
+      }
+      setSelectedRoomKey(null);
+    } else if (editingLabel.isNew) {
+      // New freeform label
+      if (text) {
         onAddLabel(text, editingLabelWorldPos.current);
-      } else if (editingLabel.id) {
-        onUpdateLabel(editingLabel.id, { text });
+      }
+    } else if (editingLabel.id) {
+      // Check if this is a furniture rename
+      const furn = state.furniture.find((f) => f.id === editingLabel.id);
+      if (furn) {
+        if (text) {
+          onUpdateFurniture(editingLabel.id, { customName: text });
+        }
+      } else {
+        // Freeform label update
+        if (text) {
+          onUpdateLabel(editingLabel.id, { text });
+        }
       }
     }
     setEditingLabel({ id: null, x: 0, y: 0, text: "", isNew: false });
-  }, [editingLabel, onAddLabel, onUpdateLabel]);
+  }, [editingLabel, onAddLabel, onUpdateLabel, onSetRoomName, onUpdateFurniture, state.furniture]);
 
   const cancelLabel = useCallback(() => {
     setEditingLabel({ id: null, x: 0, y: 0, text: "", isNew: false });
+    setSelectedRoomKey(null);
   }, []);
 
   const handleLabelKeyDown = useCallback((e: React.KeyboardEvent) => {
@@ -850,6 +933,7 @@ export default function FloorPlanCanvas({
         wallDrawingRef.current = null;
         wallPendingCommitRef.current = false;
         onSelectItem(null);
+        setSelectedRoomKey(null);
       }
       if (e.key === "Delete" || e.key === "Backspace") {
         if (state.selectedItemId) {
@@ -883,7 +967,7 @@ export default function FloorPlanCanvas({
     return "default";
   })();
 
-  const isEditingLabel = editingLabel.id !== null || editingLabel.isNew;
+  const isEditingLabel = editingLabel.id !== null || editingLabel.isNew || editingLabel.isRoomLabel;
 
   return (
     <div
@@ -922,7 +1006,7 @@ export default function FloorPlanCanvas({
             width: 120,
             transform: "translateY(-50%)",
           }}
-          placeholder="Enter label..."
+          placeholder={editingLabel.isRoomLabel ? "Room name..." : "Enter label..."}
         />
       )}
     </div>

@@ -27,6 +27,7 @@ import {
   MoreHorizontal,
   LayoutList,
   SlidersHorizontal,
+  Tags,
 } from "lucide-react";
 
 interface EditorToolbarProps {
@@ -53,6 +54,8 @@ interface EditorToolbarProps {
   isMobile?: boolean;
   onToggleFurniturePanel?: () => void;
   onTogglePropertiesPanel?: () => void;
+  componentLabelsVisible: boolean;
+  onToggleComponentLabels: () => void;
 }
 
 const tools: { tool: EditorTool; icon: typeof MousePointer2; label: string; shortcut: string }[] = [
@@ -87,6 +90,8 @@ export default function EditorToolbar({
   isMobile,
   onToggleFurniturePanel,
   onTogglePropertiesPanel,
+  componentLabelsVisible,
+  onToggleComponentLabels,
 }: EditorToolbarProps) {
   if (isMobile) {
     const btnClass = "h-11 w-11";
@@ -179,6 +184,10 @@ export default function EditorToolbar({
               </DropdownMenuItem>
               <DropdownMenuItem onClick={onToggleMeasureMode}>
                 Measure: {measureMode === "full" ? "Full Wall" : "Inside"}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onToggleComponentLabels}>
+                <Tags className="h-4 w-4 mr-2" />
+                Labels: {componentLabelsVisible ? "On" : "Off"}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={onClearAll} className="text-destructive">
@@ -342,6 +351,21 @@ export default function EditorToolbar({
             </Button>
           </TooltipTrigger>
           <TooltipContent><p>{units === "metric" ? "Switch to feet / sq ft" : "Switch to metres / m²"}</p></TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              size="sm"
+              variant={componentLabelsVisible ? "default" : "outline"}
+              onClick={onToggleComponentLabels}
+              data-testid="btn-toggle-labels"
+              className="text-xs px-2"
+            >
+              <Tags className="h-3.5 w-3.5 mr-1" />
+              Labels
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent><p>{componentLabelsVisible ? "Hide component labels" : "Show component labels"}</p></TooltipContent>
         </Tooltip>
         <Tooltip>
           <TooltipTrigger asChild>

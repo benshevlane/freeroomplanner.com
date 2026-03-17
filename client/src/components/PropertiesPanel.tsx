@@ -1,7 +1,7 @@
-import { Wall, FurnitureItem, RoomLabel } from "../lib/types";
+import { Wall, FurnitureItem, RoomLabel, LabelSize, LabelColor } from "../lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { RotateCw, Trash2, Ruler, Copy } from "lucide-react";
+import { RotateCw, Trash2, Ruler, Copy, Bold, Square } from "lucide-react";
 
 interface PropertiesPanelProps {
   selectedWall: Wall | null;
@@ -11,7 +11,21 @@ interface PropertiesPanelProps {
   onDelete: () => void;
   onDuplicate: () => void;
   onUpdateFurniture: (id: string, updates: Partial<FurnitureItem>) => void;
+  onUpdateLabel: (id: string, updates: Partial<RoomLabel>) => void;
 }
+
+const LABEL_COLORS: { color: LabelColor; hex: string; label: string }[] = [
+  { color: "black", hex: "#3a3938", label: "Black" },
+  { color: "teal", hex: "#01696f", label: "Teal" },
+  { color: "red", hex: "#d32f2f", label: "Red" },
+  { color: "grey", hex: "#9e9e9e", label: "Grey" },
+];
+
+const LABEL_SIZES: { size: LabelSize; label: string }[] = [
+  { size: "small", label: "S" },
+  { size: "medium", label: "M" },
+  { size: "large", label: "L" },
+];
 
 export default function PropertiesPanel({
   selectedWall,
@@ -21,6 +35,7 @@ export default function PropertiesPanel({
   onDelete,
   onDuplicate,
   onUpdateFurniture,
+  onUpdateLabel,
 }: PropertiesPanelProps) {
   if (!selectedWall && !selectedFurniture && !selectedLabel) {
     return (
@@ -67,7 +82,7 @@ export default function PropertiesPanel({
 
     return (
       <div className="p-4 space-y-3" data-testid="properties-furniture">
-        <p className="text-sm font-semibold">{selectedFurniture.label}</p>
+        <p className="text-sm font-semibold">{selectedFurniture.customName || selectedFurniture.label}</p>
         <div className="space-y-2 text-sm">
           <div className="flex items-center gap-2">
             <span className="text-muted-foreground">{widthLabel}</span>
@@ -133,10 +148,78 @@ export default function PropertiesPanel({
   }
 
   if (selectedLabel) {
+    const currentSize = selectedLabel.size || "medium";
+    const currentColor = selectedLabel.color || "black";
+    const isBold = selectedLabel.bold || false;
+    const hasBackground = selectedLabel.background || false;
+
     return (
       <div className="p-4 space-y-3" data-testid="properties-label">
         <p className="text-sm font-semibold">Label</p>
-        <p className="text-sm">{selectedLabel.text}</p>
+        <p className="text-sm text-muted-foreground">{selectedLabel.text}</p>
+
+        {/* Font size */}
+        <div className="space-y-1.5">
+          <p className="text-xs text-muted-foreground">Size</p>
+          <div className="flex gap-1">
+            {LABEL_SIZES.map(({ size, label }) => (
+              <Button
+                key={size}
+                size="sm"
+                variant={currentSize === size ? "default" : "outline"}
+                className="flex-1 text-xs min-h-[36px] md:min-h-0"
+                onClick={() => onUpdateLabel(selectedLabel.id, { size })}
+                data-testid={`btn-label-size-${size}`}
+              >
+                {label}
+              </Button>
+            ))}
+          </div>
+        </div>
+
+        {/* Bold toggle */}
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant={isBold ? "default" : "outline"}
+            onClick={() => onUpdateLabel(selectedLabel.id, { bold: !isBold })}
+            className="min-h-[36px] md:min-h-0"
+            data-testid="btn-label-bold"
+          >
+            <Bold className="h-3.5 w-3.5 mr-1" />
+            Bold
+          </Button>
+          <Button
+            size="sm"
+            variant={hasBackground ? "default" : "outline"}
+            onClick={() => onUpdateLabel(selectedLabel.id, { background: !hasBackground })}
+            className="min-h-[36px] md:min-h-0"
+            data-testid="btn-label-background"
+          >
+            <Square className="h-3.5 w-3.5 mr-1" />
+            Pill
+          </Button>
+        </div>
+
+        {/* Color picker */}
+        <div className="space-y-1.5">
+          <p className="text-xs text-muted-foreground">Color</p>
+          <div className="flex gap-1.5">
+            {LABEL_COLORS.map(({ color, hex, label }) => (
+              <button
+                key={color}
+                title={label}
+                className={`w-7 h-7 rounded-full border-2 transition-all ${
+                  currentColor === color ? "border-primary scale-110" : "border-transparent"
+                }`}
+                style={{ backgroundColor: hex }}
+                onClick={() => onUpdateLabel(selectedLabel.id, { color })}
+                data-testid={`btn-label-color-${color}`}
+              />
+            ))}
+          </div>
+        </div>
+
         <div className="flex gap-1 pt-1">
           <Button size="sm" variant="secondary" onClick={onDuplicate} className="flex-1 min-h-[44px] md:min-h-0" data-testid="btn-duplicate-label">
             <Copy className="h-3.5 w-3.5 mr-1" />
