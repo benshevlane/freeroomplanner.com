@@ -494,25 +494,38 @@ function drawTotalWallDimensionLine(
   displayLengthCm: number, wallThicknessCm: number,
   pxPerCm: number, panOffset: Point,
   zoom: number, isDark: boolean,
-  units: UnitSystem, color: string
+  units: UnitSystem, color: string,
+  measureMode: MeasureMode = "inside"
 ) {
   const sx = wallStart.x * pxPerCm + panOffset.x;
   const sy = wallStart.y * pxPerCm + panOffset.y;
   const ex = wallEnd.x * pxPerCm + panOffset.x;
   const ey = wallEnd.y * pxPerCm + panOffset.y;
-  const segLenPx = Math.sqrt((ex - sx) ** 2 + (ey - sy) ** 2);
 
   const angle = Math.atan2(ey - sy, ex - sx);
   const wallThickPx = wallThicknessCm * pxPerCm;
+
+  // Inset endpoints along wall direction for inside mode
+  const halfThick = wallThicknessCm / 2;
+  const inset = measureMode === "inside" ? halfThick * pxPerCm : 0;
+  const dirX = Math.cos(angle);
+  const dirY = Math.sin(angle);
+  const isx = sx + dirX * inset;
+  const isy = sy + dirY * inset;
+  const iex = ex - dirX * inset;
+  const iey = ey - dirY * inset;
+
+  const segLenPx = Math.sqrt((iex - isx) ** 2 + (iey - isy) ** 2);
+
   // Offset to opposite side (negative normal) from segment measurements
   const offsetDist = -(wallThickPx / 2 + 8 * zoom);
   const normX = -Math.sin(angle);
   const normY = Math.cos(angle);
 
-  const osx = sx + normX * offsetDist;
-  const osy = sy + normY * offsetDist;
-  const oex = ex + normX * offsetDist;
-  const oey = ey + normY * offsetDist;
+  const osx = isx + normX * offsetDist;
+  const osy = isy + normY * offsetDist;
+  const oex = iex + normX * offsetDist;
+  const oey = iey + normY * offsetDist;
 
   ctx.save();
   ctx.strokeStyle = color;
@@ -718,8 +731,12 @@ export function drawWallSegmentMeasurements(
     occupants.sort((a, b) => a.along - b.along);
 
     // Compute segments: wall start -> first door edge, between doors, last door edge -> wall end
+    // In inside mode, inset segment boundaries by half wall thickness at each wall end
+    const halfThick = wallThick / 2;
+    const wallStartAlong = measureMode === "inside" ? halfThick : 0;
+    const wallEndAlong = measureMode === "inside" ? wallLen - halfThick : wallLen;
     const segments: { startAlong: number; endAlong: number }[] = [];
-    let prevEnd = 0;
+    let prevEnd = wallStartAlong;
     for (const occ of occupants) {
       const edgeStart = occ.along - occ.halfExtent;
       const edgeEnd = occ.along + occ.halfExtent;
@@ -728,8 +745,8 @@ export function drawWallSegmentMeasurements(
       }
       prevEnd = Math.max(prevEnd, edgeEnd);
     }
-    if (wallLen - prevEnd > 1) {
-      segments.push({ startAlong: prevEnd, endAlong: wallLen });
+    if (wallEndAlong - prevEnd > 1) {
+      segments.push({ startAlong: prevEnd, endAlong: wallEndAlong });
     }
 
     // Draw each segment
@@ -751,7 +768,7 @@ export function drawWallSegmentMeasurements(
       : wallLen;
     drawTotalWallDimensionLine(
       ctx, wallStart, wallEnd, displayLengthCm, wallThick,
-      pxPerCm, panOffset, zoom, isDark, units, color
+      pxPerCm, panOffset, zoom, isDark, units, color, measureMode
     );
   }
 }
