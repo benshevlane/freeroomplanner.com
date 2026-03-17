@@ -87,6 +87,38 @@ export function drawGrid(
   ctx.stroke();
 }
 
+/** Check if a wall (defined by start/end/thickness) has any door/window occupants */
+function getWallOccupants(
+  wallStart: Point, wallEnd: Point, wallThick: number,
+  doorsWindows: FurnitureItem[]
+): { along: number; halfExtent: number }[] {
+  const wdx = wallEnd.x - wallStart.x;
+  const wdy = wallEnd.y - wallStart.y;
+  const wallLen = Math.sqrt(wdx * wdx + wdy * wdy);
+  if (wallLen < 10) return [];
+  const wallDirX = wdx / wallLen;
+  const wallDirY = wdy / wallLen;
+  const wallNormX = -wallDirY;
+  const wallNormY = wallDirX;
+
+  const occupants: { along: number; halfExtent: number }[] = [];
+  for (const item of doorsWindows) {
+    const cx = item.x + item.width / 2;
+    const cy = item.y + item.height / 2;
+    const relX = cx - wallStart.x;
+    const relY = cy - wallStart.y;
+    const along = relX * wallDirX + relY * wallDirY;
+    const perp = Math.abs(relX * wallNormX + relY * wallNormY);
+    const threshold = wallThick + Math.max(item.width, item.height);
+    if (perp > threshold) continue;
+    const halfExtent = Math.max(item.width, item.height) / 2;
+    if (along + halfExtent > 0 && along - halfExtent < wallLen) {
+      occupants.push({ along, halfExtent });
+    }
+  }
+  return occupants;
+}
+
 /**
  * Find groups of collinear walls (same direction, sharing endpoints)
  * and return merged measurement info so we show one combined label.
@@ -220,9 +252,17 @@ export function drawWalls(
     ctx.stroke();
   });
 
-  // Draw individual labels for non-merged walls
+  // Identify doors/windows for occupant checks
+  const doorsWindows = furniture.filter((f) => f.type === "door" || f.type === "window");
+
+  // Draw individual labels for non-merged walls (skip if wall has door/window occupants — total shown separately)
   walls.forEach((wall) => {
     if (mergedWallIds.has(wall.id)) return; // will be labeled by group
+
+    const wallThick = wall.thickness || 15;
+    if (doorsWindows.length > 0 && getWallOccupants(wall.start, wall.end, wallThick, doorsWindows).length > 0) {
+      return; // total will be drawn as a separate dimension line by drawWallSegmentMeasurements
+    }
 
     const sx = wall.start.x * pxPerCm + panOffset.x;
     const sy = wall.start.y * pxPerCm + panOffset.y;
@@ -232,7 +272,6 @@ export function drawWalls(
     const dx = wall.end.x - wall.start.x;
     const dy = wall.end.y - wall.start.y;
     const lengthCm = Math.sqrt(dx * dx + dy * dy);
-    const wallThick = wall.thickness || 15;
     const displayLengthCm = measureMode === "inside"
       ? Math.max(0, lengthCm - wallThick)
       : lengthCm;
@@ -241,13 +280,17 @@ export function drawWalls(
     }
   });
 
-  // Draw merged labels for collinear groups
+  // Draw merged labels for collinear groups (skip if group has door/window occupants)
   for (const group of collinearGroups.values()) {
+    const thickness = walls[0]?.thickness ?? 15;
+    if (doorsWindows.length > 0 && getWallOccupants(group.minP, group.maxP, thickness, doorsWindows).length > 0) {
+      continue; // total will be drawn as a separate dimension line by drawWallSegmentMeasurements
+    }
+
     const sx = group.minP.x * pxPerCm + panOffset.x;
     const sy = group.minP.y * pxPerCm + panOffset.y;
     const ex = group.maxP.x * pxPerCm + panOffset.x;
     const ey = group.maxP.y * pxPerCm + panOffset.y;
-    const thickness = walls[0]?.thickness ?? 15;
     const displayLengthCm = measureMode === "inside"
       ? Math.max(0, group.totalLengthCm - thickness)
       : group.totalLengthCm;
@@ -256,6 +299,85 @@ export function drawWalls(
     const representativeWall = walls.find((w) => groupWallIds.has(w.id)) || walls[0];
     drawWallDimensionLabel(ctx, sx, sy, ex, ey, displayLengthCm, thickness * pxPerCm, zoom, isDark, units, representativeWall, furniture, gridSize, panOffset);
   }
+}
+
+/** Draw the total wall length as a solid dimension line on the opposite side from segment measurements.
+ *  Used when a wall has doors/windows to clearly distinguish total length from segment lengths.
+ */
+function drawTotalWallDimensionLine(
+  ctx: CanvasRenderingContext2D,
+  wallStart: Point, wallEnd: Point,
+  displayLengthCm: number, wallThicknessCm: number,
+  pxPerCm: number, panOffset: Point,
+  zoom: number, isDark: boolean,
+  units: UnitSystem, color: string
+) {
+  const sx = wallStart.x * pxPerCm + panOffset.x;
+  const sy = wallStart.y * pxPerCm + panOffset.y;
+  const ex = wallEnd.x * pxPerCm + panOffset.x;
+  const ey = wallEnd.y * pxPerCm + panOffset.y;
+  const segLenPx = Math.sqrt((ex - sx) ** 2 + (ey - sy) ** 2);
+
+  const angle = Math.atan2(ey - sy, ex - sx);
+  const wallThickPx = wallThicknessCm * pxPerCm;
+  // Offset to opposite side (negative normal) from segment measurements
+  const offsetDist = -(wallThickPx / 2 + 8 * zoom);
+  const normX = -Math.sin(angle);
+  const normY = Math.cos(angle);
+
+  const osx = sx + normX * offsetDist;
+  const osy = sy + normY * offsetDist;
+  const oex = ex + normX * offsetDist;
+  const oey = ey + normY * offsetDist;
+
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1;
+  // Solid line (not dashed) to distinguish from segment measurements
+  ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.moveTo(osx, osy);
+  ctx.lineTo(oex, oey);
+  ctx.stroke();
+
+  // End ticks perpendicular to line
+  const tickLen = 4;
+  ctx.beginPath();
+  ctx.moveTo(osx - normX * tickLen, osy - normY * tickLen);
+  ctx.lineTo(osx + normX * tickLen, osy + normY * tickLen);
+  ctx.moveTo(oex - normX * tickLen, oey - normY * tickLen);
+  ctx.lineTo(oex + normX * tickLen, oey + normY * tickLen);
+  ctx.stroke();
+
+  // Label
+  const text = formatLength(displayLengthCm, units);
+  const baseFontSize = Math.max(10, 11 * zoom);
+  ctx.font = `600 ${baseFontSize}px 'General Sans', 'DM Sans', sans-serif`;
+  const textW = ctx.measureText(text).width;
+  const pad = 3;
+
+  if (textW + pad * 2 < segLenPx + 10) {
+    const mx = (osx + oex) / 2;
+    const my = (osy + oey) / 2;
+
+    ctx.save();
+    ctx.translate(mx, my);
+    let textAngle = angle;
+    if (textAngle > Math.PI / 2 || textAngle < -Math.PI / 2) {
+      textAngle += Math.PI;
+    }
+    ctx.rotate(textAngle);
+
+    ctx.fillStyle = isDark ? "rgba(28, 27, 25, 0.85)" : "rgba(249, 248, 245, 0.85)";
+    ctx.fillRect(-textW / 2 - pad, -baseFontSize / 2 - pad, textW + pad * 2, baseFontSize + pad * 2);
+    ctx.fillStyle = color;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(text, 0, 0);
+    ctx.restore();
+  }
+
+  ctx.restore();
 }
 
 /** Draw segment measurements for walls that have doors/windows on them.
@@ -401,21 +523,7 @@ export function drawWallSegmentMeasurements(
     const wallNormY = wallDirX;
 
     // Find doors/windows on this effective wall
-    const occupants: { along: number; halfExtent: number }[] = [];
-    for (const item of doorsWindows) {
-      const cx = item.x + item.width / 2;
-      const cy = item.y + item.height / 2;
-      const relX = cx - wallStart.x;
-      const relY = cy - wallStart.y;
-      const along = relX * wallDirX + relY * wallDirY;
-      const perp = Math.abs(relX * wallNormX + relY * wallNormY);
-      const threshold = wallThick + Math.max(item.width, item.height);
-      if (perp > threshold) continue;
-      const halfExtent = Math.max(item.width, item.height) / 2;
-      if (along + halfExtent > 0 && along - halfExtent < wallLen) {
-        occupants.push({ along, halfExtent });
-      }
-    }
+    const occupants = getWallOccupants(wallStart, wallEnd, wallThick, doorsWindows);
 
     if (occupants.length === 0) continue;
 
@@ -449,6 +557,15 @@ export function drawWallSegmentMeasurements(
       };
       drawSegment(startPt, endPt, wallThick);
     }
+
+    // Draw total wall length as a dimension line on the opposite side from segments
+    const displayLengthCm = measureMode === "inside"
+      ? Math.max(0, wallLen - wallThick)
+      : wallLen;
+    drawTotalWallDimensionLine(
+      ctx, wallStart, wallEnd, displayLengthCm, wallThick,
+      pxPerCm, panOffset, zoom, isDark, units, color
+    );
   }
 }
 
