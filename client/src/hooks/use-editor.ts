@@ -1,5 +1,40 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { EditorState, Wall, FurnitureItem, RoomLabel, TextBox, Arrow, Point, EditorTool, FurnitureTemplate, UnitSystem, DEFAULT_TEXT_BOX, DEFAULT_ARROW, FURNITURE_LIBRARY } from "../lib/types";
+
+const AUTOSAVE_KEY = "freeroomplanner-autosave";
+
+function loadSavedState(): Partial<EditorState> | null {
+  try {
+    const saved = localStorage.getItem(AUTOSAVE_KEY);
+    if (!saved) return null;
+    const parsed = JSON.parse(saved);
+    if (parsed && parsed.version === 1 && Array.isArray(parsed.walls)) {
+      return parsed;
+    }
+  } catch {
+    // Ignore corrupted data
+  }
+  return null;
+}
+
+function saveStateToStorage(state: EditorState): void {
+  try {
+    const data = {
+      version: 1,
+      roomName: state.roomName,
+      walls: state.walls,
+      furniture: state.furniture,
+      labels: state.labels,
+      textBoxes: state.textBoxes,
+      arrows: state.arrows,
+      roomNames: state.roomNames,
+      componentLabelsVisible: state.componentLabelsVisible,
+    };
+    localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(data));
+  } catch {
+    // Ignore quota errors
+  }
+}
 
 function generateId(): string {
   return Math.random().toString(36).slice(2, 10);
@@ -14,7 +49,7 @@ const LABEL_INSIDE_TYPES = new Set([
   "dining_table_4", "dining_table_6",
 ]);
 
-const INITIAL_STATE: EditorState = {
+const DEFAULT_STATE: EditorState = {
   walls: [],
   furniture: [],
   labels: [],
@@ -33,8 +68,28 @@ const INITIAL_STATE: EditorState = {
   componentLabelsVisible: true,
 };
 
+function getInitialState(): EditorState {
+  const saved = loadSavedState();
+  if (!saved) return DEFAULT_STATE;
+  return {
+    ...DEFAULT_STATE,
+    roomName: saved.roomName ?? DEFAULT_STATE.roomName,
+    walls: saved.walls ?? [],
+    furniture: (saved.furniture ?? []).map((f: any) => ({
+      ...f,
+      labelOffset: f.labelOffset ?? { x: 0, y: 0 },
+      labelInside: f.labelInside ?? LABEL_INSIDE_TYPES.has(f.type),
+    })),
+    labels: saved.labels ?? [],
+    textBoxes: saved.textBoxes ?? [],
+    arrows: saved.arrows ?? [],
+    roomNames: saved.roomNames ?? {},
+    componentLabelsVisible: saved.componentLabelsVisible ?? true,
+  };
+}
+
 export function useEditor() {
-  const [state, setState] = useState<EditorState>(INITIAL_STATE);
+  const [state, setState] = useState<EditorState>(getInitialState);
   const undoStack = useRef<EditorState[]>([]);
   const redoStack = useRef<EditorState[]>([]);
 
@@ -64,6 +119,11 @@ export function useEditor() {
       return next;
     });
   }, []);
+
+  // Auto-save plan data to localStorage whenever it changes
+  useEffect(() => {
+    saveStateToStorage(state);
+  }, [state.walls, state.furniture, state.labels, state.textBoxes, state.arrows, state.roomName, state.roomNames, state.componentLabelsVisible]);
 
   const setTool = useCallback((tool: EditorTool) => {
     setState((s) => ({ ...s, selectedTool: tool, selectedItemId: null, wallDrawing: null, wallChainStart: null }));
@@ -219,6 +279,7 @@ export function useEditor() {
 
   const clearAll = useCallback(() => {
     pushUndo();
+    try { localStorage.removeItem(AUTOSAVE_KEY); } catch {}
     setState((s) => ({
       ...s,
       walls: [],
