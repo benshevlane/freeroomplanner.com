@@ -45,6 +45,7 @@ import {
   hitTestArrow,
   hitTestArrowEndpoint,
   hitTestComponentLabel,
+  ComponentLabelInfo,
 } from "../lib/canvas-renderer";
 import { isWallCupboard } from "../lib/types";
 import { detectRooms } from "../lib/room-detection";
@@ -78,6 +79,7 @@ interface FloorPlanCanvasProps {
   onAddArrow: (start: Point, end: Point) => string;
   onUpdateArrow: (id: string, updates: Partial<Arrow>) => void;
   onRemoveArrow: (id: string) => void;
+  onSetLabelOffset: (id: string, offset: { x: number; y: number }) => void;
 }
 
 export default function FloorPlanCanvas({
@@ -109,6 +111,7 @@ export default function FloorPlanCanvas({
   onAddArrow,
   onUpdateArrow,
   onRemoveArrow,
+  onSetLabelOffset,
 }: FloorPlanCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -125,7 +128,11 @@ export default function FloorPlanCanvas({
   const [isRotating, setIsRotating] = useState(false);
   const [rotateStartAngle, setRotateStartAngle] = useState(0);
   const [rotateItemStartRot, setRotateItemStartRot] = useState(0);
-  const [draggingComponentLabel, setDraggingComponentLabel] = useState<{ id: string; startX: number; startY: number; origOffsetX: number; origOffsetY: number } | null>(null);
+  // Component label dragging state
+  const [isDraggingLabel, setIsDraggingLabel] = useState(false);
+  const [draggingLabelId, setDraggingLabelId] = useState<string | null>(null);
+  const [labelDragStart, setLabelDragStart] = useState<{ x: number; y: number; offsetX: number; offsetY: number }>({ x: 0, y: 0, offsetX: 0, offsetY: 0 });
+  const componentLabelInfosRef = useRef<ComponentLabelInfo[]>([]);
 
   // Wall snap indicator state (transient, only during drag)
   const [wallSnapEdges, setWallSnapEdges] = useState<SnappedWallEdge[]>([]);
@@ -315,8 +322,9 @@ export default function FloorPlanCanvas({
 
     // Collect component label positions (without drawing) for collision resolution
     const componentLabelInfos = state.componentLabelsVisible
-      ? collectComponentLabelRects(ctx, state.furniture, state.gridSize, state.zoom, state.panOffset, isDark, state.selectedItemId, state.units)
+      ? collectComponentLabelRects(ctx, state.furniture, state.gridSize, state.zoom, state.panOffset, isDark, state.selectedItemId, state.units, state.walls, rooms)
       : [];
+    componentLabelInfosRef.current = componentLabelInfos;
 
     // Resize handles and distance measurements for selected furniture
     const selectedFurn = state.furniture.find((f) => f.id === state.selectedItemId);
@@ -537,6 +545,25 @@ export default function FloorPlanCanvas({
           }
         }
 
+        // Try to hit test component labels first (so label drag takes priority over item drag)
+        if (state.componentLabelsVisible) {
+          const hitLabelItem = hitTestComponentLabel(pos.x, pos.y, componentLabelInfosRef.current);
+          if (hitLabelItem) {
+            const pxPerCm = (state.gridSize * state.zoom) / 100;
+            const currentOffset = hitLabelItem.labelOffset || { x: 0, y: 0 };
+            setIsDraggingLabel(true);
+            setDraggingLabelId(hitLabelItem.id);
+            setLabelDragStart({
+              x: pos.x,
+              y: pos.y,
+              offsetX: currentOffset.x,
+              offsetY: currentOffset.y,
+            });
+            onSelectItem(hitLabelItem.id);
+            return;
+          }
+        }
+
         // Try to hit test furniture first, then walls, then labels
         const hitFurn = hitTestFurniture(pos.x, pos.y, state.furniture, state.gridSize, state.zoom, state.panOffset);
         if (hitFurn) {
@@ -564,17 +591,18 @@ export default function FloorPlanCanvas({
 
         // Check component label drag
         if (state.componentLabelsVisible) {
-          const hitCompLabel = hitTestComponentLabel(pos.x, pos.y, state.furniture, state.gridSize, state.zoom, state.panOffset, ctx);
-          if (hitCompLabel) {
-            onSelectItem(hitCompLabel.id);
-            setDraggingComponentLabel({
-              id: hitCompLabel.id,
-              startX: pos.x,
-              startY: pos.y,
-              origOffsetX: hitCompLabel.labelOffsetX || 0,
-              origOffsetY: hitCompLabel.labelOffsetY || 0,
+          const hitLabelItem = hitTestComponentLabel(pos.x, pos.y, componentLabelInfosRef.current);
+          if (hitLabelItem) {
+            const currentOffset = hitLabelItem.labelOffset || { x: 0, y: 0 };
+            setIsDraggingLabel(true);
+            setDraggingLabelId(hitLabelItem.id);
+            setLabelDragStart({
+              x: pos.x,
+              y: pos.y,
+              offsetX: currentOffset.x,
+              offsetY: currentOffset.y,
             });
-            onPushUndo();
+            onSelectItem(hitLabelItem.id);
             return;
           }
         }
@@ -689,7 +717,7 @@ export default function FloorPlanCanvas({
         setTimeout(() => labelInputRef.current?.focus(), 0);
       }
     },
-    [state, getCanvasPos, onSelectItem, onAddWall, onSetWallDrawing, onRemoveWall, onRemoveFurniture, onRemoveLabel, onRemoveArrow, onPushUndo, onUpdateFurniture, onSplitWallAndConnect, onAddArrow, arrowDrawingStart, editingLabel]
+    [state, getCanvasPos, onSelectItem, onAddWall, onSetWallDrawing, onRemoveWall, onRemoveFurniture, onRemoveLabel, onRemoveArrow, onPushUndo, onUpdateFurniture, onSplitWallAndConnect, onAddArrow, arrowDrawingStart, onSetLabelOffset, editingLabel]
   );
 
   // Store world position for new labels
@@ -865,12 +893,14 @@ export default function FloorPlanCanvas({
         return;
       }
 
-      if (draggingComponentLabel) {
-        const dx = (pos.x - draggingComponentLabel.startX) / state.zoom;
-        const dy = (pos.y - draggingComponentLabel.startY) / state.zoom;
-        onUpdateFurniture(draggingComponentLabel.id, {
-          labelOffsetX: draggingComponentLabel.origOffsetX + dx,
-          labelOffsetY: draggingComponentLabel.origOffsetY + dy,
+      // Handle component label dragging
+      if (isDraggingLabel && draggingLabelId) {
+        const pxPerCm = (state.gridSize * state.zoom) / 100;
+        const dxCm = (pos.x - labelDragStart.x) / pxPerCm;
+        const dyCm = (pos.y - labelDragStart.y) / pxPerCm;
+        onSetLabelOffset(draggingLabelId, {
+          x: labelDragStart.offsetX + dxCm,
+          y: labelDragStart.offsetY + dyCm,
         });
         return;
       }
@@ -950,7 +980,7 @@ export default function FloorPlanCanvas({
         setEraserHoverId(null);
       }
     },
-    [state, isPanning, isDragging, isResizing, isRotating, rotateStartAngle, rotateItemStartRot, resizeStart, resizeCorner, dragStart, dragItemOffset, eraserHoverId, arrowDraggingEndpoint, draggingComponentLabel, getCanvasPos, onSetPan, onSetZoom, onMoveFurniture, onMoveLabel, onUpdateFurniture, onUpdateArrow]
+    [state, isPanning, isDragging, isDraggingLabel, draggingLabelId, labelDragStart, isResizing, isRotating, rotateStartAngle, rotateItemStartRot, resizeStart, resizeCorner, dragStart, dragItemOffset, eraserHoverId, arrowDraggingEndpoint, getCanvasPos, onSetPan, onSetZoom, onMoveFurniture, onMoveLabel, onUpdateFurniture, onUpdateArrow, onSetLabelOffset]
   );
 
   const handlePointerUp = useCallback(
@@ -1017,7 +1047,8 @@ export default function FloorPlanCanvas({
       setResizeCorner(null);
       setResizeStart(null);
       setArrowDraggingEndpoint(null);
-      setDraggingComponentLabel(null);
+      setIsDraggingLabel(false);
+      setDraggingLabelId(null);
     },
     [isDragging, onPushUndo, state.selectedTool, state.gridSize, state.zoom, state.panOffset, state.walls, getCanvasPos, onAddWall, onSetWallDrawing, onSplitWallAndConnect]
   );
@@ -1099,14 +1130,33 @@ export default function FloorPlanCanvas({
           return;
         }
 
-        // Check component labels (double-click to rename) — check label area first, then furniture body
+        // Check component labels (double-click to reset offset or rename)
         if (state.componentLabelsVisible) {
-          const hitCompLabel = hitTestComponentLabel(pos.x, pos.y, state.furniture, state.gridSize, state.zoom, state.panOffset, ctx);
-          const hitFurn = hitCompLabel || hitTestFurniture(pos.x, pos.y, state.furniture, state.gridSize, state.zoom, state.panOffset);
+          // First check if double-clicking on a label — reset its offset
+          const hitLabelItem = hitTestComponentLabel(pos.x, pos.y, componentLabelInfosRef.current);
+          if (hitLabelItem) {
+            const hasOffset = hitLabelItem.labelOffset && (hitLabelItem.labelOffset.x !== 0 || hitLabelItem.labelOffset.y !== 0);
+            if (hasOffset) {
+              // Reset label to default position
+              onSetLabelOffset(hitLabelItem.id, { x: 0, y: 0 });
+              return;
+            }
+            // If no offset, fall through to rename behavior
+            const pxPerCm = (state.gridSize * state.zoom) / 100;
+            const centerX = (hitLabelItem.x + hitLabelItem.width / 2) * pxPerCm + state.panOffset.x;
+            const labelY = (hitLabelItem.y + hitLabelItem.height) * pxPerCm + state.panOffset.y + 14 * state.zoom;
+            const displayName = hitLabelItem.customName || hitLabelItem.label;
+            setEditingLabel({ id: hitLabelItem.id, x: centerX, y: labelY, text: displayName, isNew: false });
+            editingLabelWorldPos.current = { x: hitLabelItem.x + hitLabelItem.width / 2, y: hitLabelItem.y + hitLabelItem.height };
+            setTimeout(() => labelInputRef.current?.focus(), 0);
+            return;
+          }
+
+          const hitFurn = hitTestFurniture(pos.x, pos.y, state.furniture, state.gridSize, state.zoom, state.panOffset);
           if (hitFurn) {
             const pxPerCm = (state.gridSize * state.zoom) / 100;
-            const centerX = (hitFurn.x + hitFurn.width / 2) * pxPerCm + state.panOffset.x + (hitFurn.labelOffsetX || 0) * state.zoom;
-            const labelY = (hitFurn.y + hitFurn.height) * pxPerCm + state.panOffset.y + 14 * state.zoom + (hitFurn.labelOffsetY || 0) * state.zoom;
+            const centerX = (hitFurn.x + hitFurn.width / 2) * pxPerCm + state.panOffset.x;
+            const labelY = (hitFurn.y + hitFurn.height) * pxPerCm + state.panOffset.y + 14 * state.zoom;
             const displayName = hitFurn.customName || hitFurn.label;
             setEditingLabel({ id: hitFurn.id, x: centerX, y: labelY, text: displayName, isNew: false });
             editingLabelWorldPos.current = { x: hitFurn.x + hitFurn.width / 2, y: hitFurn.y + hitFurn.height };
@@ -1116,7 +1166,7 @@ export default function FloorPlanCanvas({
         }
       }
     },
-    [state.selectedTool, state.wallDrawing, state.labels, state.walls, state.gridSize, state.zoom, state.panOffset, state.roomNames, state.componentLabelsVisible, state.furniture, onSetWallDrawing]
+    [state.selectedTool, state.wallDrawing, state.labels, state.walls, state.gridSize, state.zoom, state.panOffset, state.roomNames, state.componentLabelsVisible, state.furniture, onSetWallDrawing, onSetLabelOffset]
   );
 
   // Inline label editing handlers
@@ -1384,6 +1434,7 @@ export default function FloorPlanCanvas({
     if (state.selectedTool === "arrow") return "crosshair";
     if (state.selectedTool === "eraser") return "crosshair";
     if (state.selectedTool === "label") return "text";
+    if (isDraggingLabel) return "grabbing";
     if (state.selectedTool === "select") return isDragging ? "grabbing" : "default";
     return "default";
   })();

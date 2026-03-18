@@ -26,8 +26,8 @@ export interface FurnitureItem {
   customName?: string; // user-renamed label, persists across sessions
   heightFromFloor?: number; // in cm, used for wall cupboards (default 145)
   mirrored?: boolean; // horizontally flipped (for mirrorable items like L-Shape Sofa)
-  labelOffsetX?: number; // custom label position offset (px at zoom=1)
-  labelOffsetY?: number; // custom label position offset (px at zoom=1)
+  labelOffset?: { x: number; y: number }; // offset in cm from default label position
+  labelInside?: boolean; // true = render label inside rect, false = below
 }
 
 export type LabelSize = "small" | "medium" | "large";

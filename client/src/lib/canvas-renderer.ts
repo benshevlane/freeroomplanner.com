@@ -64,6 +64,15 @@ const SIMPLE_COMPONENT_TYPES = new Set([
   "wardrobe",
 ]);
 
+/** Component types whose labels should render inside the component rectangle */
+const LABEL_INSIDE_TYPES = new Set([
+  "worktop", "island", "fridge", "dishwasher",
+  "tumble_dryer", "washing_machine", "kitchen_sink_d",
+  "bed_king", "bed_superking",
+  "sofa_3", "sofa_2", "sofa_l",
+  "dining_table_4", "dining_table_6",
+]);
+
 /** Ray-casting point-in-polygon test (works for convex and concave polygons) */
 function pointInPolygon(p: Point, vertices: Point[]): boolean {
   let inside = false;
@@ -993,6 +1002,89 @@ function findComponentsOnWall(
   // Sort by start position
   occupants.sort((a, b) => a.start - b.start);
   return occupants;
+}
+
+/**
+ * For a door/window item, compute the outward-facing unit normal direction
+ * relative to the room it belongs to. Returns null if the item is not on a
+ * detectable wall/room boundary.
+ */
+function computeOutsideLabelOffset(
+  item: FurnitureItem,
+  walls: Wall[],
+  rooms: DetectedRoom[]
+): { nx: number; ny: number } | null {
+  const cx = item.x + item.width / 2;
+  const cy = item.y + item.height / 2;
+
+  // Find the closest wall to this item
+  let bestWall: Wall | null = null;
+  let bestDist = Infinity;
+
+  for (const wall of walls) {
+    const wdx = wall.end.x - wall.start.x;
+    const wdy = wall.end.y - wall.start.y;
+    const wallLen = Math.sqrt(wdx * wdx + wdy * wdy);
+    if (wallLen < 10) continue;
+
+    const wallDirX = wdx / wallLen;
+    const wallDirY = wdy / wallLen;
+    const wallNormX = -wallDirY;
+    const wallNormY = wallDirX;
+
+    const relX = cx - wall.start.x;
+    const relY = cy - wall.start.y;
+    const along = relX * wallDirX + relY * wallDirY;
+    const perp = Math.abs(relX * wallNormX + relY * wallNormY);
+
+    // Must be within wall extent and close enough perpendicularly
+    if (along < -10 || along > wallLen + 10) continue;
+    const threshold = (wall.thickness || 15) + Math.max(item.width, item.height);
+    if (perp > threshold) continue;
+
+    if (perp < bestDist) {
+      bestDist = perp;
+      bestWall = wall;
+    }
+  }
+
+  if (!bestWall) return null;
+
+  // Compute wall normal
+  const dx = bestWall.end.x - bestWall.start.x;
+  const dy = bestWall.end.y - bestWall.start.y;
+  const len = Math.sqrt(dx * dx + dy * dy);
+  const nx = -dy / len;
+  const ny = dx / len;
+
+  // Find the smallest room that owns this wall (label faces outward from it)
+  const wallMid = { x: (bestWall.start.x + bestWall.end.x) / 2, y: (bestWall.start.y + bestWall.end.y) / 2 };
+  let bestRoom: DetectedRoom | null = null;
+
+  for (const room of rooms) {
+    const hasStart = room.vertices.some(v =>
+      Math.sqrt((v.x - bestWall!.start.x) ** 2 + (v.y - bestWall!.start.y) ** 2) < 15
+    );
+    const hasEnd = room.vertices.some(v =>
+      Math.sqrt((v.x - bestWall!.end.x) ** 2 + (v.y - bestWall!.end.y) ** 2) < 15
+    );
+    if (hasStart && hasEnd) {
+      if (!bestRoom || room.area < bestRoom.area) {
+        bestRoom = room;
+      }
+    }
+  }
+
+  if (!bestRoom) return null;
+
+  // Determine outward normal (away from room centroid)
+  const toCentroid = { x: bestRoom.centroid.x - wallMid.x, y: bestRoom.centroid.y - wallMid.y };
+  const dot = toCentroid.x * nx + toCentroid.y * ny;
+  // If dot > 0, (nx, ny) points toward centroid (inside), so outward is (-nx, -ny)
+  if (dot > 0) {
+    return { nx: -nx, ny: -ny };
+  }
+  return { nx, ny };
 }
 
 /**
@@ -2033,14 +2125,13 @@ export function drawComponentLabels(
   const pxPerCm = (gridSize * zoom) / 100;
 
   furniture.forEach((item) => {
-    const baseCenterX = (item.x + item.width / 2) * pxPerCm + panOffset.x;
+    const centerX = (item.x + item.width / 2) * pxPerCm + panOffset.x;
     const centerY = (item.y + item.height / 2) * pxPerCm + panOffset.y;
     const h = item.height * pxPerCm;
     const isSelected = item.id === selectedId;
-    const centerX = baseCenterX + (item.labelOffsetX || 0) * zoom;
 
     // Position label below the item
-    const labelY = centerY + h / 2 + 14 * zoom + (item.labelOffsetY || 0) * zoom;
+    const labelY = centerY + h / 2 + 14 * zoom;
 
     const displayName = item.customName || item.label;
     const dimText = `${item.width} \u00D7 ${item.height} cm`;
@@ -2753,55 +2844,6 @@ export function hitTestLabel(
       screenY <= y + h / 2
     ) {
       return label;
-    }
-  }
-  return null;
-}
-
-/** Hit test component labels (furniture name labels rendered below/inside items) */
-export function hitTestComponentLabel(
-  screenX: number,
-  screenY: number,
-  furniture: FurnitureItem[],
-  gridSize: number,
-  zoom: number,
-  panOffset: Point,
-  ctx: CanvasRenderingContext2D
-): FurnitureItem | null {
-  const pxPerCm = (gridSize * zoom) / 100;
-
-  for (const item of furniture) {
-    const baseCenterX = (item.x + item.width / 2) * pxPerCm + panOffset.x;
-    const centerY = (item.y + item.height / 2) * pxPerCm + panOffset.y;
-    const itemHeightPx = item.height * pxPerCm;
-    const centerX = baseCenterX + (item.labelOffsetX || 0) * zoom;
-
-    const displayName = item.customName || item.label;
-    const dimText = `${item.width} \u00D7 ${item.height} cm`;
-
-    const nameFontSize = Math.max(9, 11 * zoom);
-    const dimFontSize = Math.max(8, 9 * zoom);
-
-    ctx.font = `500 ${nameFontSize}px 'General Sans', 'DM Sans', sans-serif`;
-    const nameWidth = ctx.measureText(displayName).width;
-    ctx.font = `400 ${dimFontSize}px 'General Sans', 'DM Sans', sans-serif`;
-    const dimWidth = ctx.measureText(dimText).width;
-    const maxWidth = Math.max(nameWidth, dimWidth);
-    const pillW = maxWidth + 10;
-    const pillH = nameFontSize + dimFontSize + 8;
-
-    const labelY = centerY + itemHeightPx / 2 + 14 * zoom + (item.labelOffsetY || 0) * zoom;
-
-    const pillX = centerX - pillW / 2;
-    const pillY = labelY - 2;
-
-    if (
-      screenX >= pillX &&
-      screenX <= pillX + pillW &&
-      screenY >= pillY &&
-      screenY <= pillY + pillH
-    ) {
-      return item;
     }
   }
   return null;
@@ -3636,7 +3678,9 @@ export function collectComponentLabelRects(
   panOffset: Point,
   isDark: boolean,
   selectedId: string | null,
-  units: UnitSystem = "m"
+  units: UnitSystem = "m",
+  walls: Wall[] = [],
+  rooms: DetectedRoom[] = []
 ): ComponentLabelInfo[] {
   const pxPerCm = (gridSize * zoom) / 100;
   const results: ComponentLabelInfo[] = [];
@@ -3647,7 +3691,13 @@ export function collectComponentLabelRects(
     const itemWidthPx = item.width * pxPerCm;
     const itemHeightPx = item.height * pxPerCm;
     const isSelected = item.id === selectedId;
-    const centerX = baseCenterX + (item.labelOffsetX || 0) * zoom;
+    const centerX = baseCenterX;
+
+    let labelX = centerX;
+    let labelY: number;
+
+    const isDoorOrWindow = item.type === "door" || item.type === "door_double" || item.type === "window";
+    const outsideNormal = isDoorOrWindow ? computeOutsideLabelOffset(item, walls, rooms) : null;
 
     const displayName = item.customName || item.label;
     const dimText = `${item.width} \u00D7 ${item.height} cm`;
@@ -3663,22 +3713,38 @@ export function collectComponentLabelRects(
     const pillW = maxWidth + 10;
     const pillH = nameFontSize + dimFontSize + 8;
 
-    // Check if label fits inside a simple component
-    const isInside = SIMPLE_COMPONENT_TYPES.has(item.type)
+    // Check if label fits inside the component
+    const isLabelInsideType = item.labelInside ?? LABEL_INSIDE_TYPES.has(item.type);
+    const isInside = isLabelInsideType
       && !isWallCupboard(item.type)
       && pillW < itemWidthPx * 0.95
       && pillH < itemHeightPx * 0.85;
 
-    const labelY = isInside
-      ? centerY + (item.labelOffsetY || 0) * zoom
-      : centerY + itemHeightPx / 2 + 14 * zoom + (item.labelOffsetY || 0) * zoom;
+    // Apply labelOffset (stored in cm, convert to px)
+    const offsetPx = item.labelOffset
+      ? { x: item.labelOffset.x * pxPerCm, y: item.labelOffset.y * pxPerCm }
+      : { x: 0, y: 0 };
+
+    if (outsideNormal) {
+      // Offset label to the exterior side of the room
+      const extent = Math.max(itemWidthPx, itemHeightPx) / 2;
+      const offsetDist = extent + 14 * zoom;
+      labelX = centerX + outsideNormal.nx * offsetDist + offsetPx.x;
+      labelY = centerY + outsideNormal.ny * offsetDist + offsetPx.y;
+    } else if (isInside) {
+      labelX = centerX + offsetPx.x;
+      labelY = centerY + offsetPx.y;
+    } else {
+      labelX = centerX + offsetPx.x;
+      labelY = centerY + itemHeightPx / 2 + 14 * zoom + offsetPx.y;
+    }
 
     const nameColor = isSelected
       ? (isDark ? "#4f98a3" : "#01696f")
       : (isDark ? "rgba(79, 152, 163, 0.65)" : "rgba(1, 105, 111, 0.55)");
 
     results.push({
-      item, centerX, labelY, displayName, dimText,
+      item, centerX: labelX, labelY, displayName, dimText,
       nameFontSize, dimFontSize, pillW, pillH, isSelected, nameColor, isInside,
     });
   }
@@ -3696,9 +3762,18 @@ function drawInsideComponentLabel(
   zoom: number = 1
 ) {
   const item = info.item;
-  const cx = (item.x + item.width / 2) * pxPerCm + panOffset.x + (item.labelOffsetX || 0) * zoom;
-  const cy = (item.y + item.height / 2) * pxPerCm + panOffset.y + (item.labelOffsetY || 0) * zoom;
+  // Hide label when item is too small on screen
+  const renderedWidth = item.width * pxPerCm;
+  if (renderedWidth < 60) return;
+
+  const cx = (item.x + item.width / 2) * pxPerCm + panOffset.x;
+  const cy = (item.y + item.height / 2) * pxPerCm + panOffset.y;
   const rotation = (item.rotation * Math.PI) / 180;
+
+  // Apply labelOffset in local (rotated) space
+  const offsetPx = item.labelOffset
+    ? { x: item.labelOffset.x * pxPerCm, y: item.labelOffset.y * pxPerCm }
+    : { x: 0, y: 0 };
 
   ctx.save();
   ctx.translate(cx, cy);
@@ -3706,21 +3781,44 @@ function drawInsideComponentLabel(
   if (item.mirrored) ctx.scale(-1, 1); // counter-mirror so text reads normally
 
   const totalTextH = info.nameFontSize + info.dimFontSize + 2;
-  const nameY = -totalTextH / 2;
+  const nameY = -totalTextH / 2 + offsetPx.y;
+  const labelX = offsetPx.x;
 
   // Name
   ctx.font = `${info.isSelected ? "600" : "500"} ${info.nameFontSize}px 'General Sans', 'DM Sans', sans-serif`;
   ctx.fillStyle = info.nameColor;
   ctx.textAlign = "center";
   ctx.textBaseline = "top";
-  ctx.fillText(info.displayName, 0, nameY);
+  ctx.fillText(info.displayName, labelX, nameY);
 
   // Dimensions
   ctx.font = `400 ${info.dimFontSize}px 'General Sans', 'DM Sans', sans-serif`;
   ctx.fillStyle = isDark ? "rgba(121, 120, 118, 0.8)" : "rgba(122, 121, 116, 0.7)";
-  ctx.fillText(info.dimText, 0, nameY + info.nameFontSize + 2);
+  ctx.fillText(info.dimText, labelX, nameY + info.nameFontSize + 2);
 
   ctx.restore();
+}
+
+/** Hit-test a screen point against component labels. Returns the FurnitureItem if hit, null otherwise. */
+export function hitTestComponentLabel(
+  screenX: number,
+  screenY: number,
+  componentLabelInfos: ComponentLabelInfo[]
+): FurnitureItem | null {
+  for (let i = componentLabelInfos.length - 1; i >= 0; i--) {
+    const info = componentLabelInfos[i];
+    const lx = info.centerX;
+    const ly = info.labelY;
+    const halfW = info.pillW / 2 + 4;
+    const halfH = info.pillH / 2 + 4;
+    if (
+      screenX >= lx - halfW && screenX <= lx + halfW &&
+      screenY >= ly - halfH && screenY <= ly + halfH
+    ) {
+      return info.item;
+    }
+  }
+  return null;
 }
 
 /** Draw a single component label at a given position */
