@@ -2657,6 +2657,10 @@ function computeAlongWallDistances(
   const wallDirX = wdx / wallLen;
   const wallDirY = wdy / wallLen;
 
+  // Inset wall endpoints by half thickness so measurement lines stop at the
+  // inner wall face instead of the centerline (which visually appears mid-wall).
+  const halfThick = (wall.thickness || 15) / 2;
+
   const cx = item.x + item.width / 2;
   const cy = item.y + item.height / 2;
   const relX = cx - wall.start.x;
@@ -2667,8 +2671,8 @@ function computeAlongWallDistances(
   const edgeStart = along - halfExtent;
   const edgeEnd = along + halfExtent;
 
-  const distToStart = edgeStart;
-  const distToEnd = wallLen - edgeEnd;
+  const distToStart = edgeStart - halfThick;
+  const distToEnd = (wallLen - halfThick) - edgeEnd;
 
   // Use wall orientation to determine tick axis
   const axis: "h" | "v" = Math.abs(wdx) > Math.abs(wdy) ? "h" : "v";
@@ -2682,7 +2686,10 @@ function computeAlongWallDistances(
         x: wall.start.x + wallDirX * edgeStart,
         y: wall.start.y + wallDirY * edgeStart,
       },
-      wallPt: { x: wall.start.x, y: wall.start.y },
+      wallPt: {
+        x: wall.start.x + wallDirX * halfThick,
+        y: wall.start.y + wallDirY * halfThick,
+      },
       axis,
     });
   }
@@ -2694,7 +2701,10 @@ function computeAlongWallDistances(
         x: wall.start.x + wallDirX * edgeEnd,
         y: wall.start.y + wallDirY * edgeEnd,
       },
-      wallPt: { x: wall.end.x, y: wall.end.y },
+      wallPt: {
+        x: wall.end.x - wallDirX * halfThick,
+        y: wall.end.y - wallDirY * halfThick,
+      },
       axis,
     });
   }
