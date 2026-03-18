@@ -641,7 +641,7 @@ export default function FloorPlanCanvas({
         setTimeout(() => labelInputRef.current?.focus(), 0);
       }
     },
-    [state, getCanvasPos, onSelectItem, onAddWall, onSetWallDrawing, onRemoveWall, onRemoveFurniture, onRemoveLabel, onPushUndo, onUpdateFurniture, onSplitWallAndConnect]
+    [state, getCanvasPos, onSelectItem, onAddWall, onSetWallDrawing, onRemoveWall, onRemoveFurniture, onRemoveLabel, onRemoveArrow, onPushUndo, onUpdateFurniture, onSplitWallAndConnect, onAddArrow, arrowDrawingStart]
   );
 
   // Store world position for new labels
@@ -883,7 +883,7 @@ export default function FloorPlanCanvas({
         setEraserHoverId(null);
       }
     },
-    [state, isPanning, isDragging, isResizing, isRotating, rotateStartAngle, rotateItemStartRot, resizeStart, resizeCorner, dragStart, dragItemOffset, eraserHoverId, getCanvasPos, onSetPan, onSetZoom, onMoveFurniture, onMoveLabel, onUpdateFurniture]
+    [state, isPanning, isDragging, isResizing, isRotating, rotateStartAngle, rotateItemStartRot, resizeStart, resizeCorner, dragStart, dragItemOffset, eraserHoverId, arrowDraggingEndpoint, getCanvasPos, onSetPan, onSetZoom, onMoveFurniture, onMoveLabel, onUpdateFurniture, onUpdateArrow]
   );
 
   const handlePointerUp = useCallback(
@@ -1270,6 +1270,7 @@ export default function FloorPlanCanvas({
         onSetWallDrawing(null);
         wallDrawingRef.current = null;
         wallPendingCommitRef.current = false;
+        setArrowDrawingStart(null);
         onSelectItem(null);
         setSelectedRoomKey(null);
       }
