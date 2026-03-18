@@ -194,6 +194,8 @@ export interface EditorState {
   units: UnitSystem;
   // Room name overrides keyed by room vertex signature
   roomNames: Record<string, string>;
+  // Room label position offsets keyed by room vertex signature (delta from auto-computed position)
+  roomLabelOffsets: Record<string, Point>;
   // Toggle for component labels visibility
   componentLabelsVisible: boolean;
 }
