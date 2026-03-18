@@ -549,17 +549,27 @@ export default function FloorPlanCanvas({
         if (state.componentLabelsVisible) {
           const hitLabelItem = hitTestComponentLabel(pos.x, pos.y, componentLabelInfosRef.current);
           if (hitLabelItem) {
+            // If component is already selected, drag just the label
+            if (state.selectedItemId === hitLabelItem.id) {
+              const currentOffset = hitLabelItem.labelOffset || { x: 0, y: 0 };
+              setIsDraggingLabel(true);
+              setDraggingLabelId(hitLabelItem.id);
+              setLabelDragStart({
+                x: pos.x,
+                y: pos.y,
+                offsetX: currentOffset.x,
+                offsetY: currentOffset.y,
+              });
+              return;
+            }
+            // If component not yet selected, move the whole component
             const pxPerCm = (state.gridSize * state.zoom) / 100;
-            const currentOffset = hitLabelItem.labelOffset || { x: 0, y: 0 };
-            setIsDraggingLabel(true);
-            setDraggingLabelId(hitLabelItem.id);
-            setLabelDragStart({
-              x: pos.x,
-              y: pos.y,
-              offsetX: currentOffset.x,
-              offsetY: currentOffset.y,
-            });
             onSelectItem(hitLabelItem.id);
+            setIsDragging(true);
+            setDragItemOffset({
+              x: pos.x - (hitLabelItem.x * pxPerCm + state.panOffset.x),
+              y: pos.y - (hitLabelItem.y * pxPerCm + state.panOffset.y),
+            });
             return;
           }
         }
@@ -589,20 +599,31 @@ export default function FloorPlanCanvas({
           return;
         }
 
-        // Check component label drag
+        // Check component label drag (fallback)
         if (state.componentLabelsVisible) {
           const hitLabelItem = hitTestComponentLabel(pos.x, pos.y, componentLabelInfosRef.current);
           if (hitLabelItem) {
-            const currentOffset = hitLabelItem.labelOffset || { x: 0, y: 0 };
-            setIsDraggingLabel(true);
-            setDraggingLabelId(hitLabelItem.id);
-            setLabelDragStart({
-              x: pos.x,
-              y: pos.y,
-              offsetX: currentOffset.x,
-              offsetY: currentOffset.y,
-            });
+            // If component is already selected, drag just the label
+            if (state.selectedItemId === hitLabelItem.id) {
+              const currentOffset = hitLabelItem.labelOffset || { x: 0, y: 0 };
+              setIsDraggingLabel(true);
+              setDraggingLabelId(hitLabelItem.id);
+              setLabelDragStart({
+                x: pos.x,
+                y: pos.y,
+                offsetX: currentOffset.x,
+                offsetY: currentOffset.y,
+              });
+              return;
+            }
+            // If component not yet selected, move the whole component
+            const pxPerCm = (state.gridSize * state.zoom) / 100;
             onSelectItem(hitLabelItem.id);
+            setIsDragging(true);
+            setDragItemOffset({
+              x: pos.x - (hitLabelItem.x * pxPerCm + state.panOffset.x),
+              y: pos.y - (hitLabelItem.y * pxPerCm + state.panOffset.y),
+            });
             return;
           }
         }
