@@ -29,6 +29,7 @@ import {
   LayoutList,
   SlidersHorizontal,
   Tags,
+  TextCursorInput,
 } from "lucide-react";
 
 interface EditorToolbarProps {
@@ -52,6 +53,7 @@ interface EditorToolbarProps {
   onSetUnits: (units: UnitSystem) => void;
   measureMode: MeasureMode;
   onToggleMeasureMode: () => void;
+  onAddTextBox: () => void;
   isMobile?: boolean;
   onToggleFurniturePanel?: () => void;
   onTogglePropertiesPanel?: () => void;
@@ -89,6 +91,7 @@ export default function EditorToolbar({
   onSetUnits,
   measureMode,
   onToggleMeasureMode,
+  onAddTextBox,
   isMobile,
   onToggleFurniturePanel,
   onTogglePropertiesPanel,
@@ -119,6 +122,12 @@ export default function EditorToolbar({
               <Icon className="h-5 w-5" />
             </Button>
           ))}
+
+          <Separator orientation="vertical" className="h-6 mx-0.5" />
+
+          <Button size="icon" variant="ghost" className={btnClass} onClick={onAddTextBox} data-testid="btn-add-text-box">
+            <TextCursorInput className="h-5 w-5" />
+          </Button>
 
           <Separator orientation="vertical" className="h-6 mx-0.5" />
 
@@ -228,6 +237,18 @@ export default function EditorToolbar({
           </Tooltip>
         ))}
       </div>
+
+      <Separator orientation="vertical" className="h-6 mx-1" />
+
+      {/* Add Text Box */}
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button size="icon" variant="ghost" onClick={onAddTextBox} data-testid="btn-add-text-box">
+            <TextCursorInput className="h-4 w-4" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent><p>Add Text Box (T)</p></TooltipContent>
+      </Tooltip>
 
       <Separator orientation="vertical" className="h-6 mx-1" />
 
