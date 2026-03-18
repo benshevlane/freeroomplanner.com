@@ -3551,6 +3551,226 @@ export function drawSnapHighlight(
   ctx.restore();
 }
 
+/** Snap candidate from component-to-component snapping */
+export interface SnappedComponentEdge {
+  axis: 'x' | 'y';
+  /** The world-cm coordinate of the snap line */
+  edgeCoord: number;
+  /** 'flush' = butt joint (opposing edges), 'align' = same edge alignment */
+  snapType: 'flush' | 'align';
+  /** ID of the target furniture item */
+  targetId: string;
+}
+
+/**
+ * Snap furniture to other furniture items (component-to-component).
+ * Returns adjusted {x, y} and snapped edge info for rendering guide lines.
+ * Uses AABB for rotated items, same as wall snap.
+ */
+export function snapFurnitureToItems(
+  item: FurnitureItem,
+  others: FurnitureItem[],
+  threshold: number = 20
+): { x: number; y: number; didSnap: boolean; snappedEdges: SnappedComponentEdge[] } {
+  let { x, y } = item;
+  let didSnap = false;
+  const snappedEdges: SnappedComponentEdge[] = [];
+
+  const aabb = getFurnitureAABB(item);
+  const aabbW = aabb.maxX - aabb.minX;
+  const aabbH = aabb.maxY - aabb.minY;
+  const aabbOffX = aabb.minX - item.x;
+  const aabbOffY = aabb.minY - item.y;
+
+  // Pre-filter: only consider items within 2× threshold of dragging item's AABB
+  const nearbyItems = others.filter(other =>
+    other.id !== item.id &&
+    other.x !== undefined &&
+    getFurnitureAABB(other).maxX > aabb.minX - threshold * 2 &&
+    getFurnitureAABB(other).minX < aabb.maxX + threshold * 2 &&
+    getFurnitureAABB(other).maxY > aabb.minY - threshold * 2 &&
+    getFurnitureAABB(other).minY < aabb.maxY + threshold * 2
+  );
+
+  // Collect candidates per axis, pick closest
+  const xCandidates: { dist: number; newX: number; edgeCoord: number; snapType: 'flush' | 'align'; targetId: string }[] = [];
+  const yCandidates: { dist: number; newY: number; edgeCoord: number; snapType: 'flush' | 'align'; targetId: string }[] = [];
+
+  for (const other of nearbyItems) {
+    const obb = getFurnitureAABB(other);
+
+    // Check perpendicular overlap (items must be roughly aligned on the other axis)
+    const yOverlap = aabb.minY < obb.maxY + threshold * 2 && aabb.maxY > obb.minY - threshold * 2;
+    const xOverlap = aabb.minX < obb.maxX + threshold * 2 && aabb.maxX > obb.minX - threshold * 2;
+
+    // X-axis snaps (only when items overlap on Y)
+    if (yOverlap) {
+      // Dragging LEFT edge → Other RIGHT edge (flush butt joint)
+      const d1 = Math.abs(aabb.minX - obb.maxX);
+      if (d1 <= threshold) xCandidates.push({ dist: d1, newX: obb.maxX - aabbOffX, edgeCoord: obb.maxX, snapType: 'flush', targetId: other.id });
+
+      // Dragging RIGHT edge → Other LEFT edge (flush butt joint)
+      const d2 = Math.abs(aabb.maxX - obb.minX);
+      if (d2 <= threshold) xCandidates.push({ dist: d2, newX: obb.minX - aabbW - aabbOffX, edgeCoord: obb.minX, snapType: 'flush', targetId: other.id });
+
+      // Dragging LEFT edge → Other LEFT edge (alignment)
+      const d3 = Math.abs(aabb.minX - obb.minX);
+      if (d3 <= threshold) xCandidates.push({ dist: d3, newX: obb.minX - aabbOffX, edgeCoord: obb.minX, snapType: 'align', targetId: other.id });
+
+      // Dragging RIGHT edge → Other RIGHT edge (alignment)
+      const d4 = Math.abs(aabb.maxX - obb.maxX);
+      if (d4 <= threshold) xCandidates.push({ dist: d4, newX: obb.maxX - aabbW - aabbOffX, edgeCoord: obb.maxX, snapType: 'align', targetId: other.id });
+    }
+
+    // Y-axis snaps (only when items overlap on X)
+    if (xOverlap) {
+      // Dragging TOP edge → Other BOTTOM edge (flush)
+      const d5 = Math.abs(aabb.minY - obb.maxY);
+      if (d5 <= threshold) yCandidates.push({ dist: d5, newY: obb.maxY - aabbOffY, edgeCoord: obb.maxY, snapType: 'flush', targetId: other.id });
+
+      // Dragging BOTTOM edge → Other TOP edge (flush)
+      const d6 = Math.abs(aabb.maxY - obb.minY);
+      if (d6 <= threshold) yCandidates.push({ dist: d6, newY: obb.minY - aabbH - aabbOffY, edgeCoord: obb.minY, snapType: 'flush', targetId: other.id });
+
+      // Dragging TOP edge → Other TOP edge (alignment)
+      const d7 = Math.abs(aabb.minY - obb.minY);
+      if (d7 <= threshold) yCandidates.push({ dist: d7, newY: obb.minY - aabbOffY, edgeCoord: obb.minY, snapType: 'align', targetId: other.id });
+
+      // Dragging BOTTOM edge → Other BOTTOM edge (alignment)
+      const d8 = Math.abs(aabb.maxY - obb.maxY);
+      if (d8 <= threshold) yCandidates.push({ dist: d8, newY: obb.maxY - aabbH - aabbOffY, edgeCoord: obb.maxY, snapType: 'align', targetId: other.id });
+    }
+  }
+
+  // Pick closest candidate per axis
+  if (xCandidates.length > 0) {
+    xCandidates.sort((a, b) => a.dist - b.dist);
+    const best = xCandidates[0];
+    x = best.newX;
+    didSnap = true;
+    snappedEdges.push({ axis: 'x', edgeCoord: best.edgeCoord, snapType: best.snapType, targetId: best.targetId });
+  }
+  if (yCandidates.length > 0) {
+    yCandidates.sort((a, b) => a.dist - b.dist);
+    const best = yCandidates[0];
+    y = best.newY;
+    didSnap = true;
+    snappedEdges.push({ axis: 'y', edgeCoord: best.edgeCoord, snapType: best.snapType, targetId: best.targetId });
+  }
+
+  return { x, y, didSnap, snappedEdges };
+}
+
+/**
+ * Unified snap: walls first, then components. Closest snap per axis wins.
+ * Returns combined wall + component snap edges for rendering.
+ */
+export function snapFurnitureToNearest(
+  item: FurnitureItem,
+  walls: Wall[],
+  otherFurniture: FurnitureItem[],
+  threshold: number = 20
+): {
+  x: number; y: number; didSnap: boolean;
+  snappedWallThickness?: number;
+  snappedWallEdges: SnappedWallEdge[];
+  snappedComponentEdges: SnappedComponentEdge[];
+} {
+  // Get wall snap result
+  const wallResult = snapFurnitureToWalls(item, walls, threshold);
+
+  // Get component snap result (using original item position, not wall-snapped)
+  const compResult = snapFurnitureToItems(item, otherFurniture, threshold);
+
+  // For each axis, pick the closer snap (wall vs component)
+  let finalX = item.x;
+  let finalY = item.y;
+  let didSnap = false;
+  let snappedWallThickness = wallResult.snappedWallThickness;
+  const snappedWallEdges: SnappedWallEdge[] = [];
+  const snappedComponentEdges: SnappedComponentEdge[] = [];
+
+  // Compute wall snap distances per axis
+  const aabb = getFurnitureAABB(item);
+  const wallXDist = wallResult.x !== item.x ? Math.abs(wallResult.x - item.x) : Infinity;
+  const wallYDist = wallResult.y !== item.y ? Math.abs(wallResult.y - item.y) : Infinity;
+
+  const compXEdge = compResult.snappedEdges.find(e => e.axis === 'x');
+  const compYEdge = compResult.snappedEdges.find(e => e.axis === 'y');
+  const compXDist = compResult.x !== item.x ? Math.abs(compResult.x - item.x) : Infinity;
+  const compYDist = compResult.y !== item.y ? Math.abs(compResult.y - item.y) : Infinity;
+
+  // X axis: pick closer
+  if (wallXDist <= compXDist && wallXDist < Infinity) {
+    finalX = wallResult.x;
+    didSnap = true;
+    // Include wall edges for X axis
+    for (const e of wallResult.snappedEdges) {
+      if (e.axis === 'x') snappedWallEdges.push(e);
+    }
+  } else if (compXDist < Infinity) {
+    finalX = compResult.x;
+    didSnap = true;
+    if (compXEdge) snappedComponentEdges.push(compXEdge);
+    snappedWallThickness = undefined; // component snap, not wall
+  }
+
+  // Y axis: pick closer
+  if (wallYDist <= compYDist && wallYDist < Infinity) {
+    finalY = wallResult.y;
+    didSnap = true;
+    for (const e of wallResult.snappedEdges) {
+      if (e.axis === 'y') snappedWallEdges.push(e);
+    }
+  } else if (compYDist < Infinity) {
+    finalY = compResult.y;
+    didSnap = true;
+    if (compYEdge) snappedComponentEdges.push(compYEdge);
+  }
+
+  // If wall snap won on both axes, preserve wall thickness
+  if (snappedWallEdges.length === 0) snappedWallThickness = undefined;
+
+  return { x: finalX, y: finalY, didSnap, snappedWallThickness, snappedWallEdges, snappedComponentEdges };
+}
+
+/** Draw solid teal indicator lines for component-to-component snaps */
+export function drawComponentSnapIndicators(
+  ctx: CanvasRenderingContext2D,
+  snappedEdges: SnappedComponentEdge[],
+  canvasWidth: number,
+  canvasHeight: number,
+  gridSize: number,
+  zoom: number,
+  panOffset: Point
+) {
+  if (snappedEdges.length === 0) return;
+  const pxPerCm = (gridSize * zoom) / 100;
+
+  ctx.save();
+
+  for (const edge of snappedEdges) {
+    ctx.beginPath();
+    ctx.strokeStyle = "#1a7a5e";
+    ctx.lineWidth = 1;
+    ctx.setLineDash([]);
+    ctx.globalAlpha = edge.snapType === 'flush' ? 0.7 : 0.5;
+
+    if (edge.axis === 'x') {
+      const px = edge.edgeCoord * pxPerCm + panOffset.x;
+      ctx.moveTo(px, 0);
+      ctx.lineTo(px, canvasHeight);
+    } else {
+      const py = edge.edgeCoord * pxPerCm + panOffset.y;
+      ctx.moveTo(0, py);
+      ctx.lineTo(canvasWidth, py);
+    }
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
 /** Draw eraser hover highlight on the item that will be deleted */
 export function drawEraserHighlight(
   ctx: CanvasRenderingContext2D,
