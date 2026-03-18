@@ -12,7 +12,7 @@ import DesktopWizard from "../components/DesktopWizard";
 import RoomGeneratorWizard from "../components/RoomGeneratorWizard";
 import { PerplexityAttribution } from "../components/PerplexityAttribution";
 import IntentCapture from "../components/IntentCapture";
-import { FurnitureTemplate, FurnitureItem, RoomLabel, TextBox, Point, UnitSystem, MeasureMode } from "../lib/types";
+import { FurnitureTemplate, FurnitureItem, RoomLabel, TextBox, Arrow, Point, UnitSystem, MeasureMode } from "../lib/types";
 import html2canvas from "html2canvas";
 import { trackEvent } from "@/lib/analytics";
 import { Input } from "@/components/ui/input";
@@ -93,7 +93,7 @@ export default function Editor() {
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Clipboard for copy/paste
-  const clipboardRef = useRef<{ type: "furniture"; data: FurnitureItem } | { type: "label"; data: RoomLabel } | { type: "textbox"; data: TextBox } | null>(null);
+  const clipboardRef = useRef<{ type: "furniture"; data: FurnitureItem } | { type: "label"; data: RoomLabel } | { type: "textbox"; data: TextBox } | { type: "arrow"; data: Arrow } | null>(null);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", isDark);
@@ -111,7 +111,8 @@ export default function Editor() {
   const selectedFurniture = state.furniture.find((f) => f.id === state.selectedItemId) || null;
   const selectedLabel = state.labels.find((l) => l.id === state.selectedItemId) || null;
   const selectedTextBox = state.textBoxes.find((t) => t.id === state.selectedItemId) || null;
-  const hasSelection = !!(selectedWall || selectedFurniture || selectedLabel || selectedTextBox);
+  const selectedArrow = state.arrows.find((a) => a.id === state.selectedItemId) || null;
+  const hasSelection = !!(selectedWall || selectedFurniture || selectedLabel || selectedTextBox || selectedArrow);
 
   // Auto-open properties sheet on mobile when something is selected
   useEffect(() => {
@@ -129,8 +130,10 @@ export default function Editor() {
       clipboardRef.current = { type: "label", data: { ...selectedLabel } };
     } else if (selectedTextBox) {
       clipboardRef.current = { type: "textbox", data: { ...selectedTextBox } };
+    } else if (selectedArrow) {
+      clipboardRef.current = { type: "arrow", data: { ...selectedArrow } };
     }
-  }, [selectedFurniture, selectedLabel, selectedTextBox]);
+  }, [selectedFurniture, selectedLabel, selectedTextBox, selectedArrow]);
 
   const handlePaste = useCallback(() => {
     const clip = clipboardRef.current;
@@ -157,6 +160,13 @@ export default function Editor() {
       const tbData = clip.data as TextBox;
       const newId = editor.addTextBox({ x: tbData.x + tbData.width / 2 + 20, y: tbData.y + tbData.height / 2 + 20 });
       editor.updateTextBox(newId, { ...tbData, id: newId, x: tbData.x + 20, y: tbData.y + 20 });
+    } else if (clip.type === "arrow") {
+      const arrowData = clip.data as Arrow;
+      const newId = editor.addArrow(
+        { x: arrowData.startX + 20, y: arrowData.startY + 20 },
+        { x: arrowData.endX + 20, y: arrowData.endY + 20 }
+      );
+      editor.updateArrow(newId, { ...arrowData, id: newId, startX: arrowData.startX + 20, startY: arrowData.startY + 20, endX: arrowData.endX + 20, endY: arrowData.endY + 20 });
     }
   }, [editor]);
 
@@ -167,6 +177,8 @@ export default function Editor() {
       clipboardRef.current = { type: "label", data: { ...selectedLabel } };
     } else if (selectedTextBox) {
       clipboardRef.current = { type: "textbox", data: { ...selectedTextBox } };
+    } else if (selectedArrow) {
+      clipboardRef.current = { type: "arrow", data: { ...selectedArrow } };
     }
     // Then paste immediately
     const clip = clipboardRef.current;
@@ -193,8 +205,15 @@ export default function Editor() {
       const tbData = clip.data as TextBox;
       const newId = editor.addTextBox({ x: tbData.x + tbData.width / 2 + 20, y: tbData.y + tbData.height / 2 + 20 });
       editor.updateTextBox(newId, { ...tbData, id: newId, x: tbData.x + 20, y: tbData.y + 20 });
+    } else if (clip.type === "arrow") {
+      const arrowData = clip.data as Arrow;
+      const newId = editor.addArrow(
+        { x: arrowData.startX + 20, y: arrowData.startY + 20 },
+        { x: arrowData.endX + 20, y: arrowData.endY + 20 }
+      );
+      editor.updateArrow(newId, { ...arrowData, id: newId, startX: arrowData.startX + 20, startY: arrowData.startY + 20, endX: arrowData.endX + 20, endY: arrowData.endY + 20 });
     }
-  }, [selectedFurniture, selectedLabel, selectedTextBox, editor]);
+  }, [selectedFurniture, selectedLabel, selectedTextBox, selectedArrow, editor]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -207,6 +226,9 @@ export default function Editor() {
       }
       if (e.key === "w" || e.key === "W") {
         if (!e.ctrlKey && !e.metaKey) editor.setTool("wall");
+      }
+      if (e.key === "a" || e.key === "A") {
+        if (!e.ctrlKey && !e.metaKey) editor.setTool("arrow");
       }
       if (e.key === "l" || e.key === "L") {
         if (!e.ctrlKey && !e.metaKey) editor.setTool("label");
@@ -256,7 +278,8 @@ export default function Editor() {
     if (selectedFurniture) editor.removeFurniture(selectedFurniture.id);
     if (selectedLabel) editor.removeLabel(selectedLabel.id);
     if (selectedTextBox) editor.removeTextBox(selectedTextBox.id);
-  }, [selectedWall, selectedFurniture, selectedLabel, selectedTextBox, editor]);
+    if (selectedArrow) editor.removeArrow(selectedArrow.id);
+  }, [selectedWall, selectedFurniture, selectedLabel, selectedTextBox, selectedArrow, editor]);
 
   const handleSavePlan = useCallback(async () => {
     try {
@@ -487,6 +510,7 @@ export default function Editor() {
                 <div className="space-y-2 text-sm">
                   <ShortcutRow keys="V" action="Select & Move tool" />
                   <ShortcutRow keys="W" action="Draw Walls tool" />
+                  <ShortcutRow keys="A" action="Draw Arrow tool" />
                   <ShortcutRow keys="L" action="Add Label tool" />
                   <ShortcutRow keys="E" action="Eraser tool" />
                   <Separator className="my-2" />
@@ -586,6 +610,7 @@ export default function Editor() {
                       selectedFurniture={selectedFurniture}
                       selectedLabel={selectedLabel}
                       selectedTextBox={selectedTextBox}
+                      selectedArrow={selectedArrow}
                       onRotate={handleRotateSelected}
                       onDelete={handleDeleteSelected}
                       onDuplicate={handleDuplicate}
@@ -593,6 +618,7 @@ export default function Editor() {
                       onUpdateLabel={editor.updateLabel}
                       onUpdateTextBox={editor.updateTextBox}
                       onUpdateWall={editor.updateWall}
+                      onUpdateArrow={editor.updateArrow}
                       units={state.units}
                     />
                   </ScrollArea>
@@ -632,6 +658,9 @@ export default function Editor() {
           onUpdateTextBox={editor.updateTextBox}
           onRemoveTextBox={editor.removeTextBox}
           onPushUndoForTextBox={editor.pushUndo}
+          onAddArrow={editor.addArrow}
+          onUpdateArrow={editor.updateArrow}
+          onRemoveArrow={editor.removeArrow}
         />
 
         {/* Desktop: Properties sidebar */}
@@ -643,6 +672,7 @@ export default function Editor() {
                 selectedFurniture={selectedFurniture}
                 selectedLabel={selectedLabel}
                 selectedTextBox={selectedTextBox}
+                selectedArrow={selectedArrow}
                 onRotate={handleRotateSelected}
                 onDelete={handleDeleteSelected}
                 onDuplicate={handleDuplicate}
@@ -650,6 +680,7 @@ export default function Editor() {
                 onUpdateLabel={editor.updateLabel}
                 onUpdateTextBox={editor.updateTextBox}
                 onUpdateWall={editor.updateWall}
+                onUpdateArrow={editor.updateArrow}
                 units={state.units}
               />
             </ScrollArea>
@@ -672,6 +703,12 @@ export default function Editor() {
                 <div className="flex justify-between">
                   <span>Text Boxes</span>
                   <span className="font-medium tabular-nums">{state.textBoxes.length}</span>
+                </div>
+              )}
+              {state.arrows.length > 0 && (
+                <div className="flex justify-between">
+                  <span>Arrows</span>
+                  <span className="font-medium tabular-nums">{state.arrows.length}</span>
                 </div>
               )}
             </div>

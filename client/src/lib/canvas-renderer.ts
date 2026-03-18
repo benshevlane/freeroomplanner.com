@@ -1,4 +1,4 @@
-import { Wall, FurnitureItem, RoomLabel, Point, UnitSystem, MeasureMode, LabelColor, isWallCupboard } from "./types";
+import { Wall, FurnitureItem, RoomLabel, Arrow, ArrowHeadStyle, Point, UnitSystem, MeasureMode, LabelColor, isWallCupboard } from "./types";
 import { DetectedRoom } from "./room-detection";
 
 /** Convert cm to display string based on unit system */
@@ -3590,4 +3590,237 @@ export function drawWallCupboardLegend(
   ctx.textAlign = "left";
   ctx.textBaseline = "middle";
   ctx.fillText(text, ix + iconW + gap, y + totalH / 2);
+}
+
+// ==========================================
+// Arrow Annotations
+// ==========================================
+
+/** Draw an arrowhead (filled triangle or open V) at a given point along a direction */
+function drawArrowHead(
+  ctx: CanvasRenderingContext2D,
+  tipX: number,
+  tipY: number,
+  angle: number, // direction the arrow is pointing (radians)
+  size: number,
+  style: ArrowHeadStyle,
+  color: string
+) {
+  if (style === "none") return;
+  const halfAngle = Math.PI / 7; // ~25 degrees
+  const x1 = tipX - size * Math.cos(angle - halfAngle);
+  const y1 = tipY - size * Math.sin(angle - halfAngle);
+  const x2 = tipX - size * Math.cos(angle + halfAngle);
+  const y2 = tipY - size * Math.sin(angle + halfAngle);
+
+  ctx.beginPath();
+  ctx.moveTo(tipX, tipY);
+  ctx.lineTo(x1, y1);
+  if (style === "filled") {
+    ctx.lineTo(x2, y2);
+    ctx.closePath();
+    ctx.fillStyle = color;
+    ctx.fill();
+  } else {
+    // open
+    ctx.moveTo(tipX, tipY);
+    ctx.lineTo(x2, y2);
+    ctx.strokeStyle = color;
+    ctx.stroke();
+  }
+}
+
+/** Draw all arrows on the canvas */
+export function drawArrows(
+  ctx: CanvasRenderingContext2D,
+  arrows: Arrow[],
+  gridSize: number,
+  zoom: number,
+  panOffset: Point,
+  isDark: boolean,
+  selectedId: string | null
+) {
+  const pxPerCm = (gridSize * zoom) / 100;
+
+  for (const arrow of arrows) {
+    const sx = arrow.startX * pxPerCm + panOffset.x;
+    const sy = arrow.startY * pxPerCm + panOffset.y;
+    const ex = arrow.endX * pxPerCm + panOffset.x;
+    const ey = arrow.endY * pxPerCm + panOffset.y;
+    const isSelected = arrow.id === selectedId;
+    const color = arrow.strokeColor;
+    const lineWidth = arrow.strokeWidth * zoom;
+    const headSize = Math.max(10, 12 * zoom);
+
+    // Draw the line
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = lineWidth;
+    ctx.lineCap = "round";
+    if (arrow.strokeStyle === "dashed") {
+      ctx.setLineDash([8 * zoom, 5 * zoom]);
+    }
+    ctx.beginPath();
+    ctx.moveTo(sx, sy);
+    ctx.lineTo(ex, ey);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Draw arrowheads
+    const angle = Math.atan2(ey - sy, ex - sx);
+    drawArrowHead(ctx, ex, ey, angle, headSize, arrow.headStyle, color);
+    drawArrowHead(ctx, sx, sy, angle + Math.PI, headSize, arrow.tailStyle, color);
+
+    // Draw label if present
+    if (arrow.label) {
+      const mx = (sx + ex) / 2;
+      const my = (sy + ey) / 2;
+      const fontSize = Math.max(10, 12 * zoom);
+      ctx.font = `500 ${fontSize}px 'General Sans', 'DM Sans', sans-serif`;
+      const textW = ctx.measureText(arrow.label).width;
+      const pad = 4;
+
+      // Background
+      ctx.fillStyle = isDark ? "rgba(23, 22, 20, 0.85)" : "rgba(247, 246, 242, 0.9)";
+      ctx.fillRect(mx - textW / 2 - pad, my - fontSize / 2 - pad, textW + pad * 2, fontSize + pad * 2);
+
+      // Text
+      ctx.fillStyle = color;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(arrow.label, mx, my);
+    }
+
+    // Selection highlight
+    if (isSelected) {
+      ctx.strokeStyle = SELECT_COLOR;
+      ctx.lineWidth = lineWidth + 4;
+      ctx.globalAlpha = 0.25;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(sx, sy);
+      ctx.lineTo(ex, ey);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+
+      // Endpoint handles
+      for (const [px, py] of [[sx, sy], [ex, ey]]) {
+        ctx.beginPath();
+        ctx.arc(px, py, 5, 0, Math.PI * 2);
+        ctx.fillStyle = SELECT_COLOR;
+        ctx.fill();
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      }
+    }
+
+    ctx.restore();
+  }
+}
+
+/** Draw a preview arrow while the user is placing the second point */
+export function drawArrowPreview(
+  ctx: CanvasRenderingContext2D,
+  start: Point,
+  end: Point,
+  gridSize: number,
+  zoom: number,
+  panOffset: Point,
+  isDark: boolean
+) {
+  const pxPerCm = (gridSize * zoom) / 100;
+  const sx = start.x * pxPerCm + panOffset.x;
+  const sy = start.y * pxPerCm + panOffset.y;
+  const ex = end.x * pxPerCm + panOffset.x;
+  const ey = end.y * pxPerCm + panOffset.y;
+
+  ctx.save();
+  ctx.strokeStyle = isDark ? "#cdccca" : "#3a3938";
+  ctx.lineWidth = 2 * zoom;
+  ctx.lineCap = "round";
+  ctx.setLineDash([6, 4]);
+  ctx.beginPath();
+  ctx.moveTo(sx, sy);
+  ctx.lineTo(ex, ey);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Preview arrowhead at end
+  const angle = Math.atan2(ey - sy, ex - sx);
+  const headSize = Math.max(10, 12 * zoom);
+  drawArrowHead(ctx, ex, ey, angle, headSize, "filled", isDark ? "#cdccca" : "#3a3938");
+
+  // Start point indicator
+  ctx.beginPath();
+  ctx.arc(sx, sy, 4, 0, Math.PI * 2);
+  ctx.fillStyle = SELECT_COLOR;
+  ctx.fill();
+
+  ctx.restore();
+}
+
+/** Hit-test arrows — returns the arrow if the click is near its line segment */
+export function hitTestArrow(
+  screenX: number,
+  screenY: number,
+  arrows: Arrow[],
+  gridSize: number,
+  zoom: number,
+  panOffset: Point
+): Arrow | null {
+  const pxPerCm = (gridSize * zoom) / 100;
+  const threshold = 10; // px
+
+  for (let i = arrows.length - 1; i >= 0; i--) {
+    const arrow = arrows[i];
+    const sx = arrow.startX * pxPerCm + panOffset.x;
+    const sy = arrow.startY * pxPerCm + panOffset.y;
+    const ex = arrow.endX * pxPerCm + panOffset.x;
+    const ey = arrow.endY * pxPerCm + panOffset.y;
+
+    const dx = ex - sx;
+    const dy = ey - sy;
+    const len = Math.sqrt(dx * dx + dy * dy);
+    if (len === 0) continue;
+
+    const t = Math.max(0, Math.min(1,
+      ((screenX - sx) * dx + (screenY - sy) * dy) / (len * len)
+    ));
+    const closestX = sx + t * dx;
+    const closestY = sy + t * dy;
+    const dist = Math.sqrt(
+      (screenX - closestX) ** 2 + (screenY - closestY) ** 2
+    );
+
+    if (dist < threshold + arrow.strokeWidth * zoom) {
+      return arrow;
+    }
+  }
+  return null;
+}
+
+/** Hit-test arrow endpoint handles — returns "start" or "end" if near a handle */
+export function hitTestArrowEndpoint(
+  screenX: number,
+  screenY: number,
+  arrow: Arrow,
+  gridSize: number,
+  zoom: number,
+  panOffset: Point
+): "start" | "end" | null {
+  const pxPerCm = (gridSize * zoom) / 100;
+  const threshold = 10;
+
+  const sx = arrow.startX * pxPerCm + panOffset.x;
+  const sy = arrow.startY * pxPerCm + panOffset.y;
+  const ex = arrow.endX * pxPerCm + panOffset.x;
+  const ey = arrow.endY * pxPerCm + panOffset.y;
+
+  const distStart = Math.sqrt((screenX - sx) ** 2 + (screenY - sy) ** 2);
+  const distEnd = Math.sqrt((screenX - ex) ** 2 + (screenY - ey) ** 2);
+
+  if (distEnd < threshold) return "end";
+  if (distStart < threshold) return "start";
+  return null;
 }

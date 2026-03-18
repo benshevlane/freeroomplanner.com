@@ -1,4 +1,4 @@
-import { Wall, WallType, FurnitureItem, RoomLabel, TextBox, LabelSize, LabelColor, UnitSystem, isWallCupboard, cmToDisplay, displayToCm, dimensionSuffix } from "../lib/types";
+import { Wall, WallType, FurnitureItem, RoomLabel, TextBox, Arrow, ArrowStyle, ArrowHeadStyle, LabelSize, LabelColor, UnitSystem, isWallCupboard, cmToDisplay, displayToCm, dimensionSuffix } from "../lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
@@ -10,6 +10,7 @@ interface PropertiesPanelProps {
   selectedFurniture: FurnitureItem | null;
   selectedLabel: RoomLabel | null;
   selectedTextBox: TextBox | null;
+  selectedArrow: Arrow | null;
   onRotate: () => void;
   onDelete: () => void;
   onDuplicate: () => void;
@@ -17,6 +18,7 @@ interface PropertiesPanelProps {
   onUpdateLabel: (id: string, updates: Partial<RoomLabel>) => void;
   onUpdateTextBox?: (id: string, updates: Partial<TextBox>) => void;
   onUpdateWall?: (id: string, updates: Partial<Wall>) => void;
+  onUpdateArrow?: (id: string, updates: Partial<Arrow>) => void;
   units: UnitSystem;
 }
 
@@ -55,6 +57,7 @@ export default function PropertiesPanel({
   selectedFurniture,
   selectedLabel,
   selectedTextBox,
+  selectedArrow,
   onRotate,
   onDelete,
   onDuplicate,
@@ -62,9 +65,10 @@ export default function PropertiesPanel({
   onUpdateLabel,
   onUpdateTextBox,
   onUpdateWall,
+  onUpdateArrow,
   units,
 }: PropertiesPanelProps) {
-  if (!selectedWall && !selectedFurniture && !selectedLabel && !selectedTextBox) {
+  if (!selectedWall && !selectedFurniture && !selectedLabel && !selectedTextBox && !selectedArrow) {
     return (
       <div className="p-4 text-sm text-muted-foreground" data-testid="properties-empty">
         <p className="font-medium text-foreground mb-1">Properties</p>
@@ -409,6 +413,112 @@ export default function PropertiesPanel({
             Delete
           </Button>
         </div>
+      </div>
+    );
+  }
+
+  if (selectedArrow && onUpdateArrow) {
+    const arrow = selectedArrow;
+    return (
+      <div className="p-4 space-y-3" data-testid="properties-arrow">
+        <p className="text-sm font-semibold">Arrow</p>
+
+        {/* Label */}
+        <div className="space-y-1.5">
+          <p className="text-xs text-muted-foreground">Label</p>
+          <Input
+            type="text"
+            value={arrow.label}
+            onChange={(e) => onUpdateArrow(arrow.id, { label: e.target.value })}
+            className="h-7 text-sm"
+            placeholder="Optional label"
+          />
+        </div>
+
+        {/* Stroke Color */}
+        <div className="flex items-center gap-2">
+          <p className="text-xs text-muted-foreground">Color</p>
+          <label className="relative cursor-pointer">
+            <span className="block w-6 h-6 rounded border border-border" style={{ backgroundColor: arrow.strokeColor }} />
+            <input
+              type="color"
+              className="absolute inset-0 opacity-0 cursor-pointer"
+              value={arrow.strokeColor}
+              onChange={(e) => onUpdateArrow(arrow.id, { strokeColor: e.target.value })}
+            />
+          </label>
+        </div>
+
+        {/* Stroke Width */}
+        <div className="space-y-1.5">
+          <p className="text-xs text-muted-foreground">Width: {arrow.strokeWidth}px</p>
+          <Slider
+            value={[arrow.strokeWidth]}
+            min={1}
+            max={8}
+            step={1}
+            onValueChange={([v]) => onUpdateArrow(arrow.id, { strokeWidth: v })}
+          />
+        </div>
+
+        {/* Stroke Style */}
+        <div className="space-y-1.5">
+          <p className="text-xs text-muted-foreground">Style</p>
+          <div className="flex gap-1">
+            {(["solid", "dashed"] as ArrowStyle[]).map((style) => (
+              <Button
+                key={style}
+                size="sm"
+                variant={arrow.strokeStyle === style ? "default" : "outline"}
+                className="flex-1 text-xs h-7 capitalize"
+                onClick={() => onUpdateArrow(arrow.id, { strokeStyle: style })}
+              >
+                {style}
+              </Button>
+            ))}
+          </div>
+        </div>
+
+        {/* Head Style (end) */}
+        <div className="space-y-1.5">
+          <p className="text-xs text-muted-foreground">Arrowhead (end)</p>
+          <div className="flex gap-1">
+            {(["filled", "open", "none"] as ArrowHeadStyle[]).map((style) => (
+              <Button
+                key={style}
+                size="sm"
+                variant={arrow.headStyle === style ? "default" : "outline"}
+                className="flex-1 text-xs h-7 capitalize"
+                onClick={() => onUpdateArrow(arrow.id, { headStyle: style })}
+              >
+                {style}
+              </Button>
+            ))}
+          </div>
+        </div>
+
+        {/* Tail Style (start) */}
+        <div className="space-y-1.5">
+          <p className="text-xs text-muted-foreground">Arrowhead (start)</p>
+          <div className="flex gap-1">
+            {(["filled", "open", "none"] as ArrowHeadStyle[]).map((style) => (
+              <Button
+                key={style}
+                size="sm"
+                variant={arrow.tailStyle === style ? "default" : "outline"}
+                className="flex-1 text-xs h-7 capitalize"
+                onClick={() => onUpdateArrow(arrow.id, { tailStyle: style })}
+              >
+                {style}
+              </Button>
+            ))}
+          </div>
+        </div>
+
+        <Button size="sm" variant="ghost" onClick={onDelete} className="text-destructive w-full mt-2 min-h-[44px] md:min-h-0" data-testid="btn-delete-arrow">
+          <Trash2 className="h-3.5 w-3.5 mr-1" />
+          Delete Arrow
+        </Button>
       </div>
     );
   }

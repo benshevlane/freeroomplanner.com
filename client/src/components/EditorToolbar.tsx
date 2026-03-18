@@ -12,6 +12,7 @@ import {
 import {
   MousePointer2,
   Pencil,
+  MoveRight,
   Type,
   Eraser,
   Hand,
@@ -62,6 +63,7 @@ const tools: { tool: EditorTool; icon: typeof MousePointer2; label: string; shor
   { tool: "select", icon: MousePointer2, label: "Select & Move", shortcut: "V" },
   { tool: "pan", icon: Hand, label: "Pan / Drag", shortcut: "H" },
   { tool: "wall", icon: Pencil, label: "Draw Walls", shortcut: "W" },
+  { tool: "arrow", icon: MoveRight, label: "Draw Arrow", shortcut: "A" },
   { tool: "label", icon: Type, label: "Add Label", shortcut: "L" },
   { tool: "eraser", icon: Eraser, label: "Eraser", shortcut: "E" },
 ];

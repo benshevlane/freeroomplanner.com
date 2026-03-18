@@ -1,5 +1,5 @@
 import { useRef, useEffect, useCallback, useState } from "react";
-import { EditorState, Point, FurnitureTemplate, FurnitureItem, RoomLabel, TextBox, UnitSystem, MeasureMode } from "../lib/types";
+import { EditorState, Point, FurnitureTemplate, FurnitureItem, RoomLabel, TextBox, Arrow, UnitSystem, MeasureMode } from "../lib/types";
 import RichTextBoxComponent from "./RichTextBox";
 import {
   drawGrid,
@@ -36,6 +36,10 @@ import {
   hitTestLabel,
   hitTestResizeHandle,
   ResizeCorner,
+  drawArrows,
+  drawArrowPreview,
+  hitTestArrow,
+  hitTestArrowEndpoint,
 } from "../lib/canvas-renderer";
 import { isWallCupboard } from "../lib/types";
 import { detectRooms } from "../lib/room-detection";
@@ -66,6 +70,9 @@ interface FloorPlanCanvasProps {
   onUpdateTextBox: (id: string, updates: Partial<TextBox>) => void;
   onRemoveTextBox: (id: string) => void;
   onPushUndoForTextBox: () => void;
+  onAddArrow: (start: Point, end: Point) => string;
+  onUpdateArrow: (id: string, updates: Partial<Arrow>) => void;
+  onRemoveArrow: (id: string) => void;
 }
 
 export default function FloorPlanCanvas({
@@ -94,6 +101,9 @@ export default function FloorPlanCanvas({
   onUpdateTextBox,
   onRemoveTextBox,
   onPushUndoForTextBox,
+  onAddArrow,
+  onUpdateArrow,
+  onRemoveArrow,
 }: FloorPlanCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -135,6 +145,17 @@ export default function FloorPlanCanvas({
   const [textBoxDragging, setTextBoxDragging] = useState<{ id: string; offsetX: number; offsetY: number } | null>(null);
   const [textBoxResizing, setTextBoxResizing] = useState<{ id: string; corner: string; startX: number; startY: number; origX: number; origY: number; origW: number; origH: number } | null>(null);
   const [textBoxRotating, setTextBoxRotating] = useState<{ id: string; startAngle: number; origRotation: number; centerX: number; centerY: number } | null>(null);
+
+  // Arrow drawing state
+  const [arrowDrawingStart, setArrowDrawingStart] = useState<Point | null>(null);
+  const [arrowDraggingEndpoint, setArrowDraggingEndpoint] = useState<{ id: string; endpoint: "start" | "end"; } | null>(null);
+
+  // Reset arrow drawing state when tool changes away from arrow
+  useEffect(() => {
+    if (state.selectedTool !== "arrow") {
+      setArrowDrawingStart(null);
+    }
+  }, [state.selectedTool]);
 
   // Canvas resize
   useEffect(() => {
@@ -285,6 +306,15 @@ export default function FloorPlanCanvas({
       state.roomNames, state.componentLabelsVisible, state.selectedItemId,
       roomLabelPositions
     );
+
+    // Arrows
+    drawArrows(ctx, state.arrows, state.gridSize, state.zoom, state.panOffset, isDark, state.selectedItemId);
+
+    // Arrow preview while drawing
+    if (state.selectedTool === "arrow" && arrowDrawingStart) {
+      const worldMouse = screenToWorld(mousePos.x, mousePos.y, state.gridSize, state.zoom, state.panOffset);
+      drawArrowPreview(ctx, arrowDrawingStart, worldMouse, state.gridSize, state.zoom, state.panOffset, isDark);
+    }
 
     // Snap indicator and alignment guides when wall tool is active but not drawing yet
     if (state.selectedTool === "wall" && !state.wallDrawing) {
@@ -498,6 +528,24 @@ export default function FloorPlanCanvas({
           return;
         }
 
+        // Check arrow endpoint drag handles first for selected arrow
+        const selectedArrow = state.arrows.find((a) => a.id === state.selectedItemId);
+        if (selectedArrow) {
+          const epHit = hitTestArrowEndpoint(pos.x, pos.y, selectedArrow, state.gridSize, state.zoom, state.panOffset);
+          if (epHit) {
+            onPushUndo();
+            setArrowDraggingEndpoint({ id: selectedArrow.id, endpoint: epHit });
+            return;
+          }
+        }
+
+        // Check arrow body hit
+        const hitArrow = hitTestArrow(pos.x, pos.y, state.arrows, state.gridSize, state.zoom, state.panOffset);
+        if (hitArrow) {
+          onSelectItem(hitArrow.id);
+          return;
+        }
+
         const hitW = hitTestWall(pos.x, pos.y, state.walls, state.gridSize, state.zoom, state.panOffset);
         if (hitW) {
           onSelectItem(hitW.id);
@@ -561,8 +609,22 @@ export default function FloorPlanCanvas({
         const hitLbl = hitTestLabel(pos.x, pos.y, state.labels, state.gridSize, state.zoom, state.panOffset, ctx);
         if (hitLbl) { onRemoveLabel(hitLbl.id); return; }
 
+        const hitArrowErase = hitTestArrow(pos.x, pos.y, state.arrows, state.gridSize, state.zoom, state.panOffset);
+        if (hitArrowErase) { onRemoveArrow(hitArrowErase.id); return; }
+
         const hitW = hitTestWall(pos.x, pos.y, state.walls, state.gridSize, state.zoom, state.panOffset);
         if (hitW) { onRemoveWall(hitW.id); return; }
+      } else if (state.selectedTool === "arrow") {
+        const world = screenToWorld(pos.x, pos.y, state.gridSize, state.zoom, state.panOffset);
+        const snapped = snapToGrid(world, 10);
+        if (arrowDrawingStart) {
+          // Second click: place the arrow
+          onAddArrow(arrowDrawingStart, snapped);
+          setArrowDrawingStart(null);
+        } else {
+          // First click: start drawing
+          setArrowDrawingStart(snapped);
+        }
       } else if (state.selectedTool === "label") {
         const world = screenToWorld(pos.x, pos.y, state.gridSize, state.zoom, state.panOffset);
         const snapped = snapToGrid(world, 10);
@@ -629,6 +691,18 @@ export default function FloorPlanCanvas({
           x: pos.x - dragStart.x,
           y: pos.y - dragStart.y,
         });
+        return;
+      }
+
+      // Handle arrow endpoint dragging
+      if (arrowDraggingEndpoint) {
+        const world = screenToWorld(pos.x, pos.y, state.gridSize, state.zoom, state.panOffset);
+        const snapped = snapToGrid(world, 10);
+        if (arrowDraggingEndpoint.endpoint === "start") {
+          onUpdateArrow(arrowDraggingEndpoint.id, { startX: snapped.x, startY: snapped.y });
+        } else {
+          onUpdateArrow(arrowDraggingEndpoint.id, { endX: snapped.x, endY: snapped.y });
+        }
         return;
       }
 
@@ -791,8 +865,13 @@ export default function FloorPlanCanvas({
           if (hitLbl) {
             setEraserHoverId(hitLbl.id);
           } else {
-            const hitW = hitTestWall(pos.x, pos.y, state.walls, state.gridSize, state.zoom, state.panOffset);
-            setEraserHoverId(hitW ? hitW.id : null);
+            const hitArrowHover = hitTestArrow(pos.x, pos.y, state.arrows, state.gridSize, state.zoom, state.panOffset);
+            if (hitArrowHover) {
+              setEraserHoverId(hitArrowHover.id);
+            } else {
+              const hitW = hitTestWall(pos.x, pos.y, state.walls, state.gridSize, state.zoom, state.panOffset);
+              setEraserHoverId(hitW ? hitW.id : null);
+            }
           }
         } else {
           setEraserHoverId(null);
@@ -865,6 +944,7 @@ export default function FloorPlanCanvas({
       setIsRotating(false);
       setResizeCorner(null);
       setResizeStart(null);
+      setArrowDraggingEndpoint(null);
     },
     [isDragging, onPushUndo, state.selectedTool, state.gridSize, state.zoom, state.panOffset, state.walls, getCanvasPos, onAddWall, onSetWallDrawing, onSplitWallAndConnect]
   );
@@ -1224,6 +1304,7 @@ export default function FloorPlanCanvas({
     }
     if (state.selectedTool === "pan") return "grab";
     if (state.selectedTool === "wall") return "crosshair";
+    if (state.selectedTool === "arrow") return "crosshair";
     if (state.selectedTool === "eraser") return "crosshair";
     if (state.selectedTool === "label") return "text";
     if (state.selectedTool === "select") return isDragging ? "grabbing" : "default";

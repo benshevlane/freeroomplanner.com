@@ -71,6 +71,32 @@ export interface TextBox {
   zIndex: number;
 }
 
+export type ArrowStyle = "solid" | "dashed";
+export type ArrowHeadStyle = "filled" | "open" | "none";
+
+export interface Arrow {
+  id: string;
+  startX: number;  // world cm
+  startY: number;  // world cm
+  endX: number;    // world cm
+  endY: number;    // world cm
+  strokeColor: string;
+  strokeWidth: number;    // px (1–8)
+  strokeStyle: ArrowStyle;
+  headStyle: ArrowHeadStyle;  // arrowhead at end
+  tailStyle: ArrowHeadStyle;  // arrowhead at start
+  label: string;              // optional text label along the arrow
+}
+
+export const DEFAULT_ARROW: Omit<Arrow, "id" | "startX" | "startY" | "endX" | "endY"> = {
+  strokeColor: "#3a3938",
+  strokeWidth: 2,
+  strokeStyle: "solid",
+  headStyle: "filled",
+  tailStyle: "none",
+  label: "",
+};
+
 export const DEFAULT_TEXT_BOX: Omit<TextBox, "id" | "x" | "y"> = {
   width: 200,
   height: 100,
@@ -93,7 +119,7 @@ export const DEFAULT_TEXT_BOX: Omit<TextBox, "id" | "x" | "y"> = {
   zIndex: 0,
 };
 
-export type EditorTool = "select" | "wall" | "furniture" | "label" | "eraser" | "pan";
+export type EditorTool = "select" | "wall" | "arrow" | "furniture" | "label" | "eraser" | "pan";
 
 export type UnitSystem = "m" | "cm" | "mm" | "ft";
 
@@ -150,6 +176,7 @@ export interface EditorState {
   furniture: FurnitureItem[];
   labels: RoomLabel[];
   textBoxes: TextBox[];
+  arrows: Arrow[];
   gridSize: number; // px per meter
   zoom: number;
   panOffset: Point;
