@@ -32,8 +32,11 @@ import {
   snapToWallEndpoints,
   snapToWallBody,
   snapFurnitureToWalls,
+  snapFurnitureToNearest,
   SnappedWallEdge,
+  SnappedComponentEdge,
   drawWallSnapIndicators,
+  drawComponentSnapIndicators,
   drawSnapHighlight,
   hitTestWall,
   hitTestFurniture,
@@ -136,6 +139,7 @@ export default function FloorPlanCanvas({
 
   // Wall snap indicator state (transient, only during drag)
   const [wallSnapEdges, setWallSnapEdges] = useState<SnappedWallEdge[]>([]);
+  const [componentSnapEdges, setComponentSnapEdges] = useState<SnappedComponentEdge[]>([]);
   // Snap landing highlight: item id + timestamp
   const [snapHighlightId, setSnapHighlightId] = useState<string | null>(null);
   const snapHighlightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -310,6 +314,14 @@ export default function FloorPlanCanvas({
     // Wall snap indicator lines (during drag)
     if (isDragging && wallSnapEdges.length > 0) {
       drawWallSnapIndicators(ctx, wallSnapEdges, state.gridSize, state.zoom, state.panOffset);
+    }
+
+    // Component snap indicator lines (during drag)
+    if (isDragging && componentSnapEdges.length > 0) {
+      const canvas = canvasRef.current;
+      if (canvas) {
+        drawComponentSnapIndicators(ctx, componentSnapEdges, canvas.width, canvas.height, state.gridSize, state.zoom, state.panOffset);
+      }
     }
 
     // Snap landing highlight (brief teal glow on snap)
@@ -938,21 +950,23 @@ export default function FloorPlanCanvas({
         if (furn) {
           // Try to snap furniture to wall edges
           const tempItem = { ...furn, x: snappedX, y: snappedY };
-          const wallSnap = snapFurnitureToWalls(tempItem, state.walls);
-          onMoveFurniture(state.selectedItemId, wallSnap.x, wallSnap.y);
+          const otherFurniture = state.furniture.filter(f => f.id !== state.selectedItemId);
+          const snapResult = snapFurnitureToNearest(tempItem, state.walls, otherFurniture);
+          onMoveFurniture(state.selectedItemId, snapResult.x, snapResult.y);
           // Track snap indicator state
-          setWallSnapEdges(wallSnap.snappedEdges);
+          setWallSnapEdges(snapResult.snappedWallEdges);
+          setComponentSnapEdges(snapResult.snappedComponentEdges);
           // Trigger snap landing highlight on transition to snapped
-          if (wallSnap.didSnap && !prevDidSnap.current) {
+          if (snapResult.didSnap && !prevDidSnap.current) {
             setSnapHighlightId(state.selectedItemId);
             if (snapHighlightTimer.current) clearTimeout(snapHighlightTimer.current);
             snapHighlightTimer.current = setTimeout(() => setSnapHighlightId(null), 150);
           }
-          prevDidSnap.current = wallSnap.didSnap;
+          prevDidSnap.current = snapResult.didSnap;
           // Snap opening thickness to wall thickness
           const isOpening = furn.type === "door" || furn.type === "door_double" || furn.type === "window" || furn.type === "radiator";
-          if (isOpening && wallSnap.didSnap && wallSnap.snappedWallThickness != null && furn.height !== wallSnap.snappedWallThickness) {
-            onUpdateFurniture(state.selectedItemId, { height: wallSnap.snappedWallThickness });
+          if (isOpening && snapResult.didSnap && snapResult.snappedWallThickness != null && furn.height !== snapResult.snappedWallThickness) {
+            onUpdateFurniture(state.selectedItemId, { height: snapResult.snappedWallThickness });
           }
           return;
         }
@@ -1059,6 +1073,7 @@ export default function FloorPlanCanvas({
       if (isDragging) {
         onPushUndo();
         setWallSnapEdges([]);
+        setComponentSnapEdges([]);
         prevDidSnap.current = false;
       }
       setIsDragging(false);
@@ -1383,14 +1398,14 @@ export default function FloorPlanCanvas({
           x: gridSnapped.x - template.width / 2, y: gridSnapped.y - template.height / 2,
           width: template.width, height: template.height, rotation: 0, category: template.category,
         };
-        const wallSnap = snapFurnitureToWalls(tempItem, state.walls);
-        const snapped = wallSnap.didSnap
-          ? { x: wallSnap.x + template.width / 2, y: wallSnap.y + template.height / 2 }
+        const snapResult = snapFurnitureToNearest(tempItem, state.walls, state.furniture);
+        const snapped = snapResult.didSnap
+          ? { x: snapResult.x + template.width / 2, y: snapResult.y + template.height / 2 }
           : gridSnapped;
         // Snap opening thickness to wall thickness on drop
         const isOpening = template.type === "door" || template.type === "door_double" || template.type === "window" || template.type === "radiator";
-        if (isOpening && wallSnap.didSnap && wallSnap.snappedWallThickness != null) {
-          template = { ...template, height: wallSnap.snappedWallThickness };
+        if (isOpening && snapResult.didSnap && snapResult.snappedWallThickness != null) {
+          template = { ...template, height: snapResult.snappedWallThickness };
         }
         onDropFurniture(template, snapped);
       } catch {}
