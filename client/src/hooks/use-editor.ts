@@ -251,7 +251,7 @@ export function useEditor() {
       y: position.y,
       fontSize: 16,
     };
-    setState((s) => ({ ...s, labels: [...s.labels, label] }));
+    setState((s) => ({ ...s, labels: [...s.labels, label], selectedItemId: label.id, selectedTool: "select" }));
   }, [pushUndo]);
 
   const moveLabel = useCallback((id: string, x: number, y: number) => {
@@ -361,7 +361,7 @@ export function useEditor() {
       x: position.x - DEFAULT_TEXT_BOX.width / 2,
       y: position.y - DEFAULT_TEXT_BOX.height / 2,
     };
-    setState((s) => ({ ...s, textBoxes: [...s.textBoxes, textBox], selectedItemId: textBox.id }));
+    setState((s) => ({ ...s, textBoxes: [...s.textBoxes, textBox], selectedItemId: textBox.id, selectedTool: "select" }));
     return textBox.id;
   }, [pushUndo]);
 

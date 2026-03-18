@@ -1,5 +1,5 @@
 import { useRef, useEffect, useCallback, useState } from "react";
-import { EditorState, Point, FurnitureTemplate, FurnitureItem, RoomLabel, TextBox, Arrow, UnitSystem, MeasureMode } from "../lib/types";
+import { EditorState, Point, FurnitureTemplate, FurnitureItem, RoomLabel, TextBox, Arrow, UnitSystem, MeasureMode, EditorTool } from "../lib/types";
 import RichTextBoxComponent from "./RichTextBox";
 import {
   drawGrid,
@@ -86,6 +86,7 @@ interface FloorPlanCanvasProps {
   onUpdateArrow: (id: string, updates: Partial<Arrow>) => void;
   onRemoveArrow: (id: string) => void;
   onSetLabelOffset: (id: string, offset: { x: number; y: number }) => void;
+  onSetTool: (tool: EditorTool) => void;
   onSetRoomLabelOffset: (roomKey: string, offset: Point) => void;
 }
 
@@ -119,6 +120,7 @@ export default function FloorPlanCanvas({
   onUpdateArrow,
   onRemoveArrow,
   onSetLabelOffset,
+  onSetTool,
   onSetRoomLabelOffset,
 }: FloorPlanCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -806,6 +808,7 @@ export default function FloorPlanCanvas({
           // Second click: place the arrow
           onAddArrow(arrowDrawingStart, snapped);
           setArrowDrawingStart(null);
+          onSetTool("select");
         } else {
           // First click: start drawing
           setArrowDrawingStart(snapped);
@@ -1389,10 +1392,13 @@ export default function FloorPlanCanvas({
         onSetRoomName(editingLabel.roomKey, text);
       }
       setSelectedRoomKey(null);
+      onSetTool("select");
     } else if (editingLabel.isNew) {
-      // New freeform label
+      // New freeform label — addLabel atomically selects the new label + switches to select
       if (text) {
         onAddLabel(text, editingLabelWorldPos.current);
+      } else {
+        onSetTool("select");
       }
     } else if (editingLabel.id) {
       // Check if this is a furniture rename
@@ -1407,14 +1413,18 @@ export default function FloorPlanCanvas({
           onUpdateLabel(editingLabel.id, { text });
         }
       }
+      onSetTool("select");
+    } else {
+      onSetTool("select");
     }
     setEditingLabel({ id: null, x: 0, y: 0, text: "", isNew: false });
-  }, [editingLabel, onAddLabel, onUpdateLabel, onSetRoomName, onUpdateFurniture, state.furniture]);
+  }, [editingLabel, onAddLabel, onUpdateLabel, onSetRoomName, onUpdateFurniture, state.furniture, onSetTool]);
 
   const cancelLabel = useCallback(() => {
     setEditingLabel({ id: null, x: 0, y: 0, text: "", isNew: false });
     setSelectedRoomKey(null);
-  }, []);
+    onSetTool("select");
+  }, [onSetTool]);
 
   const handleLabelKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
