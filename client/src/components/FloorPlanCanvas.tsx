@@ -661,35 +661,6 @@ export default function FloorPlanCanvas({
           return;
         }
 
-        // Check component label drag (fallback)
-        if (state.componentLabelsVisible) {
-          const hitLabelItem = hitTestComponentLabel(pos.x, pos.y, componentLabelInfosRef.current);
-          if (hitLabelItem) {
-            // If component is already selected, drag just the label
-            if (state.selectedItemId === hitLabelItem.id) {
-              const currentOffset = hitLabelItem.labelOffset || { x: 0, y: 0 };
-              setIsDraggingLabel(true);
-              setDraggingLabelId(hitLabelItem.id);
-              setLabelDragStart({
-                x: pos.x,
-                y: pos.y,
-                offsetX: currentOffset.x,
-                offsetY: currentOffset.y,
-              });
-              return;
-            }
-            // If component not yet selected, move the whole component
-            const pxPerCm = (state.gridSize * state.zoom) / 100;
-            onSelectItem(hitLabelItem.id);
-            setIsDragging(true);
-            setDragItemOffset({
-              x: pos.x - (hitLabelItem.x * pxPerCm + state.panOffset.x),
-              y: pos.y - (hitLabelItem.y * pxPerCm + state.panOffset.y),
-            });
-            return;
-          }
-        }
-
         // Check arrow endpoint drag handles first for selected arrow
         const selectedArrow = state.arrows.find((a) => a.id === state.selectedItemId);
         if (selectedArrow) {
@@ -1019,8 +990,29 @@ export default function FloorPlanCanvas({
       // Handle component label dragging
       if (isDraggingLabel && draggingLabelId) {
         const pxPerCm = (state.gridSize * state.zoom) / 100;
-        const dxCm = (pos.x - labelDragStart.x) / pxPerCm;
-        const dyCm = (pos.y - labelDragStart.y) / pxPerCm;
+        let dxCm = (pos.x - labelDragStart.x) / pxPerCm;
+        let dyCm = (pos.y - labelDragStart.y) / pxPerCm;
+
+        // For inside labels, the offset is applied in the component's local (rotated) space,
+        // so counter-rotate the screen delta to match
+        const labelInfo = componentLabelInfosRef.current.find(
+          (info) => info.item.id === draggingLabelId
+        );
+        if (labelInfo?.isInside) {
+          if (labelInfo.item.rotation) {
+            const rad = -(labelInfo.item.rotation * Math.PI) / 180;
+            const cos = Math.cos(rad);
+            const sin = Math.sin(rad);
+            const rdx = dxCm * cos - dyCm * sin;
+            const rdy = dxCm * sin + dyCm * cos;
+            dxCm = rdx;
+            dyCm = rdy;
+          }
+          if (labelInfo.item.mirrored) {
+            dxCm = -dxCm;
+          }
+        }
+
         onSetLabelOffset(draggingLabelId, {
           x: labelDragStart.offsetX + dxCm,
           y: labelDragStart.offsetY + dyCm,
@@ -1166,6 +1158,9 @@ export default function FloorPlanCanvas({
         setComponentSnapEdges([]);
         prevDidSnap.current = false;
       }
+      if (isDraggingLabel) {
+        onPushUndo();
+      }
       setIsDragging(false);
       setIsPanning(false);
       setIsResizing(false);
@@ -1181,7 +1176,7 @@ export default function FloorPlanCanvas({
       setResizingLabelId(null);
       setLabelResizeStart(null);
     },
-    [isDragging, onPushUndo, state.selectedTool, state.gridSize, state.zoom, state.panOffset, state.walls, getCanvasPos, onAddWall, onSetWallDrawing, onSplitWallAndConnect]
+    [isDragging, isDraggingLabel, onPushUndo, state.selectedTool, state.gridSize, state.zoom, state.panOffset, state.walls, getCanvasPos, onAddWall, onSetWallDrawing, onSplitWallAndConnect]
   );
 
   const handleWheel = useCallback(

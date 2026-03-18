@@ -3968,8 +3968,21 @@ export function collectComponentLabelRects(
       labelX = centerX + outsideNormal.nx * offsetDist + offsetPx.x;
       labelY = centerY + outsideNormal.ny * offsetDist + offsetPx.y;
     } else if (isInside) {
-      labelX = centerX + offsetPx.x;
-      labelY = centerY + offsetPx.y;
+      // Offset is applied in the component's local (rotated) space during rendering,
+      // so transform it to screen space for correct hit-testing
+      let ox = offsetPx.x;
+      let oy = offsetPx.y;
+      if (item.mirrored) ox = -ox;
+      if (item.rotation) {
+        const rad = (item.rotation * Math.PI) / 180;
+        const cos = Math.cos(rad);
+        const sin = Math.sin(rad);
+        labelX = centerX + ox * cos - oy * sin;
+        labelY = centerY + ox * sin + oy * cos;
+      } else {
+        labelX = centerX + ox;
+        labelY = centerY + oy;
+      }
     } else {
       labelX = centerX + offsetPx.x;
       labelY = centerY + itemHeightPx / 2 + 14 * zoom + offsetPx.y;
