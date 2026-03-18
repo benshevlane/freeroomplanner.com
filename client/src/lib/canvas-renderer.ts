@@ -3269,15 +3269,34 @@ export function collectDistanceMeasurementRects(
 }
 
 /** Snap furniture position to wall edges. Returns adjusted {x, y} if a snap occurred. */
+export interface SnappedWallEdge {
+  wall: Wall;
+  axis: 'x' | 'y';
+  /** The world-cm coordinate of the wall edge that was snapped to */
+  edgeCoord: number;
+  /** Start/end of the wall edge segment (in the other axis) */
+  segStart: number;
+  segEnd: number;
+}
+
 export function snapFurnitureToWalls(
   item: FurnitureItem,
   walls: Wall[],
-  threshold: number = 12 // cm tolerance for snapping
-): { x: number; y: number; didSnap: boolean; snappedWallThickness?: number } {
+  threshold: number = 20 // cm tolerance for snapping
+): { x: number; y: number; didSnap: boolean; snappedWallThickness?: number; snappedEdges: SnappedWallEdge[] } {
   let { x, y } = item;
   let didSnap = false;
   let snappedWallThickness: number | undefined;
-  const bb = { left: x, right: x + item.width, top: y, bottom: y + item.height };
+  const snappedEdges: SnappedWallEdge[] = [];
+
+  // Use AABB for rotated items
+  const aabb = getFurnitureAABB(item);
+  const aabbW = aabb.maxX - aabb.minX;
+  const aabbH = aabb.maxY - aabb.minY;
+  // Offset from item.x/y to AABB min
+  const aabbOffX = aabb.minX - item.x;
+  const aabbOffY = aabb.minY - item.y;
+  const bb = { left: aabb.minX, right: aabb.maxX, top: aabb.minY, bottom: aabb.maxY };
 
   for (const wall of walls) {
     const ws = wall.start;
@@ -3299,37 +3318,37 @@ export function snapFurnitureToWalls(
       if (bb.right > wallMinX && bb.left < wallMaxX) {
         const wallTopEdge = wallY - halfThick;
         const wallBottomEdge = wallY + halfThick;
+        // Find closest Y edge to snap to (pick nearest)
+        const candidates: { dist: number; newY: number; edgeCoord: number }[] = [];
         // Snap furniture bottom to wall top edge
-        if (Math.abs(bb.bottom - wallTopEdge) < threshold) {
-          y = wallTopEdge - item.height;
-          didSnap = true; snappedWallThickness = wall.thickness;
-        }
+        const d1 = Math.abs(bb.bottom - wallTopEdge);
+        if (d1 < threshold) candidates.push({ dist: d1, newY: wallTopEdge - aabbH - aabbOffY, edgeCoord: wallTopEdge });
         // Snap furniture top to wall bottom edge
-        if (Math.abs(bb.top - wallBottomEdge) < threshold) {
-          y = wallBottomEdge;
-          didSnap = true; snappedWallThickness = wall.thickness;
-        }
+        const d2 = Math.abs(bb.top - wallBottomEdge);
+        if (d2 < threshold) candidates.push({ dist: d2, newY: wallBottomEdge - aabbOffY, edgeCoord: wallBottomEdge });
         // Snap furniture top to wall top edge
-        if (Math.abs(bb.top - wallTopEdge) < threshold) {
-          y = wallTopEdge;
-          didSnap = true; snappedWallThickness = wall.thickness;
-        }
+        const d3 = Math.abs(bb.top - wallTopEdge);
+        if (d3 < threshold) candidates.push({ dist: d3, newY: wallTopEdge - aabbOffY, edgeCoord: wallTopEdge });
         // Snap furniture bottom to wall bottom edge
-        if (Math.abs(bb.bottom - wallBottomEdge) < threshold) {
-          y = wallBottomEdge - item.height;
+        const d4 = Math.abs(bb.bottom - wallBottomEdge);
+        if (d4 < threshold) candidates.push({ dist: d4, newY: wallBottomEdge - aabbH - aabbOffY, edgeCoord: wallBottomEdge });
+        if (candidates.length > 0) {
+          candidates.sort((a, b) => a.dist - b.dist);
+          y = candidates[0].newY;
           didSnap = true; snappedWallThickness = wall.thickness;
+          snappedEdges.push({ wall, axis: 'y', edgeCoord: candidates[0].edgeCoord, segStart: wallMinX, segEnd: wallMaxX });
         }
       }
       // Snap furniture edges to wall endpoints (horizontal alignment)
       if (bb.bottom > wallY - halfThick - threshold && bb.top < wallY + halfThick + threshold) {
         // Left edge to wall left end
         if (Math.abs(bb.left - wallMinX) < threshold) {
-          x = wallMinX;
+          x = wallMinX - aabbOffX;
           didSnap = true; snappedWallThickness = wall.thickness;
         }
         // Right edge to wall right end
         if (Math.abs(bb.right - wallMaxX) < threshold) {
-          x = wallMaxX - item.width;
+          x = wallMaxX - aabbW - aabbOffX;
           didSnap = true; snappedWallThickness = wall.thickness;
         }
       }
@@ -3343,44 +3362,110 @@ export function snapFurnitureToWalls(
       if (bb.bottom > wallMinY && bb.top < wallMaxY) {
         const wallLeftEdge = wallX - halfThick;
         const wallRightEdge = wallX + halfThick;
+        // Find closest X edge to snap to (pick nearest)
+        const candidates: { dist: number; newX: number; edgeCoord: number }[] = [];
         // Snap furniture right to wall left edge
-        if (Math.abs(bb.right - wallLeftEdge) < threshold) {
-          x = wallLeftEdge - item.width;
-          didSnap = true; snappedWallThickness = wall.thickness;
-        }
+        const d1 = Math.abs(bb.right - wallLeftEdge);
+        if (d1 < threshold) candidates.push({ dist: d1, newX: wallLeftEdge - aabbW - aabbOffX, edgeCoord: wallLeftEdge });
         // Snap furniture left to wall right edge
-        if (Math.abs(bb.left - wallRightEdge) < threshold) {
-          x = wallRightEdge;
-          didSnap = true; snappedWallThickness = wall.thickness;
-        }
+        const d2 = Math.abs(bb.left - wallRightEdge);
+        if (d2 < threshold) candidates.push({ dist: d2, newX: wallRightEdge - aabbOffX, edgeCoord: wallRightEdge });
         // Snap furniture left to wall left edge
-        if (Math.abs(bb.left - wallLeftEdge) < threshold) {
-          x = wallLeftEdge;
-          didSnap = true; snappedWallThickness = wall.thickness;
-        }
+        const d3 = Math.abs(bb.left - wallLeftEdge);
+        if (d3 < threshold) candidates.push({ dist: d3, newX: wallLeftEdge - aabbOffX, edgeCoord: wallLeftEdge });
         // Snap furniture right to wall right edge
-        if (Math.abs(bb.right - wallRightEdge) < threshold) {
-          x = wallRightEdge - item.width;
+        const d4 = Math.abs(bb.right - wallRightEdge);
+        if (d4 < threshold) candidates.push({ dist: d4, newX: wallRightEdge - aabbW - aabbOffX, edgeCoord: wallRightEdge });
+        if (candidates.length > 0) {
+          candidates.sort((a, b) => a.dist - b.dist);
+          x = candidates[0].newX;
           didSnap = true; snappedWallThickness = wall.thickness;
+          snappedEdges.push({ wall, axis: 'x', edgeCoord: candidates[0].edgeCoord, segStart: wallMinY, segEnd: wallMaxY });
         }
       }
       // Snap furniture edges to wall endpoints (vertical alignment)
       if (bb.right > wallX - halfThick - threshold && bb.left < wallX + halfThick + threshold) {
         // Top edge to wall top end
         if (Math.abs(bb.top - wallMinY) < threshold) {
-          y = wallMinY;
+          y = wallMinY - aabbOffY;
           didSnap = true; snappedWallThickness = wall.thickness;
         }
         // Bottom edge to wall bottom end
         if (Math.abs(bb.bottom - wallMaxY) < threshold) {
-          y = wallMaxY - item.height;
+          y = wallMaxY - aabbH - aabbOffY;
           didSnap = true; snappedWallThickness = wall.thickness;
         }
       }
     }
   }
 
-  return { x, y, didSnap, snappedWallThickness };
+  return { x, y, didSnap, snappedWallThickness, snappedEdges };
+}
+
+/** Draw dashed teal indicator lines along wall edges that an item is snapping to */
+export function drawWallSnapIndicators(
+  ctx: CanvasRenderingContext2D,
+  snappedEdges: SnappedWallEdge[],
+  gridSize: number,
+  zoom: number,
+  panOffset: Point
+) {
+  if (snappedEdges.length === 0) return;
+  const pxPerCm = (gridSize * zoom) / 100;
+
+  ctx.save();
+  ctx.strokeStyle = "#1a7a5e";
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([6, 4]);
+  ctx.globalAlpha = 0.6;
+
+  for (const edge of snappedEdges) {
+    ctx.beginPath();
+    if (edge.axis === 'y') {
+      // Horizontal wall edge — draw horizontal line
+      const px1 = edge.segStart * pxPerCm + panOffset.x;
+      const px2 = edge.segEnd * pxPerCm + panOffset.x;
+      const py = edge.edgeCoord * pxPerCm + panOffset.y;
+      ctx.moveTo(px1, py);
+      ctx.lineTo(px2, py);
+    } else {
+      // Vertical wall edge — draw vertical line
+      const px = edge.edgeCoord * pxPerCm + panOffset.x;
+      const py1 = edge.segStart * pxPerCm + panOffset.y;
+      const py2 = edge.segEnd * pxPerCm + panOffset.y;
+      ctx.moveTo(px, py1);
+      ctx.lineTo(px, py2);
+    }
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+/** Draw a snap landing highlight (brief teal glow) on a furniture item */
+export function drawSnapHighlight(
+  ctx: CanvasRenderingContext2D,
+  item: FurnitureItem,
+  gridSize: number,
+  zoom: number,
+  panOffset: Point
+) {
+  const pxPerCm = (gridSize * zoom) / 100;
+  const x = item.x * pxPerCm + panOffset.x;
+  const y = item.y * pxPerCm + panOffset.y;
+  const w = item.width * pxPerCm;
+  const h = item.height * pxPerCm;
+
+  ctx.save();
+  ctx.translate(x + w / 2, y + h / 2);
+  ctx.rotate((item.rotation * Math.PI) / 180);
+
+  ctx.strokeStyle = "#1a7a5e";
+  ctx.lineWidth = 2.5;
+  ctx.globalAlpha = 0.7;
+  ctx.strokeRect(-w / 2, -h / 2, w, h);
+
+  ctx.restore();
 }
 
 /** Draw eraser hover highlight on the item that will be deleted */
