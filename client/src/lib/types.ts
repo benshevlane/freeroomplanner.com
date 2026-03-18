@@ -28,6 +28,9 @@ export interface FurnitureItem {
   mirrored?: boolean; // horizontally flipped (for mirrorable items like L-Shape Sofa)
   labelOffset?: { x: number; y: number }; // offset in cm from default label position
   labelInside?: boolean; // true = render label inside rect, false = below
+  labelRotation?: number; // degrees, independent rotation for the component label
+  labelWidth?: number;    // px override for auto-computed label pill width
+  labelHeight?: number;   // px override for auto-computed label pill height
 }
 
 export type LabelSize = "small" | "medium" | "large";

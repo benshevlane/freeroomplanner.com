@@ -3887,6 +3887,7 @@ export interface ComponentLabelInfo {
   isSelected: boolean;
   nameColor: string;
   isInside: boolean;
+  labelRotation: number; // degrees
 }
 
 /** Measure component labels without drawing — returns info needed for deferred rendering */
@@ -3922,16 +3923,31 @@ export function collectComponentLabelRects(
     const displayName = item.customName || item.label;
     const dimText = `${item.width} \u00D7 ${item.height} cm`;
 
-    const nameFontSize = Math.max(9, 11 * zoom);
-    const dimFontSize = Math.max(8, 9 * zoom);
+    const labelRotation = item.labelRotation ?? 0;
+
+    // When custom label size is set, derive font sizes from width
+    const hasCustomSize = item.labelWidth != null;
+    let nameFontSize: number;
+    let dimFontSize: number;
+    if (hasCustomSize) {
+      const charCount = Math.max(1, displayName.length);
+      nameFontSize = Math.min(24, Math.max(8, (item.labelWidth! / charCount) * 1.5));
+      dimFontSize = Math.max(7, nameFontSize * 0.8);
+    } else {
+      nameFontSize = Math.max(9, 11 * zoom);
+      dimFontSize = Math.max(8, 9 * zoom);
+    }
 
     ctx.font = `${isSelected ? "600" : "500"} ${nameFontSize}px 'General Sans', 'DM Sans', sans-serif`;
     const nameWidth = ctx.measureText(displayName).width;
     ctx.font = `400 ${dimFontSize}px 'General Sans', 'DM Sans', sans-serif`;
     const dimWidth = ctx.measureText(dimText).width;
     const maxWidth = Math.max(nameWidth, dimWidth);
-    const pillW = maxWidth + 10;
-    const pillH = nameFontSize + dimFontSize + 8;
+    const autoPillW = maxWidth + 10;
+    const autoPillH = nameFontSize + dimFontSize + 8;
+    // Use custom label dimensions if set, otherwise use auto-computed
+    const pillW = item.labelWidth ?? autoPillW;
+    const pillH = item.labelHeight ?? autoPillH;
 
     // Check if label fits inside the component
     const isLabelInsideType = item.labelInside ?? LABEL_INSIDE_TYPES.has(item.type);
@@ -3966,6 +3982,7 @@ export function collectComponentLabelRects(
     results.push({
       item, centerX: labelX, labelY, displayName, dimText,
       nameFontSize, dimFontSize, pillW, pillH, isSelected, nameColor, isInside,
+      labelRotation,
     });
   }
 
@@ -4000,6 +4017,16 @@ function drawInsideComponentLabel(
   if (rotation) ctx.rotate(rotation);
   if (item.mirrored) ctx.scale(-1, 1); // counter-mirror so text reads normally
 
+  // Apply label-specific rotation on top of component rotation
+  const labelRot = info.labelRotation;
+  if (labelRot) {
+    const lrx = offsetPx.x;
+    const lry = offsetPx.y;
+    ctx.translate(lrx, lry);
+    ctx.rotate((labelRot * Math.PI) / 180);
+    ctx.translate(-lrx, -lry);
+  }
+
   const totalTextH = info.nameFontSize + info.dimFontSize + 2;
   const nameY = -totalTextH / 2 + offsetPx.y;
   const labelX = offsetPx.x;
@@ -4031,14 +4058,151 @@ export function hitTestComponentLabel(
     const ly = info.labelY;
     const halfW = info.pillW / 2 + 4;
     const halfH = info.pillH / 2 + 4;
+
+    // When label is rotated, transform the test point into the label's local (unrotated) space
+    let testX = screenX;
+    let testY = screenY;
+    if (info.labelRotation) {
+      // Label center (pill center)
+      const cx = lx;
+      const cy = ly + info.pillH / 2 - 2;
+      const angle = -(info.labelRotation * Math.PI) / 180;
+      const dx = screenX - cx;
+      const dy = screenY - cy;
+      testX = cx + dx * Math.cos(angle) - dy * Math.sin(angle);
+      testY = cy + dx * Math.sin(angle) + dy * Math.cos(angle);
+    }
+
     if (
-      screenX >= lx - halfW && screenX <= lx + halfW &&
-      screenY >= ly - halfH && screenY <= ly + halfH
+      testX >= lx - halfW && testX <= lx + halfW &&
+      testY >= ly - halfH && testY <= ly + halfH
     ) {
       return info.item;
     }
   }
   return null;
+}
+
+/** Draw rotate and resize handles for a selected component label */
+export function drawLabelHandles(
+  ctx: CanvasRenderingContext2D,
+  info: ComponentLabelInfo
+) {
+  if (!info.isSelected) return;
+
+  const lx = info.centerX;
+  const ly = info.labelY;
+  const pillW = info.pillW;
+  const pillH = info.pillH;
+  // Label center
+  const cx = lx;
+  const cy = ly + pillH / 2 - 2;
+
+  ctx.save();
+  ctx.translate(cx, cy);
+  if (info.labelRotation) ctx.rotate((info.labelRotation * Math.PI) / 180);
+
+  // --- Rotate handle: circle above top-right corner ---
+  const rotHandleDist = 20;
+  const rhx = pillW / 2;
+  const rhy = -pillH / 2 - rotHandleDist;
+
+  // Line from top-right to handle
+  ctx.beginPath();
+  ctx.strokeStyle = "#01696f";
+  ctx.lineWidth = 1.5;
+  ctx.moveTo(pillW / 2, -pillH / 2);
+  ctx.lineTo(rhx, rhy);
+  ctx.stroke();
+
+  // Circle handle
+  ctx.beginPath();
+  ctx.arc(rhx, rhy, 7, 0, Math.PI * 2);
+  ctx.fillStyle = "#01696f";
+  ctx.fill();
+  ctx.strokeStyle = "#ffffff";
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // Rotation arrow icon inside
+  ctx.beginPath();
+  ctx.arc(rhx, rhy, 4, -Math.PI * 0.8, Math.PI * 0.4);
+  ctx.strokeStyle = "#ffffff";
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  // Arrowhead
+  const arrowAngle = Math.PI * 0.4;
+  const ax = 4 * Math.cos(arrowAngle);
+  const ay = 4 * Math.sin(arrowAngle);
+  ctx.beginPath();
+  ctx.moveTo(rhx + ax, rhy + ay);
+  ctx.lineTo(rhx + ax + 3, rhy + ay - 2);
+  ctx.moveTo(rhx + ax, rhy + ay);
+  ctx.lineTo(rhx + ax - 1, rhy + ay - 3);
+  ctx.stroke();
+
+  // --- Resize handle: small square at bottom-right corner ---
+  const handleSize = 8;
+  const rsx = pillW / 2;
+  const rsy = pillH / 2;
+  ctx.fillStyle = "#01696f";
+  ctx.fillRect(rsx - handleSize / 2, rsy - handleSize / 2, handleSize, handleSize);
+  ctx.strokeStyle = "#ffffff";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(rsx - handleSize / 2, rsy - handleSize / 2, handleSize, handleSize);
+
+  ctx.restore();
+}
+
+/** Hit-test the rotation handle of a selected component label */
+export function hitTestLabelRotateHandle(
+  screenX: number,
+  screenY: number,
+  info: ComponentLabelInfo
+): boolean {
+  if (!info.isSelected) return false;
+
+  const cx = info.centerX;
+  const cy = info.labelY + info.pillH / 2 - 2;
+  const rotHandleDist = 20;
+
+  // Handle position in local label space
+  const lhx = info.pillW / 2;
+  const lhy = -info.pillH / 2 - rotHandleDist;
+
+  // Transform to screen space using label rotation
+  const angle = (info.labelRotation * Math.PI) / 180;
+  const shx = cx + lhx * Math.cos(angle) - lhy * Math.sin(angle);
+  const shy = cy + lhx * Math.sin(angle) + lhy * Math.cos(angle);
+
+  const dx = screenX - shx;
+  const dy = screenY - shy;
+  return Math.sqrt(dx * dx + dy * dy) <= 14;
+}
+
+/** Hit-test the resize handle (bottom-right corner) of a selected component label */
+export function hitTestLabelResizeHandle(
+  screenX: number,
+  screenY: number,
+  info: ComponentLabelInfo
+): boolean {
+  if (!info.isSelected) return false;
+
+  const cx = info.centerX;
+  const cy = info.labelY + info.pillH / 2 - 2;
+
+  // Resize handle in local label space: bottom-right
+  const lhx = info.pillW / 2;
+  const lhy = info.pillH / 2;
+
+  // Transform to screen space
+  const angle = (info.labelRotation * Math.PI) / 180;
+  const shx = cx + lhx * Math.cos(angle) - lhy * Math.sin(angle);
+  const shy = cy + lhx * Math.sin(angle) + lhy * Math.cos(angle);
+
+  const dx = screenX - shx;
+  const dy = screenY - shy;
+  return Math.sqrt(dx * dx + dy * dy) <= 10;
 }
 
 /** Draw a single component label at a given position */
@@ -4049,7 +4213,18 @@ function drawSingleComponentLabel(
   drawY: number,
   isDark: boolean
 ) {
-  const { displayName, dimText, nameFontSize, dimFontSize, pillW, pillH, isSelected, nameColor } = info;
+  const { displayName, dimText, nameFontSize, dimFontSize, pillW, pillH, isSelected, nameColor, labelRotation } = info;
+
+  // Label center is at (drawX, drawY + pillH/2 - 2) since pillY = drawY - 2
+  const labelCenterX = drawX;
+  const labelCenterY = drawY + pillH / 2 - 2;
+
+  ctx.save();
+  if (labelRotation) {
+    ctx.translate(labelCenterX, labelCenterY);
+    ctx.rotate((labelRotation * Math.PI) / 180);
+    ctx.translate(-labelCenterX, -labelCenterY);
+  }
 
   // Background pill
   const pillX = drawX - pillW / 2;
@@ -4080,6 +4255,8 @@ function drawSingleComponentLabel(
   ctx.font = `400 ${dimFontSize}px 'General Sans', 'DM Sans', sans-serif`;
   ctx.fillStyle = isDark ? "rgba(121, 120, 118, 0.8)" : "rgba(122, 121, 116, 0.7)";
   ctx.fillText(dimText, drawX, drawY + nameFontSize + 2);
+
+  ctx.restore();
 }
 
 /** Draw a single freeform label at a given position */
@@ -4283,6 +4460,13 @@ export function resolveAndDrawLabelCollisions(
     for (const info of componentLabelInfos) {
       if (info.isInside) {
         drawInsideComponentLabel(ctx, info, pxPerCm, panOffset, isDark, zoom);
+      }
+    }
+
+    // Draw rotate/resize handles for selected component labels
+    for (const info of componentLabelInfos) {
+      if (info.isSelected) {
+        drawLabelHandles(ctx, info);
       }
     }
   }

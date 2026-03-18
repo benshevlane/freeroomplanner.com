@@ -48,6 +48,8 @@ import {
   hitTestArrow,
   hitTestArrowEndpoint,
   hitTestComponentLabel,
+  hitTestLabelRotateHandle,
+  hitTestLabelResizeHandle,
   ComponentLabelInfo,
 } from "../lib/canvas-renderer";
 import { isWallCupboard } from "../lib/types";
@@ -136,6 +138,19 @@ export default function FloorPlanCanvas({
   const [draggingLabelId, setDraggingLabelId] = useState<string | null>(null);
   const [labelDragStart, setLabelDragStart] = useState<{ x: number; y: number; offsetX: number; offsetY: number }>({ x: 0, y: 0, offsetX: 0, offsetY: 0 });
   const componentLabelInfosRef = useRef<ComponentLabelInfo[]>([]);
+
+  // Label rotate/resize state
+  const [isRotatingLabel, setIsRotatingLabel] = useState(false);
+  const [labelRotateStartAngle, setLabelRotateStartAngle] = useState(0);
+  const [labelRotateItemStartRot, setLabelRotateItemStartRot] = useState(0);
+  const [rotatingLabelId, setRotatingLabelId] = useState<string | null>(null);
+  const [isResizingLabel, setIsResizingLabel] = useState(false);
+  const [resizingLabelId, setResizingLabelId] = useState<string | null>(null);
+  const [labelResizeStart, setLabelResizeStart] = useState<{
+    x: number; y: number;
+    labelW: number; labelH: number;
+    labelRotation: number;
+  } | null>(null);
 
   // Wall snap indicator state (transient, only during drag)
   const [wallSnapEdges, setWallSnapEdges] = useState<SnappedWallEdge[]>([]);
@@ -557,6 +572,41 @@ export default function FloorPlanCanvas({
           }
         }
 
+        // Try to hit test label rotate/resize handles first (before label drag)
+        if (state.componentLabelsVisible && state.selectedItemId) {
+          const selectedLabelInfo = componentLabelInfosRef.current.find(
+            (info) => info.item.id === state.selectedItemId && info.isSelected
+          );
+          if (selectedLabelInfo) {
+            // Rotate handle
+            if (hitTestLabelRotateHandle(pos.x, pos.y, selectedLabelInfo)) {
+              const cx = selectedLabelInfo.centerX;
+              const cy = selectedLabelInfo.labelY + selectedLabelInfo.pillH / 2 - 2;
+              const startAngle = Math.atan2(pos.y - cy, pos.x - cx);
+              setIsRotatingLabel(true);
+              setRotatingLabelId(state.selectedItemId);
+              setLabelRotateStartAngle(startAngle);
+              setLabelRotateItemStartRot(selectedLabelInfo.labelRotation);
+              onPushUndo();
+              return;
+            }
+            // Resize handle
+            if (hitTestLabelResizeHandle(pos.x, pos.y, selectedLabelInfo)) {
+              setIsResizingLabel(true);
+              setResizingLabelId(state.selectedItemId);
+              setLabelResizeStart({
+                x: pos.x,
+                y: pos.y,
+                labelW: selectedLabelInfo.pillW,
+                labelH: selectedLabelInfo.pillH,
+                labelRotation: selectedLabelInfo.labelRotation,
+              });
+              onPushUndo();
+              return;
+            }
+          }
+        }
+
         // Try to hit test component labels first (so label drag takes priority over item drag)
         if (state.componentLabelsVisible) {
           const hitLabelItem = hitTestComponentLabel(pos.x, pos.y, componentLabelInfosRef.current);
@@ -818,6 +868,46 @@ export default function FloorPlanCanvas({
         return;
       }
 
+      // Handle label rotation
+      if (isRotatingLabel && rotatingLabelId) {
+        const labelInfo = componentLabelInfosRef.current.find(
+          (info) => info.item.id === rotatingLabelId
+        );
+        if (labelInfo) {
+          const cx = labelInfo.centerX;
+          const cy = labelInfo.labelY + labelInfo.pillH / 2 - 2;
+          const currentAngle = Math.atan2(pos.y - cy, pos.x - cx);
+          let deltaDeg = ((currentAngle - labelRotateStartAngle) * 180) / Math.PI;
+          let newRot = labelRotateItemStartRot + deltaDeg;
+          // Snap to 15° increments when within 3° threshold
+          const snapDeg = 15;
+          const nearestSnap = Math.round(newRot / snapDeg) * snapDeg;
+          if (Math.abs(newRot - nearestSnap) < 3) newRot = nearestSnap;
+          newRot = ((newRot % 360) + 360) % 360;
+          onUpdateFurniture(rotatingLabelId, { labelRotation: Math.round(newRot) });
+        }
+        return;
+      }
+
+      // Handle label resize
+      if (isResizingLabel && resizingLabelId && labelResizeStart) {
+        const dxPx = pos.x - labelResizeStart.x;
+        const dyPx = pos.y - labelResizeStart.y;
+
+        // Transform to label's local space using label rotation
+        const rotRad = (labelResizeStart.labelRotation * Math.PI) / 180;
+        const cosR = Math.cos(rotRad);
+        const sinR = Math.sin(rotRad);
+        const localDx = dxPx * cosR + dyPx * sinR;
+        const localDy = -dxPx * sinR + dyPx * cosR;
+
+        // Apply with minimum size constraint (60×20px)
+        const newW = Math.max(60, labelResizeStart.labelW + localDx);
+        const newH = Math.max(20, labelResizeStart.labelH + localDy);
+        onUpdateFurniture(resizingLabelId, { labelWidth: newW, labelHeight: newH });
+        return;
+      }
+
       // Handle free rotation
       if (isRotating && state.selectedItemId) {
         const furn = state.furniture.find((f) => f.id === state.selectedItemId);
@@ -1015,7 +1105,7 @@ export default function FloorPlanCanvas({
         setEraserHoverId(null);
       }
     },
-    [state, isPanning, isDragging, isDraggingLabel, draggingLabelId, labelDragStart, isResizing, isRotating, rotateStartAngle, rotateItemStartRot, resizeStart, resizeCorner, dragStart, dragItemOffset, eraserHoverId, arrowDraggingEndpoint, getCanvasPos, onSetPan, onSetZoom, onMoveFurniture, onMoveLabel, onUpdateFurniture, onUpdateArrow, onSetLabelOffset]
+    [state, isPanning, isDragging, isDraggingLabel, draggingLabelId, labelDragStart, isResizing, isRotating, rotateStartAngle, rotateItemStartRot, resizeStart, resizeCorner, dragStart, dragItemOffset, eraserHoverId, arrowDraggingEndpoint, isRotatingLabel, rotatingLabelId, labelRotateStartAngle, labelRotateItemStartRot, isResizingLabel, resizingLabelId, labelResizeStart, getCanvasPos, onSetPan, onSetZoom, onMoveFurniture, onMoveLabel, onUpdateFurniture, onUpdateArrow, onSetLabelOffset]
   );
 
   const handlePointerUp = useCallback(
@@ -1085,6 +1175,11 @@ export default function FloorPlanCanvas({
       setArrowDraggingEndpoint(null);
       setIsDraggingLabel(false);
       setDraggingLabelId(null);
+      setIsRotatingLabel(false);
+      setRotatingLabelId(null);
+      setIsResizingLabel(false);
+      setResizingLabelId(null);
+      setLabelResizeStart(null);
     },
     [isDragging, onPushUndo, state.selectedTool, state.gridSize, state.zoom, state.panOffset, state.walls, getCanvasPos, onAddWall, onSetWallDrawing, onSplitWallAndConnect]
   );
@@ -1172,9 +1267,11 @@ export default function FloorPlanCanvas({
           const hitLabelItem = hitTestComponentLabel(pos.x, pos.y, componentLabelInfosRef.current);
           if (hitLabelItem) {
             const hasOffset = hitLabelItem.labelOffset && (hitLabelItem.labelOffset.x !== 0 || hitLabelItem.labelOffset.y !== 0);
-            if (hasOffset) {
-              // Reset label to default position
+            const hasCustomLabel = hitLabelItem.labelRotation || hitLabelItem.labelWidth || hitLabelItem.labelHeight;
+            if (hasOffset || hasCustomLabel) {
+              // Reset label to default position, rotation, and size
               onSetLabelOffset(hitLabelItem.id, { x: 0, y: 0 });
+              onUpdateFurniture(hitLabelItem.id, { labelRotation: undefined, labelWidth: undefined, labelHeight: undefined });
               return;
             }
             // If no offset, fall through to rename behavior
@@ -1458,6 +1555,8 @@ export default function FloorPlanCanvas({
 
   const cursorStyle = (() => {
     if (isPanning) return "grabbing";
+    if (isRotatingLabel) return "grab";
+    if (isResizingLabel) return "nwse-resize";
     if (isRotating) return "grab";
     if (isResizing) {
       if (resizeCorner === "t" || resizeCorner === "b") return "ns-resize";
