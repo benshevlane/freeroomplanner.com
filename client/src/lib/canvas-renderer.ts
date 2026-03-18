@@ -2864,6 +2864,82 @@ export function drawDistanceMeasurements(
   ctx.restore();
 }
 
+/** Rect info for a distance measurement label, used for collision avoidance */
+export interface DistanceMeasurementLabelInfo {
+  centerX: number;
+  centerY: number;
+  halfW: number;
+  halfH: number;
+}
+
+/** Collect distance measurement label rects without drawing — returns positions for collision detection */
+export function collectDistanceMeasurementRects(
+  ctx: CanvasRenderingContext2D,
+  selectedItem: FurnitureItem,
+  walls: Wall[],
+  furniture: FurnitureItem[],
+  gridSize: number,
+  zoom: number,
+  panOffset: Point,
+  isDark: boolean,
+  units: UnitSystem = "m"
+): DistanceMeasurementLabelInfo[] {
+  const pxPerCm = (gridSize * zoom) / 100;
+  const results: DistanceMeasurementLabelInfo[] = [];
+  const pad = 3;
+  const fontSize = Math.max(10, 11 * zoom);
+  ctx.font = `500 ${fontSize}px 'General Sans', 'DM Sans', sans-serif`;
+
+  // For doors/windows on a wall, compute along-wall distance label positions
+  if (selectedItem.type === "door" || selectedItem.type === "window") {
+    const hostWall = findHostWall(selectedItem, walls);
+    if (hostWall) {
+      const alongDists = computeAlongWallDistances(selectedItem, hostWall);
+      for (const d of alongDists) {
+        const sx = d.furnitureEdgePt.x * pxPerCm + panOffset.x;
+        const sy = d.furnitureEdgePt.y * pxPerCm + panOffset.y;
+        const ex = d.wallPt.x * pxPerCm + panOffset.x;
+        const ey = d.wallPt.y * pxPerCm + panOffset.y;
+        const text = formatLength(d.dist, units);
+        const textW = ctx.measureText(text).width;
+        results.push({
+          centerX: (sx + ex) / 2,
+          centerY: (sy + ey) / 2,
+          halfW: textW / 2 + pad,
+          halfH: fontSize / 2 + pad,
+        });
+      }
+      return results;
+    }
+  }
+
+  // Regular furniture: perpendicular distances to walls/furniture
+  const wallDists = computeEdgeToWallDistances(selectedItem, walls);
+  const furnDists = computeFurnitureToFurnitureDistances(selectedItem, furniture);
+  const allDists = [...wallDists, ...furnDists.map(d => ({ dist: d.dist, furnitureEdgePt: d.fromPt, wallPt: d.toPt, axis: d.axis }))];
+
+  const hDists = allDists.filter(d => d.axis === "h").sort((a, b) => a.dist - b.dist).slice(0, 1);
+  const vDists = allDists.filter(d => d.axis === "v").sort((a, b) => a.dist - b.dist).slice(0, 1);
+  const toDraw = [...hDists, ...vDists];
+
+  for (const d of toDraw) {
+    const sx = d.furnitureEdgePt.x * pxPerCm + panOffset.x;
+    const sy = d.furnitureEdgePt.y * pxPerCm + panOffset.y;
+    const ex = d.wallPt.x * pxPerCm + panOffset.x;
+    const ey = d.wallPt.y * pxPerCm + panOffset.y;
+    const text = formatLength(d.dist, units);
+    const textW = ctx.measureText(text).width;
+    results.push({
+      centerX: (sx + ex) / 2,
+      centerY: (sy + ey) / 2,
+      halfW: textW / 2 + pad,
+      halfH: fontSize / 2 + pad,
+    });
+  }
+
+  return results;
+}
+
 /** Snap furniture position to wall edges. Returns adjusted {x, y} if a snap occurred. */
 export function snapFurnitureToWalls(
   item: FurnitureItem,
@@ -3267,7 +3343,8 @@ export function resolveAndDrawLabelCollisions(
   roomNames: Record<string, string>,
   componentLabelsVisible: boolean,
   selectedId: string | null,
-  labelPositions: Map<string, Point> = new Map()
+  labelPositions: Map<string, Point> = new Map(),
+  distanceMeasurementRects: DistanceMeasurementLabelInfo[] = []
 ): void {
   // Collect all label rects with priority
   const allRects: LabelRect[] = [];
@@ -3288,6 +3365,14 @@ export function resolveAndDrawLabelCollisions(
     allRects.push({
       x: cx, y: cy, w: nameW / 2 + 4, h: totalH / 2 + 2,
       priority: 0, anchorX: cx, anchorY: cy, sourceIndex: -1,
+    });
+  }
+
+  // Distance measurement labels (priority 1) — immovable anchors, already drawn by drawDistanceMeasurements
+  for (const dm of distanceMeasurementRects) {
+    allRects.push({
+      x: dm.centerX, y: dm.centerY, w: dm.halfW, h: dm.halfH,
+      priority: 1, anchorX: dm.centerX, anchorY: dm.centerY, sourceIndex: -1,
     });
   }
 

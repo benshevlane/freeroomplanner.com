@@ -13,6 +13,7 @@ import {
   drawSnapIndicator,
   drawAlignmentGuides,
   drawDistanceMeasurements,
+  collectDistanceMeasurementRects,
   drawEraserHighlight,
   collectComponentLabelRects,
   resolveAndDrawLabelCollisions,
@@ -294,9 +295,11 @@ export default function FloorPlanCanvas({
 
     // Resize handles and distance measurements for selected furniture
     const selectedFurn = state.furniture.find((f) => f.id === state.selectedItemId);
+    let distanceMeasurementRects: { centerX: number; centerY: number; halfW: number; halfH: number }[] = [];
     if (selectedFurn && state.selectedTool === "select") {
       drawResizeHandles(ctx, selectedFurn, state.gridSize, state.zoom, state.panOffset);
       drawDistanceMeasurements(ctx, selectedFurn, state.walls, state.furniture, state.gridSize, state.zoom, state.panOffset, isDark, state.units);
+      distanceMeasurementRects = collectDistanceMeasurementRects(ctx, selectedFurn, state.walls, state.furniture, state.gridSize, state.zoom, state.panOffset, isDark, state.units);
     }
 
     // Resolve label collisions and draw all labels (component + freeform) at resolved positions
@@ -304,7 +307,7 @@ export default function FloorPlanCanvas({
       ctx, rooms, state.walls, componentLabelInfos, state.labels,
       state.gridSize, state.zoom, state.panOffset, isDark,
       state.roomNames, state.componentLabelsVisible, state.selectedItemId,
-      roomLabelPositions
+      roomLabelPositions, distanceMeasurementRects
     );
 
     // Arrows
