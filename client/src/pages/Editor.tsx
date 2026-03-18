@@ -695,6 +695,7 @@ export default function Editor() {
           onUpdateArrow={editor.updateArrow}
           onRemoveArrow={editor.removeArrow}
           onSetLabelOffset={editor.setLabelOffset}
+          onSetRoomLabelOffset={editor.setRoomLabelOffset}
         />
 
         {/* Desktop: Properties sidebar */}

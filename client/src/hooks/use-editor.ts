@@ -28,6 +28,7 @@ function saveStateToStorage(state: EditorState): void {
       textBoxes: state.textBoxes,
       arrows: state.arrows,
       roomNames: state.roomNames,
+      roomLabelOffsets: state.roomLabelOffsets,
       componentLabelsVisible: state.componentLabelsVisible,
     };
     localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(data));
@@ -50,6 +51,7 @@ function deepCopyState(s: EditorState): EditorState {
     textBoxes: s.textBoxes.map(t => ({ ...t })),
     arrows: s.arrows.map(a => ({ ...a })),
     roomNames: { ...s.roomNames },
+    roomLabelOffsets: { ...s.roomLabelOffsets },
     panOffset: { ...s.panOffset },
   };
 }
@@ -79,6 +81,7 @@ const DEFAULT_STATE: EditorState = {
   roomName: "My Room",
   units: "m" as UnitSystem,
   roomNames: {},
+  roomLabelOffsets: {},
   componentLabelsVisible: true,
 };
 
@@ -98,6 +101,7 @@ function getInitialState(): EditorState {
     textBoxes: saved.textBoxes ?? [],
     arrows: saved.arrows ?? [],
     roomNames: saved.roomNames ?? {},
+    roomLabelOffsets: saved.roomLabelOffsets ?? {},
     componentLabelsVisible: saved.componentLabelsVisible ?? true,
   };
 }
@@ -422,6 +426,13 @@ export function useEditor() {
     }));
   }, [pushUndo]);
 
+  const setRoomLabelOffset = useCallback((roomKey: string, offset: Point) => {
+    setState((s) => ({
+      ...s,
+      roomLabelOffsets: { ...s.roomLabelOffsets, [roomKey]: offset },
+    }));
+  }, []);
+
   const toggleComponentLabels = useCallback(() => {
     setState((s) => ({ ...s, componentLabelsVisible: !s.componentLabelsVisible }));
   }, []);
@@ -436,9 +447,10 @@ export function useEditor() {
       textBoxes: state.textBoxes,
       arrows: state.arrows,
       roomNames: state.roomNames,
+      roomLabelOffsets: state.roomLabelOffsets,
       componentLabelsVisible: state.componentLabelsVisible,
     };
-  }, [state.roomName, state.walls, state.furniture, state.labels, state.textBoxes, state.arrows, state.roomNames, state.componentLabelsVisible]);
+  }, [state.roomName, state.walls, state.furniture, state.labels, state.textBoxes, state.arrows, state.roomNames, state.roomLabelOffsets, state.componentLabelsVisible]);
 
   const importState = useCallback((plan: { version: number; roomName: string; walls: Wall[]; furniture: FurnitureItem[]; labels: RoomLabel[]; textBoxes?: TextBox[]; arrows?: Arrow[]; roomNames?: Record<string, string>; componentLabelsVisible?: boolean }) => {
     pushUndo();
@@ -501,6 +513,7 @@ export function useEditor() {
     importState,
     splitWallAndConnect,
     setRoomNameForRoom,
+    setRoomLabelOffset,
     toggleComponentLabels,
   };
 }

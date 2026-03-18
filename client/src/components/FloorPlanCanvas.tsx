@@ -86,6 +86,7 @@ interface FloorPlanCanvasProps {
   onUpdateArrow: (id: string, updates: Partial<Arrow>) => void;
   onRemoveArrow: (id: string) => void;
   onSetLabelOffset: (id: string, offset: { x: number; y: number }) => void;
+  onSetRoomLabelOffset: (roomKey: string, offset: Point) => void;
 }
 
 export default function FloorPlanCanvas({
@@ -118,6 +119,7 @@ export default function FloorPlanCanvas({
   onUpdateArrow,
   onRemoveArrow,
   onSetLabelOffset,
+  onSetRoomLabelOffset,
 }: FloorPlanCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -152,6 +154,11 @@ export default function FloorPlanCanvas({
     labelW: number; labelH: number;
     labelRotation: number;
   } | null>(null);
+
+  // Room label dragging state
+  const [isDraggingRoomLabel, setIsDraggingRoomLabel] = useState(false);
+  const [draggingRoomKey, setDraggingRoomKey] = useState<string | null>(null);
+  const [roomLabelDragStart, setRoomLabelDragStart] = useState<{ x: number; y: number; offsetX: number; offsetY: number }>({ x: 0, y: 0, offsetX: 0, offsetY: 0 });
 
   // Wall snap indicator state (transient, only during drag)
   const [wallSnapEdges, setWallSnapEdges] = useState<SnappedWallEdge[]>([]);
@@ -240,7 +247,7 @@ export default function FloorPlanCanvas({
       ? computeRoomLabelPositions(ctx, rooms, state.furniture, state.gridSize, state.zoom, state.roomNames, state.units)
       : new Map<string, Point>();
     if (rooms.length > 0) {
-      drawRoomAreas(ctx, rooms, state.gridSize, state.zoom, state.panOffset, isDark, state.units, state.roomNames, selectedRoomKey, roomLabelPositions);
+      drawRoomAreas(ctx, rooms, state.gridSize, state.zoom, state.panOffset, isDark, state.units, state.roomNames, selectedRoomKey, roomLabelPositions, state.roomLabelOffsets);
     }
 
     // Walls
@@ -645,6 +652,34 @@ export default function FloorPlanCanvas({
           }
         }
 
+        // Try to hit test room labels for dragging
+        {
+          const rooms = detectRooms(state.walls);
+          if (rooms.length > 0) {
+            const canvas = canvasRef.current;
+            const ctx = canvas?.getContext("2d");
+            if (ctx) {
+              const roomLabelPos = computeRoomLabelPositions(ctx, rooms, state.furniture, state.gridSize, state.zoom, state.roomNames, state.units);
+              const hitRoom = hitTestRoomLabel(pos.x, pos.y, rooms, state.gridSize, state.zoom, state.panOffset, state.roomNames, roomLabelPos, state.roomLabelOffsets);
+              if (hitRoom) {
+                const currentOffset = state.roomLabelOffsets[hitRoom.roomKey] || { x: 0, y: 0 };
+                setSelectedRoomKey(hitRoom.roomKey);
+                onSelectItem(null);
+                setIsDraggingRoomLabel(true);
+                setDraggingRoomKey(hitRoom.roomKey);
+                setRoomLabelDragStart({
+                  x: pos.x,
+                  y: pos.y,
+                  offsetX: currentOffset.x,
+                  offsetY: currentOffset.y,
+                });
+                onPushUndo();
+                return;
+              }
+            }
+          }
+        }
+
         // Try to hit test furniture first, then walls, then labels
         const hitFurn = hitTestFurniture(pos.x, pos.y, state.furniture, state.gridSize, state.zoom, state.panOffset);
         if (hitFurn) {
@@ -1004,6 +1039,18 @@ export default function FloorPlanCanvas({
         return;
       }
 
+      // Handle room label dragging
+      if (isDraggingRoomLabel && draggingRoomKey) {
+        const pxPerCm = (state.gridSize * state.zoom) / 100;
+        const dxCm = (pos.x - roomLabelDragStart.x) / pxPerCm;
+        const dyCm = (pos.y - roomLabelDragStart.y) / pxPerCm;
+        onSetRoomLabelOffset(draggingRoomKey, {
+          x: roomLabelDragStart.offsetX + dxCm,
+          y: roomLabelDragStart.offsetY + dyCm,
+        });
+        return;
+      }
+
       // Handle component label dragging
       if (isDraggingLabel && draggingLabelId) {
         const pxPerCm = (state.gridSize * state.zoom) / 100;
@@ -1123,7 +1170,7 @@ export default function FloorPlanCanvas({
         setEraserHoverId(null);
       }
     },
-    [state, isPanning, isDragging, isDraggingLabel, draggingLabelId, labelDragStart, isResizing, isRotating, rotateStartAngle, rotateItemStartRot, resizeStart, resizeCorner, dragStart, dragItemOffset, eraserHoverId, arrowDraggingEndpoint, isRotatingLabel, rotatingLabelId, labelRotateStartAngle, labelRotateItemStartRot, isResizingLabel, resizingLabelId, labelResizeStart, getCanvasPos, onSetPan, onSetZoom, onMoveFurniture, onMoveLabel, onUpdateFurniture, onUpdateArrow, onSetLabelOffset]
+    [state, isPanning, isDragging, isDraggingLabel, draggingLabelId, labelDragStart, isDraggingRoomLabel, draggingRoomKey, roomLabelDragStart, isResizing, isRotating, rotateStartAngle, rotateItemStartRot, resizeStart, resizeCorner, dragStart, dragItemOffset, eraserHoverId, arrowDraggingEndpoint, isRotatingLabel, rotatingLabelId, labelRotateStartAngle, labelRotateItemStartRot, isResizingLabel, resizingLabelId, labelResizeStart, getCanvasPos, onSetPan, onSetZoom, onMoveFurniture, onMoveLabel, onUpdateFurniture, onUpdateArrow, onSetLabelOffset, onSetRoomLabelOffset]
   );
 
   const handlePointerUp = useCallback(
@@ -1204,13 +1251,15 @@ export default function FloorPlanCanvas({
       setArrowDraggingEndpoint(null);
       setIsDraggingLabel(false);
       setDraggingLabelId(null);
+      setIsDraggingRoomLabel(false);
+      setDraggingRoomKey(null);
       setIsRotatingLabel(false);
       setRotatingLabelId(null);
       setIsResizingLabel(false);
       setResizingLabelId(null);
       setLabelResizeStart(null);
     },
-    [isDragging, isDraggingLabel, onPushUndo, state.selectedTool, state.gridSize, state.zoom, state.panOffset, state.walls, getCanvasPos, onAddWall, onSetWallDrawing, onSplitWallAndConnect]
+    [isDragging, isDraggingLabel, isDraggingRoomLabel, onPushUndo, state.selectedTool, state.gridSize, state.zoom, state.panOffset, state.walls, getCanvasPos, onAddWall, onSetWallDrawing, onSplitWallAndConnect]
   );
 
   const handleWheel = useCallback(
@@ -1265,7 +1314,7 @@ export default function FloorPlanCanvas({
         const roomLabelPos = rooms.length > 0
           ? computeRoomLabelPositions(ctx, rooms, state.furniture, state.gridSize, state.zoom, state.roomNames, state.units)
           : new Map<string, Point>();
-        const hitRoom = hitTestRoomLabel(pos.x, pos.y, rooms, state.gridSize, state.zoom, state.panOffset, state.roomNames, roomLabelPos);
+        const hitRoom = hitTestRoomLabel(pos.x, pos.y, rooms, state.gridSize, state.zoom, state.panOffset, state.roomNames, roomLabelPos, state.roomLabelOffsets);
         if (hitRoom) {
           const pxPerCm = (state.gridSize * state.zoom) / 100;
           const screenX = hitRoom.centroid.x * pxPerCm + state.panOffset.x;
@@ -1601,6 +1650,7 @@ export default function FloorPlanCanvas({
     if (state.selectedTool === "eraser") return "crosshair";
     if (state.selectedTool === "label") return "text";
     if (isDraggingLabel) return "grabbing";
+    if (isDraggingRoomLabel) return "grabbing";
     if (state.selectedTool === "select") return isDragging ? "grabbing" : "default";
     return "default";
   })();
