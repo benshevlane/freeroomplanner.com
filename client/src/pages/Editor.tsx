@@ -224,7 +224,6 @@ export default function Editor() {
       y: (cy - state.panOffset.y) / ((state.gridSize * state.zoom) / 100),
     };
     editor.addTextBox(centerWorld);
-    editor.setTool("select");
   }, [editor, state]);
 
   const handleDeleteSelected = useCallback(() => {
@@ -294,6 +293,8 @@ export default function Editor() {
           editor.setWallDrawing(null);
         } else if (state.selectedItemId) {
           editor.setSelectedItem(null);
+        } else if (state.selectedTool !== "select") {
+          editor.setTool("select");
         }
       }
 
@@ -306,7 +307,7 @@ export default function Editor() {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [editor, handleCopy, handlePaste, handleDuplicate, handleAddTextBox, handleDeleteSelected, state.wallDrawing, state.selectedItemId]);
+  }, [editor, handleCopy, handlePaste, handleDuplicate, handleAddTextBox, handleDeleteSelected, state.wallDrawing, state.selectedItemId, state.selectedTool]);
 
   const handleRotateSelected = useCallback(() => {
     if (selectedFurniture) editor.rotateFurniture(selectedFurniture.id);
@@ -695,6 +696,7 @@ export default function Editor() {
           onUpdateArrow={editor.updateArrow}
           onRemoveArrow={editor.removeArrow}
           onSetLabelOffset={editor.setLabelOffset}
+          onSetTool={editor.setTool}
         />
 
         {/* Desktop: Properties sidebar */}

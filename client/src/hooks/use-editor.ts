@@ -357,7 +357,7 @@ export function useEditor() {
       x: position.x - DEFAULT_TEXT_BOX.width / 2,
       y: position.y - DEFAULT_TEXT_BOX.height / 2,
     };
-    setState((s) => ({ ...s, textBoxes: [...s.textBoxes, textBox], selectedItemId: textBox.id }));
+    setState((s) => ({ ...s, textBoxes: [...s.textBoxes, textBox], selectedItemId: textBox.id, selectedTool: "select" }));
     return textBox.id;
   }, [pushUndo]);
 

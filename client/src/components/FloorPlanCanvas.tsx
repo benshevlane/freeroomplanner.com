@@ -86,6 +86,7 @@ interface FloorPlanCanvasProps {
   onUpdateArrow: (id: string, updates: Partial<Arrow>) => void;
   onRemoveArrow: (id: string) => void;
   onSetLabelOffset: (id: string, offset: { x: number; y: number }) => void;
+  onSetTool: (tool: EditorTool) => void;
 }
 
 export default function FloorPlanCanvas({
@@ -118,6 +119,7 @@ export default function FloorPlanCanvas({
   onUpdateArrow,
   onRemoveArrow,
   onSetLabelOffset,
+  onSetTool,
 }: FloorPlanCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -771,6 +773,7 @@ export default function FloorPlanCanvas({
           // Second click: place the arrow
           onAddArrow(arrowDrawingStart, snapped);
           setArrowDrawingStart(null);
+          onSetTool("select");
         } else {
           // First click: start drawing
           setArrowDrawingStart(snapped);
@@ -1360,12 +1363,14 @@ export default function FloorPlanCanvas({
       }
     }
     setEditingLabel({ id: null, x: 0, y: 0, text: "", isNew: false });
-  }, [editingLabel, onAddLabel, onUpdateLabel, onSetRoomName, onUpdateFurniture, state.furniture]);
+    onSetTool("select");
+  }, [editingLabel, onAddLabel, onUpdateLabel, onSetRoomName, onUpdateFurniture, state.furniture, onSetTool]);
 
   const cancelLabel = useCallback(() => {
     setEditingLabel({ id: null, x: 0, y: 0, text: "", isNew: false });
     setSelectedRoomKey(null);
-  }, []);
+    onSetTool("select");
+  }, [onSetTool]);
 
   const handleLabelKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
