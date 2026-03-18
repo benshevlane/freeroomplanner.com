@@ -215,6 +215,15 @@ export default function Editor() {
     }
   }, [selectedFurniture, selectedLabel, selectedTextBox, selectedArrow, editor]);
 
+  const handleAddTextBox = useCallback(() => {
+    const centerWorld = {
+      x: (400 - state.panOffset.x) / ((state.gridSize * state.zoom) / 100),
+      y: (300 - state.panOffset.y) / ((state.gridSize * state.zoom) / 100),
+    };
+    editor.addTextBox(centerWorld);
+    editor.setTool("select");
+  }, [editor, state]);
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -238,6 +247,9 @@ export default function Editor() {
       }
       if (e.key === "h" || e.key === "H") {
         if (!e.ctrlKey && !e.metaKey) editor.setTool("pan");
+      }
+      if (e.key === "t" || e.key === "T") {
+        if (!e.ctrlKey && !e.metaKey) handleAddTextBox();
       }
 
       if ((e.ctrlKey || e.metaKey) && e.key === "z") {
@@ -267,7 +279,7 @@ export default function Editor() {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [editor, handleCopy, handlePaste, handleDuplicate]);
+  }, [editor, handleCopy, handlePaste, handleDuplicate, handleAddTextBox]);
 
   const handleRotateSelected = useCallback(() => {
     if (selectedFurniture) editor.rotateFurniture(selectedFurniture.id);
@@ -418,14 +430,7 @@ export default function Editor() {
     [editor, state]
   );
 
-  const handleAddTextBox = useCallback(() => {
-    const centerWorld = {
-      x: (400 - state.panOffset.x) / ((state.gridSize * state.zoom) / 100),
-      y: (300 - state.panOffset.y) / ((state.gridSize * state.zoom) / 100),
-    };
-    editor.addTextBox(centerWorld);
-    editor.setTool("select");
-  }, [editor, state]);
+
 
   const handleDropFurniture = useCallback(
     (template: FurnitureTemplate, position: Point) => {
@@ -517,6 +522,7 @@ export default function Editor() {
                   <ShortcutRow keys="A" action="Draw Arrow tool" />
                   <ShortcutRow keys="L" action="Add Label tool" />
                   <ShortcutRow keys="E" action="Eraser tool" />
+                  <ShortcutRow keys="T" action="Add Text Box" />
                   <Separator className="my-2" />
                   <ShortcutRow keys="Ctrl+Z" action="Undo" />
                   <ShortcutRow keys="Ctrl+Y" action="Redo" />
@@ -584,6 +590,7 @@ export default function Editor() {
         onTogglePropertiesPanel={() => setPropertiesPanelOpen((o) => !o)}
         componentLabelsVisible={state.componentLabelsVisible}
         onToggleComponentLabels={editor.toggleComponentLabels}
+        onAddTextBox={handleAddTextBox}
       />
 
       {/* Main area */}
@@ -598,7 +605,6 @@ export default function Editor() {
                   className="w-full border-r-0"
                   onSelectFurniture={(t) => { handleSelectFurniture(t); setFurniturePanelOpen(false); }}
                   onSwitchToSelect={() => editor.setTool("select")}
-                  onAddTextBox={() => { handleAddTextBox(); setFurniturePanelOpen(false); }}
                 />
               </SheetContent>
             </Sheet>
@@ -633,7 +639,7 @@ export default function Editor() {
           </>
         ) : (
           /* Desktop: Furniture panel inline */
-          <FurniturePanel onSelectFurniture={handleSelectFurniture} onSwitchToSelect={() => editor.setTool("select")} onAddTextBox={handleAddTextBox} />
+          <FurniturePanel onSelectFurniture={handleSelectFurniture} onSwitchToSelect={() => editor.setTool("select")} />
         )}
 
         {/* Canvas */}
