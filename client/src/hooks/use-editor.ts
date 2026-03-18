@@ -5,6 +5,15 @@ function generateId(): string {
   return Math.random().toString(36).slice(2, 10);
 }
 
+/** Component types whose labels should render inside the component rectangle */
+const LABEL_INSIDE_TYPES = new Set([
+  "worktop", "island", "fridge", "dishwasher",
+  "tumble_dryer", "washing_machine", "kitchen_sink_d",
+  "bed_king", "bed_superking",
+  "sofa_3", "sofa_2", "sofa_l",
+  "dining_table_4", "dining_table_6",
+]);
+
 const INITIAL_STATE: EditorState = {
   walls: [],
   furniture: [],
@@ -101,6 +110,8 @@ export function useEditor() {
       rotation: 0,
       category: template.category,
       ...(template.isWallCupboard ? { heightFromFloor: template.defaultHeightFromFloor ?? 145 } : {}),
+      labelOffset: { x: 0, y: 0 },
+      labelInside: LABEL_INSIDE_TYPES.has(template.type),
     };
     setState((s) => ({ ...s, furniture: [...s.furniture, item], selectedItemId: item.id }));
   }, [pushUndo]);
@@ -245,6 +256,15 @@ export function useEditor() {
     }));
   }, []);
 
+  const setLabelOffset = useCallback((id: string, offset: { x: number; y: number }) => {
+    setState((s) => ({
+      ...s,
+      furniture: s.furniture.map((f) =>
+        f.id === id ? { ...f, labelOffset: offset } : f
+      ),
+    }));
+  }, []);
+
   const updateLabel = useCallback((id: string, updates: Partial<RoomLabel>) => {
     setState((s) => ({
       ...s,
@@ -351,7 +371,11 @@ export function useEditor() {
       ...s,
       roomName: plan.roomName,
       walls: plan.walls,
-      furniture: plan.furniture,
+      furniture: plan.furniture.map((f) => ({
+        ...f,
+        labelOffset: f.labelOffset ?? { x: 0, y: 0 },
+        labelInside: f.labelInside ?? LABEL_INSIDE_TYPES.has(f.type),
+      })),
       labels: plan.labels,
       textBoxes: plan.textBoxes || [],
       arrows: plan.arrows || [],
@@ -388,6 +412,7 @@ export function useEditor() {
     canRedo: redoStack.current.length > 0,
     pushUndo,
     updateFurniture,
+    setLabelOffset,
     updateLabel,
     addTextBox,
     moveTextBox,
