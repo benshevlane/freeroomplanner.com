@@ -569,7 +569,8 @@ function drawTotalWallDimensionLine(
   pxPerCm: number, panOffset: Point,
   zoom: number, isDark: boolean,
   units: UnitSystem, color: string,
-  measureMode: MeasureMode = "inside"
+  measureMode: MeasureMode = "inside",
+  occupants: { along: number; halfExtent: number }[] = []
 ) {
   const sx = wallStart.x * pxPerCm + panOffset.x;
   const sy = wallStart.y * pxPerCm + panOffset.y;
@@ -628,8 +629,26 @@ function drawTotalWallDimensionLine(
   const pad = 3;
 
   if (textW + pad * 2 < segLenPx + 10) {
-    const mx = (osx + oex) / 2;
-    const my = (osy + oey) / 2;
+    // Find optimal label position along wall, avoiding door/window occupants
+    let labelFrac = 0.5;
+    if (occupants.length > 0) {
+      const wallLenCm = Math.sqrt(
+        (wallEnd.x - wallStart.x) ** 2 + (wallEnd.y - wallStart.y) ** 2
+      );
+      if (wallLenCm > 0) {
+        const fracOccupants: { start: number; end: number }[] = occupants.map(occ => ({
+          start: Math.max(0, (occ.along - occ.halfExtent) / wallLenCm),
+          end: Math.min(1, (occ.along + occ.halfExtent) / wallLenCm),
+        }));
+        fracOccupants.sort((a, b) => a.start - b.start);
+        const textFrac = segLenPx > 0 ? (textW + pad * 2) / segLenPx : 1;
+        const result = findOptimalLabelPosition(fracOccupants, textFrac);
+        labelFrac = result.position;
+      }
+    }
+
+    const mx = osx + (oex - osx) * labelFrac;
+    const my = osy + (oey - osy) * labelFrac;
 
     ctx.save();
     ctx.translate(mx, my);
@@ -839,7 +858,8 @@ export function drawWallSegmentMeasurements(
       : wallLen;
     drawTotalWallDimensionLine(
       ctx, wallStart, wallEnd, displayLengthCm, wallThick,
-      pxPerCm, panOffset, zoom, isDark, units, color, measureMode
+      pxPerCm, panOffset, zoom, isDark, units, color, measureMode,
+      occupants
     );
   }
 }
