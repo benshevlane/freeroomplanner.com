@@ -516,6 +516,10 @@ export function drawWalls(
 
     const wallThick = wall.thickness || 15;
 
+    // Skip walls with door/window occupants — total measurement is drawn by drawWallSegmentMeasurements
+    const occupants = getWallOccupants(wall.start, wall.end, wallThick, doorsWindows);
+    if (occupants.length > 0) return;
+
     const sx = wall.start.x * pxPerCm + panOffset.x;
     const sy = wall.start.y * pxPerCm + panOffset.y;
     const ex = wall.end.x * pxPerCm + panOffset.x;
@@ -536,6 +540,10 @@ export function drawWalls(
   for (const group of collinearGroups.values()) {
     const representativeWallForThickness = walls.find((w) => group.wallIds.has(w.id));
     const thickness = representativeWallForThickness?.thickness ?? 15;
+
+    // Skip groups with door/window occupants — total measurement is drawn by drawWallSegmentMeasurements
+    const groupOccupants = getWallOccupants(group.minP, group.maxP, thickness, doorsWindows);
+    if (groupOccupants.length > 0) continue;
 
     const sx = group.minP.x * pxPerCm + panOffset.x;
     const sy = group.minP.y * pxPerCm + panOffset.y;
