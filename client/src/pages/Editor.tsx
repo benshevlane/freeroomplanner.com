@@ -297,8 +297,10 @@ export default function Editor() {
         }
       }
 
-      // Delete/Backspace: delete selected item
+      // Delete/Backspace: delete selected item (guard against input fields)
       if (e.key === "Delete" || e.key === "Backspace") {
+        if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+        if (e.target instanceof HTMLElement && e.target.isContentEditable) return;
         handleDeleteSelected();
       }
     };

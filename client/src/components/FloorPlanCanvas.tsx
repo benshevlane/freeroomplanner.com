@@ -1541,12 +1541,14 @@ export default function FloorPlanCanvas({
           if (lbl) onRemoveLabel(state.selectedItemId);
           const tb = state.textBoxes.find((t) => t.id === state.selectedItemId);
           if (tb) onRemoveTextBox(state.selectedItemId);
+          const arrow = state.arrows.find((a) => a.id === state.selectedItemId);
+          if (arrow) onRemoveArrow(state.selectedItemId);
         }
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [state.selectedItemId, state.furniture, state.walls, state.labels, state.textBoxes, editingTextBoxId, onRemoveFurniture, onRemoveWall, onRemoveLabel, onRemoveTextBox, onSetWallDrawing, onSelectItem]);
+  }, [state.selectedItemId, state.furniture, state.walls, state.labels, state.textBoxes, state.arrows, editingTextBoxId, onRemoveFurniture, onRemoveWall, onRemoveLabel, onRemoveTextBox, onRemoveArrow, onSetWallDrawing, onSelectItem]);
 
   // Prevent native context menu so right-click can pan
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
