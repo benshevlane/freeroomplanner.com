@@ -57,6 +57,13 @@ const DIMENSION_COLOR_LIGHT = "#01696f";
 const DIMENSION_COLOR_DARK = "#4f98a3";
 const SELECT_COLOR = "#01696f";
 
+/** Simple component types that render as plain rectangles (no internal visual details) */
+const SIMPLE_COMPONENT_TYPES = new Set([
+  "worktop", "fridge", "dishwasher", "island",
+  "coffee_table", "tv_unit", "bookshelf",
+  "wardrobe",
+]);
+
 /** Ray-casting point-in-polygon test (works for convex and concave polygons) */
 function pointInPolygon(p: Point, vertices: Point[]): boolean {
   let inside = false;
@@ -3482,6 +3489,7 @@ export interface ComponentLabelInfo {
   pillH: number;
   isSelected: boolean;
   nameColor: string;
+  isInside: boolean;
 }
 
 /** Measure component labels without drawing — returns info needed for deferred rendering */
@@ -3501,9 +3509,9 @@ export function collectComponentLabelRects(
   for (const item of furniture) {
     const centerX = (item.x + item.width / 2) * pxPerCm + panOffset.x;
     const centerY = (item.y + item.height / 2) * pxPerCm + panOffset.y;
-    const h = item.height * pxPerCm;
+    const itemWidthPx = item.width * pxPerCm;
+    const itemHeightPx = item.height * pxPerCm;
     const isSelected = item.id === selectedId;
-    const labelY = centerY + h / 2 + 14 * zoom;
 
     const displayName = item.customName || item.label;
     const dimText = `${item.width} \u00D7 ${item.height} cm`;
@@ -3519,17 +3527,63 @@ export function collectComponentLabelRects(
     const pillW = maxWidth + 10;
     const pillH = nameFontSize + dimFontSize + 8;
 
+    // Check if label fits inside a simple component
+    const isInside = SIMPLE_COMPONENT_TYPES.has(item.type)
+      && !isWallCupboard(item.type)
+      && pillW < itemWidthPx * 0.95
+      && pillH < itemHeightPx * 0.85;
+
+    const labelY = isInside
+      ? centerY
+      : centerY + itemHeightPx / 2 + 14 * zoom;
+
     const nameColor = isSelected
       ? (isDark ? "#4f98a3" : "#01696f")
       : (isDark ? "rgba(79, 152, 163, 0.65)" : "rgba(1, 105, 111, 0.55)");
 
     results.push({
       item, centerX, labelY, displayName, dimText,
-      nameFontSize, dimFontSize, pillW, pillH, isSelected, nameColor,
+      nameFontSize, dimFontSize, pillW, pillH, isSelected, nameColor, isInside,
     });
   }
 
   return results;
+}
+
+/** Draw a component label centered inside the component (no pill background) */
+function drawInsideComponentLabel(
+  ctx: CanvasRenderingContext2D,
+  info: ComponentLabelInfo,
+  pxPerCm: number,
+  panOffset: Point,
+  isDark: boolean
+) {
+  const item = info.item;
+  const cx = (item.x + item.width / 2) * pxPerCm + panOffset.x;
+  const cy = (item.y + item.height / 2) * pxPerCm + panOffset.y;
+  const rotation = (item.rotation * Math.PI) / 180;
+
+  ctx.save();
+  ctx.translate(cx, cy);
+  if (rotation) ctx.rotate(rotation);
+  if (item.mirrored) ctx.scale(-1, 1); // counter-mirror so text reads normally
+
+  const totalTextH = info.nameFontSize + info.dimFontSize + 2;
+  const nameY = -totalTextH / 2;
+
+  // Name
+  ctx.font = `${info.isSelected ? "600" : "500"} ${info.nameFontSize}px 'General Sans', 'DM Sans', sans-serif`;
+  ctx.fillStyle = info.nameColor;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "top";
+  ctx.fillText(info.displayName, 0, nameY);
+
+  // Dimensions
+  ctx.font = `400 ${info.dimFontSize}px 'General Sans', 'DM Sans', sans-serif`;
+  ctx.fillStyle = isDark ? "rgba(121, 120, 118, 0.8)" : "rgba(122, 121, 116, 0.7)";
+  ctx.fillText(info.dimText, 0, nameY + info.nameFontSize + 2);
+
+  ctx.restore();
 }
 
 /** Draw a single component label at a given position */
@@ -3688,10 +3742,11 @@ export function resolveAndDrawLabelCollisions(
     });
   }
 
-  // Component labels (priority 2)
+  // Component labels (priority 2) — only outside labels participate in collision
   if (componentLabelsVisible) {
     for (let i = 0; i < componentLabelInfos.length; i++) {
       const info = componentLabelInfos[i];
+      if (info.isInside) continue;
       const totalH = info.pillH;
       allRects.push({
         x: info.centerX, y: info.labelY + totalH / 2 - 2,
@@ -3766,6 +3821,13 @@ export function resolveAndDrawLabelCollisions(
         // rect.y is the center of the label rect; convert back to top-of-label Y
         const resolvedLabelY = rect.y - info.pillH / 2 + 2;
         drawSingleComponentLabel(ctx, info, rect.x, resolvedLabelY, isDark);
+      }
+    }
+
+    // Draw inside-component labels (not collision-resolved, anchored inside)
+    for (const info of componentLabelInfos) {
+      if (info.isInside) {
+        drawInsideComponentLabel(ctx, info, pxPerCm, panOffset, isDark);
       }
     }
   }
