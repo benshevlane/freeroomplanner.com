@@ -973,7 +973,7 @@ function findComponentsOnWall(
   const occupants: { start: number; end: number }[] = [];
 
   for (const item of furniture) {
-    if (item.type !== "door" && item.type !== "window") continue;
+    if (item.type !== "door" && item.type !== "door_double" && item.type !== "window") continue;
 
     // Get item center in world coords
     const cx = item.x + item.width / 2;
@@ -2792,7 +2792,7 @@ export function hitTestResizeHandle(
 
   // For structural items (doors/windows), test edge handles first so
   // single-dimension resizing is easier to grab on thin items
-  const isStructural = item.type === "door" || item.type === "window";
+  const isStructural = item.type === "door" || item.type === "door_double" || item.type === "window";
   const first = isStructural ? edgeHandles : corners;
   const second = isStructural ? corners : edgeHandles;
 
@@ -3139,7 +3139,7 @@ export function drawDistanceMeasurements(
   const color = isDark ? "#e8894a" : "#d06220";
 
   // For doors/windows on a wall, show along-wall distances instead of perpendicular
-  if (selectedItem.type === "door" || selectedItem.type === "window") {
+  if (selectedItem.type === "door" || selectedItem.type === "door_double" || selectedItem.type === "window") {
     const hostWall = findHostWall(selectedItem, walls);
     if (hostWall) {
       const alongDists = computeAlongWallDistances(selectedItem, hostWall);
@@ -3302,7 +3302,7 @@ export function collectDistanceMeasurementRects(
   ctx.font = `500 ${fontSize}px 'General Sans', 'DM Sans', sans-serif`;
 
   // For doors/windows on a wall, compute along-wall distance label positions
-  if (selectedItem.type === "door" || selectedItem.type === "window") {
+  if (selectedItem.type === "door" || selectedItem.type === "door_double" || selectedItem.type === "window") {
     const hostWall = findHostWall(selectedItem, walls);
     if (hostWall) {
       const alongDists = computeAlongWallDistances(selectedItem, hostWall);
