@@ -1,6 +1,37 @@
 import { Wall, FurnitureItem, RoomLabel, Arrow, ArrowHeadStyle, Point, UnitSystem, MeasureMode, LabelColor, isWallCupboard } from "./types";
 import { DetectedRoom } from "./room-detection";
 
+const CONNECT_THRESHOLD_EXT = 15; // cm, same as wall snap threshold
+
+/** Detect how far to extend measurement at each wall endpoint in "full" mode.
+ *  Accounts for junction circles that visually extend the wall at connected corners. */
+function getEndpointExtensions(
+  wallStart: Point, wallEnd: Point, wallThickness: number, walls: Wall[]
+): { startExtension: number; endExtension: number } {
+  let startConnected = false;
+  let endConnected = false;
+  const halfThick = wallThickness / 2;
+
+  for (const other of walls) {
+    for (const pt of [other.start, other.end]) {
+      if (!startConnected) {
+        const d = Math.sqrt((pt.x - wallStart.x) ** 2 + (pt.y - wallStart.y) ** 2);
+        if (d <= CONNECT_THRESHOLD_EXT && d > 0.01) startConnected = true;
+      }
+      if (!endConnected) {
+        const d = Math.sqrt((pt.x - wallEnd.x) ** 2 + (pt.y - wallEnd.y) ** 2);
+        if (d <= CONNECT_THRESHOLD_EXT && d > 0.01) endConnected = true;
+      }
+    }
+    if (startConnected && endConnected) break;
+  }
+
+  return {
+    startExtension: startConnected ? halfThick : 0,
+    endExtension: endConnected ? halfThick : 0,
+  };
+}
+
 /** Convert cm to display string based on unit system */
 function formatLength(cm: number, units: UnitSystem): string {
   switch (units) {
@@ -545,20 +576,26 @@ export function drawWalls(
     const occupants = getWallOccupants(wall.start, wall.end, wallThick, doorsWindows);
     if (occupants.length > 0) return;
 
-    const sx = wall.start.x * pxPerCm + panOffset.x;
-    const sy = wall.start.y * pxPerCm + panOffset.y;
-    const ex = wall.end.x * pxPerCm + panOffset.x;
-    const ey = wall.end.y * pxPerCm + panOffset.y;
-
     const dx = wall.end.x - wall.start.x;
     const dy = wall.end.y - wall.start.y;
     const lengthCm = Math.sqrt(dx * dx + dy * dy);
+    if (lengthCm <= 10) return;
+
+    const { startExtension, endExtension } = measureMode === "full"
+      ? getEndpointExtensions(wall.start, wall.end, wallThick, walls)
+      : { startExtension: 0, endExtension: 0 };
+    const udx = dx / lengthCm;
+    const udy = dy / lengthCm;
+
+    const sx = (wall.start.x - udx * startExtension) * pxPerCm + panOffset.x;
+    const sy = (wall.start.y - udy * startExtension) * pxPerCm + panOffset.y;
+    const ex = (wall.end.x + udx * endExtension) * pxPerCm + panOffset.x;
+    const ey = (wall.end.y + udy * endExtension) * pxPerCm + panOffset.y;
+
     const displayLengthCm = measureMode === "inside"
       ? Math.max(0, lengthCm - wallThick)
-      : lengthCm;
-    if (lengthCm > 10) {
-      drawWallDimensionLabel(ctx, sx, sy, ex, ey, displayLengthCm, wall.thickness * pxPerCm, zoom, isDark, units, wall, furniture, gridSize, panOffset, rooms, walls, measureMode);
-    }
+      : lengthCm + startExtension + endExtension;
+    drawWallDimensionLabel(ctx, sx, sy, ex, ey, displayLengthCm, wall.thickness * pxPerCm, zoom, isDark, units, wall, furniture, gridSize, panOffset, rooms, walls, measureMode);
   });
 
   // Draw merged labels for collinear groups (skip if group has door/window occupants)
@@ -570,13 +607,22 @@ export function drawWalls(
     const groupOccupants = getWallOccupants(group.minP, group.maxP, thickness, doorsWindows);
     if (groupOccupants.length > 0) continue;
 
-    const sx = group.minP.x * pxPerCm + panOffset.x;
-    const sy = group.minP.y * pxPerCm + panOffset.y;
-    const ex = group.maxP.x * pxPerCm + panOffset.x;
-    const ey = group.maxP.y * pxPerCm + panOffset.y;
+    const { startExtension, endExtension } = measureMode === "full"
+      ? getEndpointExtensions(group.minP, group.maxP, thickness, walls)
+      : { startExtension: 0, endExtension: 0 };
+    const gdx = group.maxP.x - group.minP.x;
+    const gdy = group.maxP.y - group.minP.y;
+    const glen = Math.sqrt(gdx * gdx + gdy * gdy);
+    const gudx = glen > 0 ? gdx / glen : 0;
+    const gudy = glen > 0 ? gdy / glen : 0;
+
+    const sx = (group.minP.x - gudx * startExtension) * pxPerCm + panOffset.x;
+    const sy = (group.minP.y - gudy * startExtension) * pxPerCm + panOffset.y;
+    const ex = (group.maxP.x + gudx * endExtension) * pxPerCm + panOffset.x;
+    const ey = (group.maxP.y + gudy * endExtension) * pxPerCm + panOffset.y;
     const displayLengthCm = measureMode === "inside"
       ? Math.max(0, group.totalLengthCm - thickness)
-      : group.totalLengthCm;
+      : group.totalLengthCm + startExtension + endExtension;
     // Find the actual wall for collision detection
     const groupWallIds = group.wallIds;
     const representativeWall = walls.find((w) => groupWallIds.has(w.id)) || walls[0];
@@ -595,7 +641,9 @@ function drawTotalWallDimensionLine(
   zoom: number, isDark: boolean,
   units: UnitSystem, color: string,
   measureMode: MeasureMode = "inside",
-  occupants: { along: number; halfExtent: number }[] = []
+  occupants: { along: number; halfExtent: number }[] = [],
+  startExtension: number = 0,
+  endExtension: number = 0
 ) {
   const sx = wallStart.x * pxPerCm + panOffset.x;
   const sy = wallStart.y * pxPerCm + panOffset.y;
@@ -605,15 +653,16 @@ function drawTotalWallDimensionLine(
   const angle = Math.atan2(ey - sy, ex - sx);
   const wallThickPx = wallThicknessCm * pxPerCm;
 
-  // Inset endpoints along wall direction for inside mode
+  // Inset endpoints along wall direction for inside mode, outset for full mode at connected ends
   const halfThick = wallThicknessCm / 2;
-  const inset = measureMode === "inside" ? halfThick * pxPerCm : 0;
+  const startInset = measureMode === "inside" ? halfThick * pxPerCm : -startExtension * pxPerCm;
+  const endInset = measureMode === "inside" ? halfThick * pxPerCm : -endExtension * pxPerCm;
   const dirX = Math.cos(angle);
   const dirY = Math.sin(angle);
-  const isx = sx + dirX * inset;
-  const isy = sy + dirY * inset;
-  const iex = ex - dirX * inset;
-  const iey = ey - dirY * inset;
+  const isx = sx + dirX * startInset;
+  const isy = sy + dirY * startInset;
+  const iex = ex - dirX * endInset;
+  const iey = ey - dirY * endInset;
 
   const segLenPx = Math.sqrt((iex - isx) ** 2 + (iey - isy) ** 2);
 
@@ -847,9 +896,13 @@ export function drawWallSegmentMeasurements(
 
     // Compute segments: wall start -> first door edge, between doors, last door edge -> wall end
     // In inside mode, inset segment boundaries by half wall thickness at each wall end
+    // In full mode, extend at connected endpoints to match junction circle extent
     const halfThick = wallThick / 2;
-    const wallStartAlong = measureMode === "inside" ? halfThick : 0;
-    const wallEndAlong = measureMode === "inside" ? wallLen - halfThick : wallLen;
+    const { startExtension: segStartExt, endExtension: segEndExt } = measureMode === "full"
+      ? getEndpointExtensions(wallStart, wallEnd, wallThick, walls)
+      : { startExtension: 0, endExtension: 0 };
+    const wallStartAlong = measureMode === "inside" ? halfThick : -segStartExt;
+    const wallEndAlong = measureMode === "inside" ? wallLen - halfThick : wallLen + segEndExt;
     const segments: { startAlong: number; endAlong: number }[] = [];
     let prevEnd = wallStartAlong;
     for (const occ of occupants) {
@@ -880,11 +933,11 @@ export function drawWallSegmentMeasurements(
     // Draw total wall length as a dimension line on the opposite side from segments
     const displayLengthCm = measureMode === "inside"
       ? Math.max(0, wallLen - wallThick)
-      : wallLen;
+      : wallLen + segStartExt + segEndExt;
     drawTotalWallDimensionLine(
       ctx, wallStart, wallEnd, displayLengthCm, wallThick,
       pxPerCm, panOffset, zoom, isDark, units, color, measureMode,
-      occupants
+      occupants, segStartExt, segEndExt
     );
   }
 }
@@ -986,12 +1039,20 @@ export function drawMeasurementIndicatorLines(
     const udy = dy / len;
 
     // In inside mode, shorten the green line by halfThickness at each end
-    // so its span matches the inside measurement value
-    const inset = measureMode === "inside" ? halfThickness : 0;
-    const sx = (wall.start.x + udx * inset) * pxPerCm + panOffset.x + offsetX * pxPerCm;
-    const sy = (wall.start.y + udy * inset) * pxPerCm + panOffset.y + offsetY * pxPerCm;
-    const ex = (wall.end.x - udx * inset) * pxPerCm + panOffset.x + offsetX * pxPerCm;
-    const ey = (wall.end.y - udy * inset) * pxPerCm + panOffset.y + offsetY * pxPerCm;
+    // In full mode, extend at connected endpoints to match junction circle extent
+    let startInset: number, endInset: number;
+    if (measureMode === "inside") {
+      startInset = halfThickness;
+      endInset = halfThickness;
+    } else {
+      const { startExtension, endExtension } = getEndpointExtensions(wall.start, wall.end, wall.thickness, walls);
+      startInset = -startExtension;
+      endInset = -endExtension;
+    }
+    const sx = (wall.start.x + udx * startInset) * pxPerCm + panOffset.x + offsetX * pxPerCm;
+    const sy = (wall.start.y + udy * startInset) * pxPerCm + panOffset.y + offsetY * pxPerCm;
+    const ex = (wall.end.x - udx * endInset) * pxPerCm + panOffset.x + offsetX * pxPerCm;
+    const ey = (wall.end.y - udy * endInset) * pxPerCm + panOffset.y + offsetY * pxPerCm;
 
     ctx.strokeStyle = INDICATOR_COLOR;
     ctx.lineWidth = 1.5;
