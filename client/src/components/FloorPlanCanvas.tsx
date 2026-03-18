@@ -313,7 +313,7 @@ export default function FloorPlanCanvas({
 
     // Collect component label positions (without drawing) for collision resolution
     const componentLabelInfos = state.componentLabelsVisible
-      ? collectComponentLabelRects(ctx, state.furniture, state.gridSize, state.zoom, state.panOffset, isDark, state.selectedItemId, state.units)
+      ? collectComponentLabelRects(ctx, state.furniture, state.gridSize, state.zoom, state.panOffset, isDark, state.selectedItemId, state.units, state.walls, rooms)
       : [];
 
     // Resize handles and distance measurements for selected furniture

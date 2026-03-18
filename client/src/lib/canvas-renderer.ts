@@ -996,6 +996,89 @@ function findComponentsOnWall(
 }
 
 /**
+ * For a door/window item, compute the outward-facing unit normal direction
+ * relative to the room it belongs to. Returns null if the item is not on a
+ * detectable wall/room boundary.
+ */
+function computeOutsideLabelOffset(
+  item: FurnitureItem,
+  walls: Wall[],
+  rooms: DetectedRoom[]
+): { nx: number; ny: number } | null {
+  const cx = item.x + item.width / 2;
+  const cy = item.y + item.height / 2;
+
+  // Find the closest wall to this item
+  let bestWall: Wall | null = null;
+  let bestDist = Infinity;
+
+  for (const wall of walls) {
+    const wdx = wall.end.x - wall.start.x;
+    const wdy = wall.end.y - wall.start.y;
+    const wallLen = Math.sqrt(wdx * wdx + wdy * wdy);
+    if (wallLen < 10) continue;
+
+    const wallDirX = wdx / wallLen;
+    const wallDirY = wdy / wallLen;
+    const wallNormX = -wallDirY;
+    const wallNormY = wallDirX;
+
+    const relX = cx - wall.start.x;
+    const relY = cy - wall.start.y;
+    const along = relX * wallDirX + relY * wallDirY;
+    const perp = Math.abs(relX * wallNormX + relY * wallNormY);
+
+    // Must be within wall extent and close enough perpendicularly
+    if (along < -10 || along > wallLen + 10) continue;
+    const threshold = (wall.thickness || 15) + Math.max(item.width, item.height);
+    if (perp > threshold) continue;
+
+    if (perp < bestDist) {
+      bestDist = perp;
+      bestWall = wall;
+    }
+  }
+
+  if (!bestWall) return null;
+
+  // Compute wall normal
+  const dx = bestWall.end.x - bestWall.start.x;
+  const dy = bestWall.end.y - bestWall.start.y;
+  const len = Math.sqrt(dx * dx + dy * dy);
+  const nx = -dy / len;
+  const ny = dx / len;
+
+  // Find the smallest room that owns this wall (label faces outward from it)
+  const wallMid = { x: (bestWall.start.x + bestWall.end.x) / 2, y: (bestWall.start.y + bestWall.end.y) / 2 };
+  let bestRoom: DetectedRoom | null = null;
+
+  for (const room of rooms) {
+    const hasStart = room.vertices.some(v =>
+      Math.sqrt((v.x - bestWall!.start.x) ** 2 + (v.y - bestWall!.start.y) ** 2) < 15
+    );
+    const hasEnd = room.vertices.some(v =>
+      Math.sqrt((v.x - bestWall!.end.x) ** 2 + (v.y - bestWall!.end.y) ** 2) < 15
+    );
+    if (hasStart && hasEnd) {
+      if (!bestRoom || room.area < bestRoom.area) {
+        bestRoom = room;
+      }
+    }
+  }
+
+  if (!bestRoom) return null;
+
+  // Determine outward normal (away from room centroid)
+  const toCentroid = { x: bestRoom.centroid.x - wallMid.x, y: bestRoom.centroid.y - wallMid.y };
+  const dot = toCentroid.x * nx + toCentroid.y * ny;
+  // If dot > 0, (nx, ny) points toward centroid (inside), so outward is (-nx, -ny)
+  if (dot > 0) {
+    return { nx: -nx, ny: -ny };
+  }
+  return { nx, ny };
+}
+
+/**
  * Find the optimal label position along a wall, avoiding door/window overlap.
  * Returns a fraction [0..1] along the wall where the label center should go,
  * and whether to offset perpendicular if no clear gap exists.
@@ -3586,7 +3669,9 @@ export function collectComponentLabelRects(
   panOffset: Point,
   isDark: boolean,
   selectedId: string | null,
-  units: UnitSystem = "m"
+  units: UnitSystem = "m",
+  walls: Wall[] = [],
+  rooms: DetectedRoom[] = []
 ): ComponentLabelInfo[] {
   const pxPerCm = (gridSize * zoom) / 100;
   const results: ComponentLabelInfo[] = [];
@@ -3597,6 +3682,12 @@ export function collectComponentLabelRects(
     const itemWidthPx = item.width * pxPerCm;
     const itemHeightPx = item.height * pxPerCm;
     const isSelected = item.id === selectedId;
+
+    let labelX = centerX;
+    let labelY: number;
+
+    const isDoorOrWindow = item.type === "door" || item.type === "door_double" || item.type === "window";
+    const outsideNormal = isDoorOrWindow ? computeOutsideLabelOffset(item, walls, rooms) : null;
 
     const displayName = item.customName || item.label;
     const dimText = `${item.width} \u00D7 ${item.height} cm`;
@@ -3618,16 +3709,24 @@ export function collectComponentLabelRects(
       && pillW < itemWidthPx * 0.95
       && pillH < itemHeightPx * 0.85;
 
-    const labelY = isInside
-      ? centerY
-      : centerY + itemHeightPx / 2 + 14 * zoom;
+    if (outsideNormal) {
+      // Offset label to the exterior side of the room
+      const extent = Math.max(itemWidthPx, itemHeightPx) / 2;
+      const offsetDist = extent + 14 * zoom;
+      labelX = centerX + outsideNormal.nx * offsetDist;
+      labelY = centerY + outsideNormal.ny * offsetDist;
+    } else if (isInside) {
+      labelY = centerY;
+    } else {
+      labelY = centerY + itemHeightPx / 2 + 14 * zoom;
+    }
 
     const nameColor = isSelected
       ? (isDark ? "#4f98a3" : "#01696f")
       : (isDark ? "rgba(79, 152, 163, 0.65)" : "rgba(1, 105, 111, 0.55)");
 
     results.push({
-      item, centerX, labelY, displayName, dimText,
+      item, centerX: labelX, labelY, displayName, dimText,
       nameFontSize, dimFontSize, pillW, pillH, isSelected, nameColor, isInside,
     });
   }
