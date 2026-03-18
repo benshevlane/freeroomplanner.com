@@ -350,6 +350,12 @@ function findCollinearGroups(walls: Wall[]): Map<string, { totalLengthCm: number
     const cross = Math.abs(da.dx * db.dy - da.dy * db.dx);
     if (cross > 0.01) return false; // not parallel
 
+    // Verify walls are on the SAME line (not just parallel at different offsets)
+    const abx = b.start.x - a.start.x;
+    const aby = b.start.y - a.start.y;
+    const perpDist = Math.abs(abx * da.dy - aby * da.dx);
+    if (perpDist > 1.0) return false; // parallel but offset lines
+
     // Must share an endpoint
     const eps = 0.5;
     const shareEndpoint =
@@ -2460,6 +2466,30 @@ export function snapToWallEndpoints(
 
   if (closest) {
     return { snapped: { x: closest.x, y: closest.y }, didSnap: true };
+  }
+  return { snapped: point, didSnap: false };
+}
+
+/** Snap to the chain start point with a screen-space-aware threshold.
+ *  Ensures the snap zone is always at least `minScreenPx` pixels on screen,
+ *  regardless of zoom level, so closing large rooms when zoomed out is reliable.
+ */
+export function snapToChainStart(
+  point: Point,
+  chainStart: Point,
+  worldThreshold: number,
+  gridSize: number,
+  zoom: number,
+  minScreenPx: number = 12
+): { snapped: Point; didSnap: boolean } {
+  const pxPerCm = (gridSize * zoom) / 100;
+  // Ensure threshold is at least minScreenPx in screen space
+  const screenAwareThreshold = Math.max(worldThreshold, minScreenPx / pxPerCm);
+  const dx = point.x - chainStart.x;
+  const dy = point.y - chainStart.y;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  if (dist < screenAwareThreshold) {
+    return { snapped: { x: chainStart.x, y: chainStart.y }, didSnap: true };
   }
   return { snapped: point, didSnap: false };
 }

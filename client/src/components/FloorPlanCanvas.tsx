@@ -30,6 +30,7 @@ import {
   screenToWorld,
   snapToGrid,
   snapToWallEndpoints,
+  snapToChainStart,
   snapToWallBody,
   snapFurnitureToWalls,
   snapFurnitureToNearest,
@@ -264,7 +265,15 @@ export default function FloorPlanCanvas({
       const worldMouse = screenToWorld(mousePos.x, mousePos.y, state.gridSize, state.zoom, state.panOffset);
       const gridSnapped = snapToGrid(worldMouse, 10);
       // Check snap against raw world position for accurate distance
-      const { snapped: wallSnapped, didSnap: epSnap } = snapToWallEndpoints(worldMouse, state.walls, 15);
+      let { snapped: wallSnapped, didSnap: epSnap } = snapToWallEndpoints(worldMouse, state.walls, 15);
+      // Chain-start closure in preview
+      if (!epSnap && state.wallChainStart && state.walls.length >= 2) {
+        const csResult = snapToChainStart(worldMouse, state.wallChainStart, 15, state.gridSize, state.zoom);
+        if (csResult.didSnap) {
+          wallSnapped = csResult.snapped;
+          epSnap = true;
+        }
+      }
       const { snapped: bodySnapped, didSnap: bodySnap } = snapToWallBody(worldMouse, state.walls, 15);
       const didSnap = epSnap || bodySnap;
       let finalPoint = epSnap ? wallSnapped : (bodySnap ? bodySnapped : gridSnapped);
@@ -722,7 +731,15 @@ export default function FloorPlanCanvas({
         const gridSnapped = snapToGrid(world, 10);
         // Check endpoint snap against RAW world position (not grid-snapped)
         // so that the threshold accurately reflects cursor distance
-        const { snapped: wallSnapped, didSnap: endpointSnap } = snapToWallEndpoints(world, state.walls, 15);
+        let { snapped: wallSnapped, didSnap: endpointSnap } = snapToWallEndpoints(world, state.walls, 15);
+        // Chain-start closure: screen-space-aware snap to first point of the chain
+        if (!endpointSnap && state.wallChainStart && wallDrawingRef.current && state.walls.length >= 2) {
+          const csResult = snapToChainStart(world, state.wallChainStart, 15, state.gridSize, state.zoom);
+          if (csResult.didSnap) {
+            wallSnapped = csResult.snapped;
+            endpointSnap = true;
+          }
+        }
         // Also check wall body snap (for mid-wall connections)
         const { snapped: bodySnapped, didSnap: bodySnap, wallId: bodyWallId } = snapToWallBody(world, state.walls, 15);
 
@@ -1072,6 +1089,15 @@ export default function FloorPlanCanvas({
         const { snapped: epSnapped, didSnap: epSnap } = snapToWallEndpoints(world, state.walls, 15);
         if (epSnap) {
           setWallSnapPoint(epSnapped);
+        } else if (state.wallChainStart && state.wallDrawing && state.walls.length >= 2) {
+          // Chain-start closure indicator
+          const csResult = snapToChainStart(world, state.wallChainStart, 15, state.gridSize, state.zoom);
+          if (csResult.didSnap) {
+            setWallSnapPoint(csResult.snapped);
+          } else {
+            const { snapped: bodySnapped, didSnap: bodySnap } = snapToWallBody(world, state.walls, 15);
+            setWallSnapPoint(bodySnap ? bodySnapped : null);
+          }
         } else {
           const { snapped: bodySnapped, didSnap: bodySnap } = snapToWallBody(world, state.walls, 15);
           setWallSnapPoint(bodySnap ? bodySnapped : null);
@@ -1124,7 +1150,15 @@ export default function FloorPlanCanvas({
           const pos = getCanvasPos(e);
           const world = screenToWorld(pos.x, pos.y, state.gridSize, state.zoom, state.panOffset);
           const gridSnapped = snapToGrid(world, 10);
-          const { snapped: wallSnapped, didSnap: endpointSnap } = snapToWallEndpoints(world, state.walls, 15);
+          let { snapped: wallSnapped, didSnap: endpointSnap } = snapToWallEndpoints(world, state.walls, 15);
+          // Chain-start closure: screen-space-aware snap to first point of the chain
+          if (!endpointSnap && state.wallChainStart && state.walls.length >= 2) {
+            const csResult = snapToChainStart(world, state.wallChainStart, 15, state.gridSize, state.zoom);
+            if (csResult.didSnap) {
+              wallSnapped = csResult.snapped;
+              endpointSnap = true;
+            }
+          }
           const { snapped: bodySnapped, didSnap: bodySnap, wallId: bodyWallId } = snapToWallBody(world, state.walls, 15);
           const didSnap = endpointSnap || bodySnap;
           let finalPoint = endpointSnap ? wallSnapped : (bodySnap ? bodySnapped : gridSnapped);
