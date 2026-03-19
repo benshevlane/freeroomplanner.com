@@ -12,7 +12,7 @@ export default function Admin() {
     const res = await fetch("/api/admin/hero-image");
     const data = await res.json();
     setHeroExists(data.exists);
-    if (data.exists) setPreview(data.path + "?t=" + Date.now());
+    if (data.exists && data.url) setPreview(data.url);
   }, []);
 
   useEffect(() => { checkHero(); }, [checkHero]);
@@ -127,7 +127,7 @@ export default function Admin() {
             <div className="rounded-xl border border-[#e8e3d8] overflow-hidden shadow-sm bg-white">
               <img src={preview} alt="Hero preview" className="w-full" />
             </div>
-            <p className="text-xs text-[#9a9488] mt-2">Served at <code className="bg-[#f0ede6] px-1.5 py-0.5 rounded">/hero-floorplan.png</code></p>
+            <p className="text-xs text-[#9a9488] mt-2">Stored in Supabase Storage</p>
           </div>
         )}
       </div>

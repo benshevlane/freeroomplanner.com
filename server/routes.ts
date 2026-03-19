@@ -1,41 +1,41 @@
 import express, { type Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import path from "path";
-import fs from "fs";
+import { supabaseAdmin } from "./supabase";
 
+const BUCKET = "hero-images";
+const OBJECT_PATH = "hero-floorplan.jpg";
 
-// In production the server runs from dist/ and serves dist/public/.
-// In dev, Vite serves from client/public/. Write to both so the file
-// is reachable regardless of environment.
-function getHeroImagePaths(): string[] {
-  const paths: string[] = [];
-  // Production: dist/public/ (where static.ts serves from)
-  const distPublic = path.resolve(__dirname, "public", "hero-floorplan.png");
-  paths.push(distPublic);
-  // Development: client/public/
-  const clientPublic = path.resolve(__dirname, "..", "client", "public", "hero-floorplan.png");
-  if (clientPublic !== distPublic) paths.push(clientPublic);
-  return paths;
+async function heroImageExists(): Promise<boolean> {
+  if (!supabaseAdmin) return false;
+  const { data, error } = await supabaseAdmin.storage
+    .from(BUCKET)
+    .list("", { search: OBJECT_PATH });
+  if (error || !data) return false;
+  return data.some((f) => f.name === OBJECT_PATH);
 }
 
-function heroImageExists(): boolean {
-  return getHeroImagePaths().some((p) => fs.existsSync(p));
+function getHeroPublicUrl(): string | null {
+  if (!supabaseAdmin) return null;
+  const { data } = supabaseAdmin.storage.from(BUCKET).getPublicUrl(OBJECT_PATH);
+  return data.publicUrl;
 }
 
-function writeHeroImage(buf: Buffer): void {
-  for (const p of getHeroImagePaths()) {
-    const dir = path.dirname(p);
-    if (fs.existsSync(dir)) {
-      fs.writeFileSync(p, buf);
-    }
-  }
+async function writeHeroImage(buf: Buffer): Promise<string> {
+  if (!supabaseAdmin) throw new Error("Supabase Storage not configured");
+  const { error } = await supabaseAdmin.storage
+    .from(BUCKET)
+    .upload(OBJECT_PATH, buf, {
+      contentType: "image/jpeg",
+      upsert: true,
+    });
+  if (error) throw error;
+  return getHeroPublicUrl()!;
 }
 
-function deleteHeroImage(): void {
-  for (const p of getHeroImagePaths()) {
-    if (fs.existsSync(p)) fs.unlinkSync(p);
-  }
+async function deleteHeroImage(): Promise<void> {
+  if (!supabaseAdmin) return;
+  await supabaseAdmin.storage.from(BUCKET).remove([OBJECT_PATH]);
 }
 
 export async function registerRoutes(
@@ -60,24 +60,31 @@ export async function registerRoutes(
   // Admin: upload hero image
   app.post("/api/admin/hero-image",
     express.raw({ type: "application/octet-stream", limit: "20mb" }),
-    (req, res) => {
+    async (req, res) => {
       const buf = req.body;
       if (!Buffer.isBuffer(buf) || buf.length === 0) {
         return res.status(400).json({ error: "Missing image data" });
       }
-      writeHeroImage(buf);
-      return res.json({ ok: true, size: buf.length });
+      try {
+        const url = await writeHeroImage(buf);
+        return res.json({ ok: true, size: buf.length, url });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Upload failed";
+        return res.status(500).json({ error: msg });
+      }
     },
   );
 
   // Admin: check if hero image exists
-  app.get("/api/admin/hero-image", (_req, res) => {
-    res.json({ exists: heroImageExists(), path: "/hero-floorplan.png" });
+  app.get("/api/admin/hero-image", async (_req, res) => {
+    const exists = await heroImageExists();
+    const url = exists ? getHeroPublicUrl() : null;
+    res.json({ exists, url });
   });
 
   // Admin: delete hero image
-  app.delete("/api/admin/hero-image", (_req, res) => {
-    deleteHeroImage();
+  app.delete("/api/admin/hero-image", async (_req, res) => {
+    await deleteHeroImage();
     res.json({ ok: true });
   });
 

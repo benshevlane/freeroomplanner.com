@@ -90,7 +90,7 @@ export default function Landing() {
   useEffect(() => {
     fetch("/api/admin/hero-image")
       .then((r) => r.json())
-      .then((d) => { if (d.exists) setHeroImg(d.path); })
+      .then((d) => { if (d.exists && d.url) setHeroImg(d.url); })
       .catch(() => {});
   }, []);
 
