@@ -57,27 +57,20 @@ export async function registerRoutes(
     res.json(plan);
   });
 
-  // Admin: upload hero image (reads raw body to avoid middleware issues)
+  // Admin: upload hero image
   app.post("/api/admin/hero-image", (req, res) => {
-    const chunks: Buffer[] = [];
-    req.on("data", (chunk: Buffer) => chunks.push(chunk));
-    req.on("end", () => {
-      try {
-        const body = Buffer.concat(chunks).toString("utf-8");
-        if (!body || body.length < 10) {
-          return res.status(400).json({ error: "Missing image data" });
-        }
-        const base64 = body.includes(",") ? body.split(",")[1] : body;
-        const buf = Buffer.from(base64, "base64");
-        writeHeroImage(buf);
-        return res.json({ ok: true, size: buf.length });
-      } catch {
-        return res.status(400).json({ error: "Invalid image data" });
+    try {
+      const body: string = typeof req.body === "string" ? req.body : "";
+      if (!body || body.length < 10) {
+        return res.status(400).json({ error: "Missing image data" });
       }
-    });
-    req.on("error", () => {
-      res.status(400).json({ error: "Upload error" });
-    });
+      const base64 = body.includes(",") ? body.split(",")[1] : body;
+      const buf = Buffer.from(base64, "base64");
+      writeHeroImage(buf);
+      return res.json({ ok: true, size: buf.length });
+    } catch {
+      return res.status(400).json({ error: "Invalid image data" });
+    }
   });
 
   // Admin: check if hero image exists
