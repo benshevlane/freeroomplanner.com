@@ -81,17 +81,9 @@ export default function Landing() {
   const [, navigate] = useLocation();
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [isDark, setIsDark] = useState(false);
-  const [heroImg, setHeroImg] = useState<string | null>(null);
 
   useEffect(() => {
     setIsDark(window.matchMedia("(prefers-color-scheme: dark)").matches);
-  }, []);
-
-  useEffect(() => {
-    fetch("/api/admin/hero-image")
-      .then((r) => r.json())
-      .then((d) => { if (d.exists && d.url) setHeroImg(d.url); })
-      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -188,11 +180,6 @@ export default function Landing() {
 
         {/* Hero illustration */}
         <div className="rs-fade opacity-0 translate-y-4 transition-all duration-700 delay-200 mt-14">
-          {heroImg ? (
-            <div className="rounded-2xl border overflow-hidden shadow-lg max-w-2xl mx-auto border-[#e8e3d8]">
-              <img src={heroImg} alt="Kitchen floor plan created with Free Room Planner" className="w-full" />
-            </div>
-          ) : (
           <div className={`rounded-2xl border overflow-hidden shadow-lg max-w-2xl mx-auto ${isDark ? "bg-[#222220] border-[#2e2e2a]" : "bg-white border-[#e8e3d8]"}`}>
             {/* Browser chrome */}
             <div className={`flex items-center gap-1.5 px-4 py-3 border-b ${isDark ? "border-[#2e2e2a] bg-[#1e1e1c]" : "border-[#e8e3d8] bg-[#f5f2ec]"}`}>
@@ -357,7 +344,6 @@ export default function Landing() {
               <text x="594" y="110" textAnchor="middle" fill={isDark ? "#5ba89a" : "#3d8a7c"} fontSize="10" fontFamily="sans-serif" fontWeight="600" transform="rotate(-90 594 110)">13&apos;1&quot;</text>
             </svg>
           </div>
-          )}
         </div>
       </section>
 
