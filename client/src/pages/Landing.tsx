@@ -188,8 +188,75 @@ export default function Landing() {
               <span className="w-2.5 h-2.5 rounded-full bg-[#28c840]"/>
               <span className={`ml-3 text-xs ${isDark ? "text-[#5a5a52]" : "text-[#9a9488]"}`}>freeroomplanner.com/app</span>
             </div>
-            {/* Floor plan screenshot */}
-            <img src="/hero-kitchen.png" alt="Kitchen floor plan created with Free Room Planner showing furniture layout, measurements, and room labels" className="w-full" />
+            {/* Floor plan illustration */}
+            <svg viewBox="0 0 640 400" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full" role="img" aria-label="Kitchen floor plan created with Free Room Planner showing furniture layout, measurements, and room labels">
+              {/* Background */}
+              <rect width="640" height="400" fill={isDark ? "#222220" : "#ffffff"} />
+
+              {/* Grid */}
+              {Array.from({ length: 16 }).map((_, i) => (
+                <line key={`vg${i}`} x1={40 * i} y1="0" x2={40 * i} y2="400" stroke={isDark ? "#2e2e2a" : "#f0ede6"} strokeWidth="0.5" />
+              ))}
+              {Array.from({ length: 10 }).map((_, i) => (
+                <line key={`hg${i}`} x1="0" y1={40 * i} x2="640" y2={40 * i} stroke={isDark ? "#2e2e2a" : "#f0ede6"} strokeWidth="0.5" />
+              ))}
+
+              {/* Room walls */}
+              <rect x="80" y="60" width="480" height="280" fill="none" stroke={isDark ? "#5ba89a" : "#3d8a7c"} strokeWidth="3" />
+
+              {/* Door opening (bottom wall) */}
+              <line x1="280" y1="340" x2="360" y2="340" stroke={isDark ? "#222220" : "#ffffff"} strokeWidth="5" />
+              {/* Door arc */}
+              <path d="M 280 340 A 80 80 0 0 1 280 260" stroke={isDark ? "#5a5a52" : "#c4bfb4"} strokeWidth="1.5" fill="none" strokeDasharray="4 3" />
+
+              {/* Window (top wall) */}
+              <line x1="200" y1="60" x2="340" y2="60" stroke={isDark ? "#5ba89a" : "#3d8a7c"} strokeWidth="6" />
+              <line x1="200" y1="60" x2="340" y2="60" stroke={isDark ? "#3d6b62" : "#a8ddd0"} strokeWidth="2" />
+
+              {/* Kitchen counter (L-shape along top-right) */}
+              <rect x="400" y="70" width="150" height="50" rx="4" fill={isDark ? "#2e2e2a" : "#f5f2ec"} stroke={isDark ? "#5a5a52" : "#d8d2c4"} strokeWidth="1.5" />
+              <rect x="500" y="70" width="50" height="140" rx="4" fill={isDark ? "#2e2e2a" : "#f5f2ec"} stroke={isDark ? "#5a5a52" : "#d8d2c4"} strokeWidth="1.5" />
+              {/* Sink */}
+              <rect x="430" y="80" width="36" height="28" rx="6" fill="none" stroke={isDark ? "#5a5a52" : "#c4bfb4"} strokeWidth="1.5" />
+              <circle cx="448" cy="94" r="4" fill={isDark ? "#5a5a52" : "#c4bfb4"} />
+              {/* Stove */}
+              <rect x="510" y="100" width="30" height="36" rx="3" fill="none" stroke={isDark ? "#5a5a52" : "#c4bfb4"} strokeWidth="1.5" />
+              <circle cx="520" cy="110" r="4" fill="none" stroke={isDark ? "#5a5a52" : "#c4bfb4"} strokeWidth="1" />
+              <circle cx="530" cy="110" r="4" fill="none" stroke={isDark ? "#5a5a52" : "#c4bfb4"} strokeWidth="1" />
+              <circle cx="520" cy="124" r="4" fill="none" stroke={isDark ? "#5a5a52" : "#c4bfb4"} strokeWidth="1" />
+              <circle cx="530" cy="124" r="4" fill="none" stroke={isDark ? "#5a5a52" : "#c4bfb4"} strokeWidth="1" />
+
+              {/* Kitchen island */}
+              <rect x="260" y="160" width="140" height="70" rx="6" fill={isDark ? "#2e2e2a" : "#f5f2ec"} stroke={isDark ? "#5a5a52" : "#d8d2c4"} strokeWidth="1.5" />
+
+              {/* Dining table */}
+              <rect x="120" y="170" width="90" height="60" rx="8" fill={isDark ? "#2e2e2a" : "#f5f2ec"} stroke={isDark ? "#5a5a52" : "#d8d2c4"} strokeWidth="1.5" />
+              {/* Chairs */}
+              <rect x="138" y="152" width="20" height="14" rx="4" fill="none" stroke={isDark ? "#5a5a52" : "#c4bfb4"} strokeWidth="1" />
+              <rect x="172" y="152" width="20" height="14" rx="4" fill="none" stroke={isDark ? "#5a5a52" : "#c4bfb4"} strokeWidth="1" />
+              <rect x="138" y="234" width="20" height="14" rx="4" fill="none" stroke={isDark ? "#5a5a52" : "#c4bfb4"} strokeWidth="1" />
+              <rect x="172" y="234" width="20" height="14" rx="4" fill="none" stroke={isDark ? "#5a5a52" : "#c4bfb4"} strokeWidth="1" />
+
+              {/* Fridge */}
+              <rect x="500" y="220" width="50" height="60" rx="4" fill={isDark ? "#2e2e2a" : "#f5f2ec"} stroke={isDark ? "#5a5a52" : "#d8d2c4"} strokeWidth="1.5" />
+              <line x1="500" y1="248" x2="550" y2="248" stroke={isDark ? "#5a5a52" : "#d8d2c4"} strokeWidth="1" />
+
+              {/* Dimension lines */}
+              {/* Top dimension */}
+              <line x1="80" y1="42" x2="560" y2="42" stroke={isDark ? "#5ba89a" : "#3d8a7c"} strokeWidth="1" />
+              <line x1="80" y1="36" x2="80" y2="48" stroke={isDark ? "#5ba89a" : "#3d8a7c"} strokeWidth="1" />
+              <line x1="560" y1="36" x2="560" y2="48" stroke={isDark ? "#5ba89a" : "#3d8a7c"} strokeWidth="1" />
+              <text x="320" y="38" textAnchor="middle" fill={isDark ? "#5ba89a" : "#3d8a7c"} fontSize="11" fontFamily="sans-serif">4.8 m</text>
+
+              {/* Left dimension */}
+              <line x1="62" y1="60" x2="62" y2="340" stroke={isDark ? "#5ba89a" : "#3d8a7c"} strokeWidth="1" />
+              <line x1="56" y1="60" x2="68" y2="60" stroke={isDark ? "#5ba89a" : "#3d8a7c"} strokeWidth="1" />
+              <line x1="56" y1="340" x2="68" y2="340" stroke={isDark ? "#5ba89a" : "#3d8a7c"} strokeWidth="1" />
+              <text x="50" y="204" textAnchor="middle" fill={isDark ? "#5ba89a" : "#3d8a7c"} fontSize="11" fontFamily="sans-serif" transform="rotate(-90 50 204)">2.8 m</text>
+
+              {/* Room label */}
+              <text x="320" y="300" textAnchor="middle" fill={isDark ? "#5a5a52" : "#c4bfb4"} fontSize="14" fontFamily="sans-serif" fontWeight="500">Kitchen</text>
+            </svg>
           </div>
         </div>
       </section>
