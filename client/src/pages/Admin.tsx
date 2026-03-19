@@ -27,13 +27,19 @@ export default function Admin() {
     try {
       const formData = new FormData();
       formData.append("image", file);
-      const res = await fetch("/api/admin/hero-image", {
-        method: "POST",
-        body: formData,
+      const url = new URL("/api/admin/hero-image", window.location.origin).href;
+      const data: { ok?: boolean; size?: number; error?: string } = await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("POST", url);
+        xhr.onload = () => {
+          try { resolve(JSON.parse(xhr.responseText)); }
+          catch { reject(new Error("Invalid server response")); }
+        };
+        xhr.onerror = () => reject(new Error("Network error"));
+        xhr.send(formData);
       });
-      const data = await res.json();
       if (data.ok) {
-        setMessage(`Uploaded (${(data.size / 1024).toFixed(0)} KB)`);
+        setMessage(`Uploaded (${((data.size ?? 0) / 1024).toFixed(0)} KB)`);
         checkHero();
       } else {
         setMessage(data.error || "Upload failed");
