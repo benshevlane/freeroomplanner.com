@@ -99,16 +99,16 @@ export default function EditorToolbar({
   onToggleComponentLabels,
 }: EditorToolbarProps) {
   if (isMobile) {
-    const btnClass = "h-11 w-11";
+    const btnClass = "h-11 w-11 flex-shrink-0";
     return (
-      <div className="border-b border-border bg-card" data-testid="editor-toolbar">
+      <div className="border-b border-border bg-card overflow-hidden" data-testid="editor-toolbar">
         {/* Row 1: Library + Tools + Undo/Redo + Properties */}
-        <div className="flex items-center gap-0.5 px-2 py-1">
+        <div className="flex items-center gap-0.5 px-2 py-1 overflow-x-auto scrollbar-hide">
           <Button size="icon" variant="ghost" className={btnClass} onClick={onToggleFurniturePanel} data-testid="btn-library">
             <LayoutList className="h-5 w-5" />
           </Button>
 
-          <Separator orientation="vertical" className="h-6 mx-0.5" />
+          <Separator orientation="vertical" className="h-6 mx-0.5 flex-shrink-0" />
 
           {tools.map(({ tool, icon: Icon }) => (
             <Button
@@ -123,13 +123,13 @@ export default function EditorToolbar({
             </Button>
           ))}
 
-          <Separator orientation="vertical" className="h-6 mx-0.5" />
+          <Separator orientation="vertical" className="h-6 mx-0.5 flex-shrink-0" />
 
           <Button size="icon" variant="ghost" className={btnClass} onClick={onAddTextBox} data-testid="btn-add-text-box">
             <TextCursorInput className="h-5 w-5" />
           </Button>
 
-          <Separator orientation="vertical" className="h-6 mx-0.5" />
+          <Separator orientation="vertical" className="h-6 mx-0.5 flex-shrink-0" />
 
           <Button size="icon" variant="ghost" className={btnClass} onClick={onUndo} disabled={!canUndo} data-testid="btn-undo">
             <Undo2 className="h-5 w-5" />
@@ -138,11 +138,6 @@ export default function EditorToolbar({
             <Redo2 className="h-5 w-5" />
           </Button>
 
-          <div className="flex-1" />
-
-          <Button size="icon" variant="ghost" className={btnClass} onClick={onTogglePropertiesPanel} data-testid="btn-properties">
-            <SlidersHorizontal className="h-5 w-5" />
-          </Button>
         </div>
 
         {/* Row 2: Zoom + Selection actions + Overflow menu */}
@@ -172,6 +167,10 @@ export default function EditorToolbar({
           )}
 
           <div className="flex-1" />
+
+          <Button size="icon" variant="ghost" className={btnClass} onClick={onTogglePropertiesPanel} data-testid="btn-properties">
+            <SlidersHorizontal className="h-5 w-5" />
+          </Button>
 
           {/* Overflow menu */}
           <DropdownMenu>

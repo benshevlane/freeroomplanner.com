@@ -2,6 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Hide scrollbar while keeping scroll functionality */
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
 /* Rich text box content styles */
 .rich-text-content h1 { font-size: 2em; font-weight: 700; margin: 0.3em 0; }
 .rich-text-content h2 { font-size: 1.5em; font-weight: 600; margin: 0.3em 0; }
