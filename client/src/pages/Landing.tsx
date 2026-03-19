@@ -188,8 +188,161 @@ export default function Landing() {
               <span className="w-2.5 h-2.5 rounded-full bg-[#28c840]"/>
               <span className={`ml-3 text-xs ${isDark ? "text-[#5a5a52]" : "text-[#9a9488]"}`}>freeroomplanner.com/app</span>
             </div>
-            {/* Floor plan screenshot */}
-            <img src="/hero-kitchen.png" alt="Kitchen floor plan created with Free Room Planner showing furniture layout, measurements, and room labels" className="w-full" />
+            {/* Floor plan illustration — L-shaped kitchen */}
+            <svg viewBox="0 0 700 580" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full" role="img" aria-label="L-shaped kitchen floor plan with furniture layout, dimensions, and room labels created with Free Room Planner">
+              {/* Background */}
+              <rect width="700" height="580" fill={isDark ? "#222220" : "#ffffff"} />
+
+              {/* Grid */}
+              {Array.from({ length: 18 }).map((_, i) => (
+                <line key={`vg${i}`} x1={40 * i} y1="0" x2={40 * i} y2="580" stroke={isDark ? "#2e2e2a" : "#f0ede6"} strokeWidth="0.5" />
+              ))}
+              {Array.from({ length: 15 }).map((_, i) => (
+                <line key={`hg${i}`} x1="0" y1={40 * i} x2="700" y2={40 * i} stroke={isDark ? "#2e2e2a" : "#f0ede6"} strokeWidth="0.5" />
+              ))}
+
+              {/* L-shaped room walls */}
+              <path d="M 80 50 L 540 50 L 540 160 L 640 160 L 640 370 L 540 370 L 540 530 L 80 530 Z" fill="none" stroke={isDark ? "#5ba89a" : "#2a6e62"} strokeWidth="5" strokeLinejoin="round" />
+
+              {/* Window (top wall) */}
+              <line x1="210" y1="50" x2="310" y2="50" stroke={isDark ? "#222220" : "#ffffff"} strokeWidth="7" />
+              <rect x="210" y="44" width="100" height="12" fill="none" stroke={isDark ? "#5ba89a" : "#3d8a7c"} strokeWidth="1.5" />
+              <line x1="260" y1="44" x2="260" y2="56" stroke={isDark ? "#5ba89a" : "#3d8a7c"} strokeWidth="1" />
+
+              {/* Double door (top wall, right of window) */}
+              <line x1="380" y1="50" x2="460" y2="50" stroke={isDark ? "#222220" : "#ffffff"} strokeWidth="7" />
+              <line x1="380" y1="44" x2="380" y2="56" stroke={isDark ? "#5a5a52" : "#c4bfb4"} strokeWidth="1.5" />
+              <line x1="460" y1="44" x2="460" y2="56" stroke={isDark ? "#5a5a52" : "#c4bfb4"} strokeWidth="1.5" />
+
+              {/* Double door (bottom-right wall) */}
+              <line x1="540" y1="370" x2="540" y2="450" stroke={isDark ? "#222220" : "#ffffff"} strokeWidth="7" />
+              {/* Door arcs */}
+              <path d="M 540 370 A 80 80 0 0 0 460 370" stroke={isDark ? "#5a5a52" : "#c4bfb4"} strokeWidth="1.5" fill="none" />
+              <path d="M 540 450 A 80 80 0 0 1 460 450" stroke={isDark ? "#5a5a52" : "#c4bfb4"} strokeWidth="1.5" fill="none" />
+
+              {/* === FURNITURE === */}
+
+              {/* Top worktop (along top wall) */}
+              <rect x="95" y="58" width="180" height="54" rx="2" fill={isDark ? "#2e2e2a" : "#f5f2ec"} stroke={isDark ? "#5a5a52" : "#d8d2c4"} strokeWidth="1.5" strokeDasharray="5 3" />
+              <text x="185" y="82" textAnchor="middle" fill={isDark ? "#5ba89a" : "#5a9a8e"} fontSize="8" fontFamily="sans-serif" fontWeight="500">Worktop</text>
+              <text x="185" y="94" textAnchor="middle" fill={isDark ? "#5a5a52" : "#9a9488"} fontSize="7" fontFamily="sans-serif">287 × 86 cm</text>
+
+              {/* Kitchen sink (double) */}
+              <rect x="310" y="58" width="80" height="54" rx="2" fill={isDark ? "#2e2e2a" : "#f5f2ec"} stroke={isDark ? "#5a5a52" : "#d8d2c4"} strokeWidth="1.5" strokeDasharray="5 3" />
+              <rect x="330" y="64" width="18" height="14" rx="3" fill="none" stroke={isDark ? "#5a5a52" : "#c4bfb4"} strokeWidth="1" />
+              <rect x="354" y="64" width="18" height="14" rx="3" fill="none" stroke={isDark ? "#5a5a52" : "#c4bfb4"} strokeWidth="1" />
+              <text x="350" y="94" textAnchor="middle" fill={isDark ? "#5ba89a" : "#5a9a8e"} fontSize="7" fontFamily="sans-serif" fontWeight="500">Kitchen Sink (double)</text>
+              <text x="350" y="104" textAnchor="middle" fill={isDark ? "#5a5a52" : "#9a9488"} fontSize="7" fontFamily="sans-serif">123 × 85 cm</text>
+
+              {/* Left worktop (vertical, along left wall) */}
+              <rect x="88" y="130" width="50" height="140" rx="2" fill={isDark ? "#2e2e2a" : "#f5f2ec"} stroke={isDark ? "#5a5a52" : "#d8d2c4"} strokeWidth="1.5" strokeDasharray="5 3" />
+              <text x="113" y="195" textAnchor="middle" fill={isDark ? "#5ba89a" : "#5a9a8e"} fontSize="7" fontFamily="sans-serif" fontWeight="500" transform="rotate(-90 113 195)">Worktop</text>
+              <text x="113" y="210" textAnchor="middle" fill={isDark ? "#5a5a52" : "#9a9488"} fontSize="6" fontFamily="sans-serif" transform="rotate(-90 113 210)">224 × 80 cm</text>
+
+              {/* Range cooker */}
+              <rect x="160" y="220" width="65" height="50" rx="2" fill={isDark ? "#2e2e2a" : "#f5f2ec"} stroke={isDark ? "#5a5a52" : "#d8d2c4"} strokeWidth="1.5" strokeDasharray="5 3" />
+              {/* Burners */}
+              <circle cx="178" cy="237" r="5" fill="none" stroke={isDark ? "#5a5a52" : "#c4bfb4"} strokeWidth="1" />
+              <circle cx="196" cy="237" r="5" fill="none" stroke={isDark ? "#5a5a52" : "#c4bfb4"} strokeWidth="1" />
+              <circle cx="178" cy="255" r="5" fill="none" stroke={isDark ? "#5a5a52" : "#c4bfb4"} strokeWidth="1" />
+              <circle cx="196" cy="255" r="5" fill="none" stroke={isDark ? "#5a5a52" : "#c4bfb4"} strokeWidth="1" />
+              <text x="192" y="282" textAnchor="middle" fill={isDark ? "#5ba89a" : "#5a9a8e"} fontSize="7" fontFamily="sans-serif" fontWeight="500">Range Cooker</text>
+              <text x="192" y="292" textAnchor="middle" fill={isDark ? "#5a5a52" : "#9a9488"} fontSize="6" fontFamily="sans-serif">100 × 81 cm</text>
+
+              {/* Lower-left worktop */}
+              <rect x="88" y="310" width="50" height="125" rx="2" fill={isDark ? "#2e2e2a" : "#f5f2ec"} stroke={isDark ? "#5a5a52" : "#d8d2c4"} strokeWidth="1.5" strokeDasharray="5 3" />
+              <text x="113" y="370" textAnchor="middle" fill={isDark ? "#5ba89a" : "#5a9a8e"} fontSize="7" fontFamily="sans-serif" fontWeight="500" transform="rotate(-90 113 370)">Worktop</text>
+              <text x="113" y="385" textAnchor="middle" fill={isDark ? "#5a5a52" : "#9a9488"} fontSize="6" fontFamily="sans-serif" transform="rotate(-90 113 385)">200 × 80 cm</text>
+
+              {/* Kitchen island (large center) */}
+              <rect x="220" y="155" width="220" height="120" rx="4" fill={isDark ? "#2e2e2a" : "#f5f2ec"} stroke={isDark ? "#5a5a52" : "#d8d2c4"} strokeWidth="1.5" strokeDasharray="5 3" />
+              <text x="330" y="210" textAnchor="middle" fill={isDark ? "#5ba89a" : "#5a9a8e"} fontSize="10" fontFamily="sans-serif" fontWeight="600">Kitchen Island</text>
+              <text x="330" y="225" textAnchor="middle" fill={isDark ? "#5a5a52" : "#9a9488"} fontSize="8" fontFamily="sans-serif">352 × 194 cm</text>
+
+              {/* 3-seat sofa (top-right corner) */}
+              <rect x="545" y="58" width="28" height="135" rx="4" fill={isDark ? "#2e2e2a" : "#f5f2ec"} stroke={isDark ? "#5a5a52" : "#d8d2c4"} strokeWidth="1.5" strokeDasharray="5 3" />
+              <text x="559" y="125" textAnchor="middle" fill={isDark ? "#5ba89a" : "#5a9a8e"} fontSize="7" fontFamily="sans-serif" fontWeight="500" transform="rotate(-90 559 125)">3-Seat Sofa</text>
+              <text x="559" y="140" textAnchor="middle" fill={isDark ? "#5a5a52" : "#9a9488"} fontSize="6" fontFamily="sans-serif" transform="rotate(-90 559 140)">220 × 90 cm</text>
+
+              {/* Coffee table */}
+              <rect x="465" y="120" width="60" height="35" rx="3" fill={isDark ? "#2e2e2a" : "#f5f2ec"} stroke={isDark ? "#5a5a52" : "#d8d2c4"} strokeWidth="1.5" strokeDasharray="5 3" />
+              <text x="495" y="137" textAnchor="middle" fill={isDark ? "#5ba89a" : "#5a9a8e"} fontSize="7" fontFamily="sans-serif" fontWeight="500">Coffee Table</text>
+              <text x="495" y="148" textAnchor="middle" fill={isDark ? "#5a5a52" : "#9a9488"} fontSize="6" fontFamily="sans-serif">120 × 60 cm</text>
+
+              {/* Room label + area */}
+              <text x="430" y="295" textAnchor="middle" fill={isDark ? "#5a5a52" : "#4a463e"} fontSize="16" fontFamily="sans-serif" fontWeight="700">Kitchen</text>
+              <text x="430" y="314" textAnchor="middle" fill={isDark ? "#5a5a52" : "#9a9488"} fontSize="11" fontFamily="sans-serif">918.2 sq ft</text>
+
+              {/* === BOTTOM SECTION — Living area furniture === */}
+
+              {/* Bookshelf (bottom-left) */}
+              <rect x="95" y="460" width="55" height="30" rx="2" fill={isDark ? "#2e2e2a" : "#f5f2ec"} stroke={isDark ? "#5a5a52" : "#d8d2c4"} strokeWidth="1.5" strokeDasharray="5 3" />
+              <text x="122" y="479" textAnchor="middle" fill={isDark ? "#5ba89a" : "#5a9a8e"} fontSize="7" fontFamily="sans-serif" fontWeight="500">Bookshelf</text>
+              <text x="122" y="492" textAnchor="middle" fill={isDark ? "#5a5a52" : "#9a9488"} fontSize="6" fontFamily="sans-serif">94 × 47 cm</text>
+
+              {/* TV Unit */}
+              <rect x="95" y="505" width="80" height="12" rx="2" fill={isDark ? "#2e2e2a" : "#f5f2ec"} stroke={isDark ? "#5a5a52" : "#d8d2c4"} strokeWidth="1.5" strokeDasharray="5 3" />
+              <text x="135" y="527" textAnchor="middle" fill={isDark ? "#5ba89a" : "#5a9a8e"} fontSize="7" fontFamily="sans-serif" fontWeight="500">TV Unit</text>
+              <text x="135" y="537" textAnchor="middle" fill={isDark ? "#5a5a52" : "#9a9488"} fontSize="6" fontFamily="sans-serif">133 × 20 cm</text>
+
+              {/* Bookshelf (bottom) */}
+              <rect x="95" y="545" width="70" height="22" rx="2" fill={isDark ? "#2e2e2a" : "#f5f2ec"} stroke={isDark ? "#5a5a52" : "#d8d2c4"} strokeWidth="1.5" strokeDasharray="5 3" />
+              <text x="130" y="558" textAnchor="middle" fill={isDark ? "#5ba89a" : "#5a9a8e"} fontSize="6" fontFamily="sans-serif" fontWeight="500">Bookshelf 120 × 35 cm</text>
+
+              {/* Armchair */}
+              <rect x="195" y="455" width="50" height="50" rx="4" fill={isDark ? "#2e2e2a" : "#f5f2ec"} stroke={isDark ? "#5a5a52" : "#d8d2c4"} strokeWidth="1.5" strokeDasharray="5 3" />
+              <text x="220" y="478" textAnchor="middle" fill={isDark ? "#5ba89a" : "#5a9a8e"} fontSize="7" fontFamily="sans-serif" fontWeight="500">Armchair</text>
+              <text x="220" y="490" textAnchor="middle" fill={isDark ? "#5a5a52" : "#9a9488"} fontSize="6" fontFamily="sans-serif">85 × 85 cm</text>
+
+              {/* 3-seat sofa (bottom center) */}
+              <rect x="290" y="460" width="80" height="150" rx="4" fill={isDark ? "#2e2e2a" : "#f5f2ec"} stroke={isDark ? "#5a5a52" : "#d8d2c4"} strokeWidth="1.5" strokeDasharray="5 3" />
+              <text x="330" y="530" textAnchor="middle" fill={isDark ? "#5ba89a" : "#5a9a8e"} fontSize="8" fontFamily="sans-serif" fontWeight="500" transform="rotate(-90 330 530)">3-Seat Sofa</text>
+              <text x="330" y="545" textAnchor="middle" fill={isDark ? "#5a5a52" : "#9a9488"} fontSize="6" fontFamily="sans-serif" transform="rotate(-90 330 545)">241 × 126 cm</text>
+
+              {/* Double door label (bottom-right) */}
+              <text x="565" y="415" textAnchor="middle" fill={isDark ? "#5ba89a" : "#5a9a8e"} fontSize="7" fontFamily="sans-serif" fontWeight="500">Double Door</text>
+              <text x="565" y="425" textAnchor="middle" fill={isDark ? "#5a5a52" : "#9a9488"} fontSize="6" fontFamily="sans-serif">215 × 15 cm</text>
+
+              {/* Window label (top) */}
+              <text x="260" y="35" textAnchor="middle" fill={isDark ? "#5ba89a" : "#5a9a8e"} fontSize="7" fontFamily="sans-serif" fontWeight="500">Window</text>
+              <text x="260" y="44" textAnchor="middle" fill={isDark ? "#5a5a52" : "#9a9488"} fontSize="6" fontFamily="sans-serif">172 × 15 cm</text>
+
+              {/* Double door label (top) */}
+              <text x="420" y="35" textAnchor="middle" fill={isDark ? "#5ba89a" : "#5a9a8e"} fontSize="7" fontFamily="sans-serif" fontWeight="500">Double Door</text>
+              <text x="420" y="44" textAnchor="middle" fill={isDark ? "#5a5a52" : "#9a9488"} fontSize="6" fontFamily="sans-serif">150 × 15 cm</text>
+
+              {/* === DIMENSION LINES === */}
+
+              {/* Bottom dimension — 22'0" */}
+              <line x1="80" y1="570" x2="540" y2="570" stroke={isDark ? "#5ba89a" : "#3d8a7c"} strokeWidth="1" />
+              <line x1="80" y1="564" x2="80" y2="576" stroke={isDark ? "#5ba89a" : "#3d8a7c"} strokeWidth="1" />
+              <line x1="540" y1="564" x2="540" y2="576" stroke={isDark ? "#5ba89a" : "#3d8a7c"} strokeWidth="1" />
+              <text x="310" y="568" textAnchor="middle" fill={isDark ? "#5ba89a" : "#3d8a7c"} fontSize="11" fontFamily="sans-serif" fontWeight="600">22&apos;0&quot;</text>
+
+              {/* Left dimension — 36'7" */}
+              <line x1="50" y1="50" x2="50" y2="530" stroke={isDark ? "#5ba89a" : "#3d8a7c"} strokeWidth="1" />
+              <line x1="44" y1="50" x2="56" y2="50" stroke={isDark ? "#5ba89a" : "#3d8a7c"} strokeWidth="1" />
+              <line x1="44" y1="530" x2="56" y2="530" stroke={isDark ? "#5ba89a" : "#3d8a7c"} strokeWidth="1" />
+              <text x="38" y="290" textAnchor="middle" fill={isDark ? "#5ba89a" : "#3d8a7c"} fontSize="11" fontFamily="sans-serif" fontWeight="600" transform="rotate(-90 38 290)">36&apos;7&quot;</text>
+
+              {/* Right dimension (notch width) — 9'6" */}
+              <line x1="540" y1="168" x2="640" y2="168" stroke={isDark ? "#5ba89a" : "#3d8a7c"} strokeWidth="1" />
+              <line x1="540" y1="162" x2="540" y2="174" stroke={isDark ? "#5ba89a" : "#3d8a7c"} strokeWidth="1" />
+              <line x1="640" y1="162" x2="640" y2="174" stroke={isDark ? "#5ba89a" : "#3d8a7c"} strokeWidth="1" />
+              <text x="590" y="183" textAnchor="middle" fill={isDark ? "#5ba89a" : "#3d8a7c"} fontSize="10" fontFamily="sans-serif" fontWeight="600">9&apos;6&quot;</text>
+
+              {/* Right dimension (notch height) — 23'0" */}
+              <line x1="658" y1="160" x2="658" y2="370" stroke={isDark ? "#5ba89a" : "#3d8a7c"} strokeWidth="1" />
+              <line x1="652" y1="160" x2="664" y2="160" stroke={isDark ? "#5ba89a" : "#3d8a7c"} strokeWidth="1" />
+              <line x1="652" y1="370" x2="664" y2="370" stroke={isDark ? "#5ba89a" : "#3d8a7c"} strokeWidth="1" />
+              <text x="670" y="270" textAnchor="middle" fill={isDark ? "#5ba89a" : "#3d8a7c"} fontSize="10" fontFamily="sans-serif" fontWeight="600" transform="rotate(-90 670 270)">23&apos;0&quot;</text>
+
+              {/* Top-right dimension — 13'1" */}
+              <line x1="582" y1="50" x2="582" y2="160" stroke={isDark ? "#5ba89a" : "#3d8a7c"} strokeWidth="1" />
+              <line x1="576" y1="50" x2="588" y2="50" stroke={isDark ? "#5ba89a" : "#3d8a7c"} strokeWidth="1" />
+              <line x1="576" y1="160" x2="588" y2="160" stroke={isDark ? "#5ba89a" : "#3d8a7c"} strokeWidth="1" />
+              <text x="594" y="110" textAnchor="middle" fill={isDark ? "#5ba89a" : "#3d8a7c"} fontSize="10" fontFamily="sans-serif" fontWeight="600" transform="rotate(-90 594 110)">13&apos;1&quot;</text>
+            </svg>
           </div>
         </div>
       </section>
