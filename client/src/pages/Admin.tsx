@@ -1,10 +1,130 @@
 import { useState, useRef, useCallback, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
+import { apiRequest } from "@/lib/queryClient";
 
 const BUCKET = "hero-images";
 const OBJECT_PATH = "hero-floorplan.jpg";
 
+interface EmbedPartner {
+  partner_id: string;
+  business_name: string;
+  email: string;
+  website_url: string | null;
+  created_at: string | null;
+  embed_loaded_count: number;
+  plan_exported_count: number;
+}
+
+function LoginForm({ onSuccess }: { onSuccess: () => void }) {
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    try {
+      await apiRequest("POST", "/api/admin/login", { password });
+      onSuccess();
+    } catch {
+      setError("Invalid password");
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div className="min-h-screen bg-[#faf8f4] text-[#1a1a18] flex items-center justify-center">
+      <div className="w-full max-w-sm px-5">
+        <h1 className="text-2xl font-bold mb-1 text-center">Admin</h1>
+        <p className="text-[#6b6457] mb-8 text-center text-sm">Enter the admin password to continue.</p>
+        <form onSubmit={handleSubmit}>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Password"
+            autoFocus
+            className="w-full border border-[#d8d2c4] rounded-lg px-4 py-2.5 text-sm bg-white focus:outline-none focus:border-[#3d8a7c] transition-colors"
+          />
+          {error && <p className="text-red-600 text-sm mt-2">{error}</p>}
+          <button
+            type="submit"
+            disabled={loading || !password}
+            className="w-full mt-4 bg-[#3d8a7c] text-white rounded-lg px-4 py-2.5 text-sm font-medium hover:bg-[#357a6e] disabled:opacity-50 transition-colors"
+          >
+            {loading ? "Checking..." : "Log in"}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function EmbedReport() {
+  const { data, isLoading, error } = useQuery<{ partners: EmbedPartner[] }>({
+    queryKey: ["/api/admin/embed-report"],
+  });
+
+  if (isLoading) return <p className="text-sm text-[#9a9488]">Loading embed report...</p>;
+  if (error) return <p className="text-sm text-red-600">Failed to load embed report.</p>;
+
+  const partners = data?.partners ?? [];
+
+  return (
+    <div className="mt-12">
+      <h2 className="text-lg font-semibold mb-1">Embed Users</h2>
+      <p className="text-sm text-[#6b6457] mb-4">
+        {partners.length} registered partner{partners.length !== 1 ? "s" : ""}
+      </p>
+      {partners.length === 0 ? (
+        <p className="text-sm text-[#9a9488]">No embed users yet.</p>
+      ) : (
+        <div className="overflow-x-auto rounded-xl border border-[#e8e3d8] bg-white shadow-sm">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-[#e8e3d8] bg-[#f5f2ec]">
+                <th className="text-left px-4 py-3 font-medium text-[#6b6457]">Business Name</th>
+                <th className="text-left px-4 py-3 font-medium text-[#6b6457]">Email</th>
+                <th className="text-left px-4 py-3 font-medium text-[#6b6457]">Website</th>
+                <th className="text-right px-4 py-3 font-medium text-[#6b6457]">Embed Loads</th>
+                <th className="text-right px-4 py-3 font-medium text-[#6b6457]">Plans Exported</th>
+              </tr>
+            </thead>
+            <tbody>
+              {partners.map((p) => (
+                <tr key={p.partner_id} className="border-b border-[#e8e3d8] last:border-0">
+                  <td className="px-4 py-3 font-medium">{p.business_name}</td>
+                  <td className="px-4 py-3 text-[#6b6457]">{p.email}</td>
+                  <td className="px-4 py-3">
+                    {p.website_url ? (
+                      <a
+                        href={p.website_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[#3d8a7c] hover:underline"
+                      >
+                        {p.website_url.replace(/^https?:\/\//, "")}
+                      </a>
+                    ) : (
+                      <span className="text-[#c4bfb4]">—</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-right tabular-nums">{p.embed_loaded_count}</td>
+                  <td className="px-4 py-3 text-right tabular-nums">{p.plan_exported_count}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Admin() {
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [heroExists, setHeroExists] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -12,6 +132,14 @@ export default function Admin() {
   const [messageType, setMessageType] = useState<"success" | "error">("success");
   const fileRef = useRef<HTMLInputElement>(null);
   const dropRef = useRef<HTMLDivElement>(null);
+
+  // Check auth status on mount
+  useEffect(() => {
+    fetch("/api/admin/auth-status")
+      .then((r) => r.json())
+      .then((d) => setIsAuthenticated(d.authenticated))
+      .catch(() => setIsAuthenticated(false));
+  }, []);
 
   const getPublicUrl = useCallback((): string | null => {
     if (!supabase) return null;
@@ -38,7 +166,6 @@ export default function Admin() {
       setHeroExists(exists);
       if (exists) {
         const url = getPublicUrl();
-        // Add cache-buster so the preview always shows the latest version
         setPreview(url ? `${url}?t=${Date.now()}` : null);
       } else {
         setPreview(null);
@@ -49,7 +176,9 @@ export default function Admin() {
     }
   }, [getPublicUrl]);
 
-  useEffect(() => { checkHero(); }, [checkHero]);
+  useEffect(() => {
+    if (isAuthenticated) checkHero();
+  }, [isAuthenticated, checkHero]);
 
   const compressImage = (file: File, maxWidth = 1920, quality = 0.85): Promise<Blob> => {
     return new Promise((resolve, reject) => {
@@ -132,12 +261,27 @@ export default function Admin() {
     setMessageType("success");
   };
 
+  // Loading state
+  if (isAuthenticated === null) {
+    return (
+      <div className="min-h-screen bg-[#faf8f4] flex items-center justify-center">
+        <p className="text-sm text-[#9a9488]">Loading...</p>
+      </div>
+    );
+  }
+
+  // Not authenticated — show login
+  if (!isAuthenticated) {
+    return <LoginForm onSuccess={() => setIsAuthenticated(true)} />;
+  }
+
+  // Authenticated — show admin content
   return (
     <div className="min-h-screen bg-[#faf8f4] text-[#1a1a18]">
-      <div className="max-w-2xl mx-auto px-5 py-16">
+      <div className="max-w-3xl mx-auto px-5 py-16">
         <a href="/" className="text-sm text-[#3d8a7c] hover:underline mb-6 inline-block">&larr; Back to site</a>
         <h1 className="text-3xl font-bold mb-2">Admin</h1>
-        <p className="text-[#6b6457] mb-10">Manage the homepage hero image.</p>
+        <p className="text-[#6b6457] mb-10">Manage the homepage hero image and view embed analytics.</p>
 
         {/* Upload area */}
         <div
@@ -181,6 +325,9 @@ export default function Admin() {
             <p className="text-xs text-[#9a9488] mt-2">Stored in Supabase Storage</p>
           </div>
         )}
+
+        {/* Embed Users Report */}
+        <EmbedReport />
       </div>
     </div>
   );

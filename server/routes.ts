@@ -1,7 +1,13 @@
-import express, { type Express } from "express";
+import crypto from "crypto";
+import express, { type Express, type Request, type Response, type NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { supabaseAdmin } from "./supabase";
+
+function requireAdmin(req: Request, res: Response, next: NextFunction) {
+  if (req.session?.isAdmin) return next();
+  return res.status(401).json({ error: "Unauthorized" });
+}
 
 const BUCKET = "hero-images";
 const OBJECT_PATH = "hero-floorplan.jpg";
@@ -57,8 +63,78 @@ export async function registerRoutes(
     res.json(plan);
   });
 
+  // Admin: login
+  app.post("/api/admin/login", async (req, res) => {
+    const { password } = req.body ?? {};
+    const expected = process.env.ADMIN_PASSWORD;
+    if (!expected) {
+      return res.status(500).json({ error: "ADMIN_PASSWORD not configured" });
+    }
+    if (typeof password !== "string" || password.length === 0) {
+      return res.status(400).json({ error: "Password required" });
+    }
+    const a = Buffer.from(password);
+    const b = Buffer.from(expected);
+    const valid = a.length === b.length && crypto.timingSafeEqual(a, b);
+    if (!valid) {
+      return res.status(401).json({ error: "Invalid password" });
+    }
+    req.session.isAdmin = true;
+    return res.json({ ok: true });
+  });
+
+  // Admin: check auth status
+  app.get("/api/admin/auth-status", (req, res) => {
+    res.json({ authenticated: !!req.session?.isAdmin });
+  });
+
+  // Admin: embed users report
+  app.get("/api/admin/embed-report", requireAdmin, async (_req, res) => {
+    if (!supabaseAdmin) {
+      return res.status(500).json({ error: "Supabase not configured" });
+    }
+    try {
+      const { data: partners, error: pErr } = await supabaseAdmin
+        .from("partners")
+        .select("partner_id, business_name, email, website_url, created_at");
+      if (pErr) throw pErr;
+
+      const { data: events, error: eErr } = await supabaseAdmin
+        .from("embed_events")
+        .select("partner_id, event_type")
+        .in("event_type", ["plan_exported", "embed_loaded"]);
+      if (eErr) throw eErr;
+
+      // Aggregate event counts per partner
+      const counts: Record<string, { embed_loaded: number; plan_exported: number }> = {};
+      for (const ev of events ?? []) {
+        if (!counts[ev.partner_id]) {
+          counts[ev.partner_id] = { embed_loaded: 0, plan_exported: 0 };
+        }
+        if (ev.event_type === "embed_loaded") counts[ev.partner_id].embed_loaded++;
+        if (ev.event_type === "plan_exported") counts[ev.partner_id].plan_exported++;
+      }
+
+      const result = (partners ?? []).map((p) => ({
+        partner_id: p.partner_id,
+        business_name: p.business_name,
+        email: p.email,
+        website_url: p.website_url,
+        created_at: p.created_at,
+        embed_loaded_count: counts[p.partner_id]?.embed_loaded ?? 0,
+        plan_exported_count: counts[p.partner_id]?.plan_exported ?? 0,
+      }));
+
+      return res.json({ partners: result });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to fetch report";
+      return res.status(500).json({ error: msg });
+    }
+  });
+
   // Admin: upload hero image
   app.post("/api/admin/hero-image",
+    requireAdmin,
     express.raw({ type: "application/octet-stream", limit: "20mb" }),
     async (req, res) => {
       const buf = req.body;
@@ -76,14 +152,14 @@ export async function registerRoutes(
   );
 
   // Admin: check if hero image exists
-  app.get("/api/admin/hero-image", async (_req, res) => {
+  app.get("/api/admin/hero-image", requireAdmin, async (_req, res) => {
     const exists = await heroImageExists();
     const url = exists ? getHeroPublicUrl() : null;
     res.json({ exists, url });
   });
 
   // Admin: delete hero image
-  app.delete("/api/admin/hero-image", async (_req, res) => {
+  app.delete("/api/admin/hero-image", requireAdmin, async (_req, res) => {
     await deleteHeroImage();
     res.json({ ok: true });
   });
