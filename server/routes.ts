@@ -31,50 +31,21 @@ export async function registerRoutes(
     res.json(plan);
   });
 
-  // Admin: upload hero image
+  // Admin: upload hero image (accepts JSON with base64 data)
   app.post("/api/admin/hero-image", (req, res) => {
-    const chunks: Buffer[] = [];
-    req.on("data", (chunk: Buffer) => chunks.push(chunk));
-    req.on("end", () => {
-      const body = Buffer.concat(chunks);
-      // Find the boundary from content-type
-      const contentType = req.headers["content-type"] || "";
-      const boundaryMatch = contentType.match(/boundary=(.+)/);
-      if (!boundaryMatch) {
-        return res.status(400).json({ error: "Missing multipart boundary" });
+    try {
+      const { data } = req.body;
+      if (!data || typeof data !== "string") {
+        return res.status(400).json({ error: "Missing image data" });
       }
-      const boundary = boundaryMatch[1];
-      const boundaryBuf = Buffer.from(`--${boundary}`);
-
-      // Split on boundary
-      const parts: Buffer[] = [];
-      let start = 0;
-      while (true) {
-        const idx = body.indexOf(boundaryBuf, start);
-        if (idx === -1) break;
-        if (start > 0) parts.push(body.subarray(start, idx));
-        start = idx + boundaryBuf.length;
-      }
-
-      // Find the file part
-      for (const part of parts) {
-        const headerEnd = part.indexOf("\r\n\r\n");
-        if (headerEnd === -1) continue;
-        const headers = part.subarray(0, headerEnd).toString();
-        if (!headers.includes("filename=")) continue;
-
-        // File data starts after \r\n\r\n and ends before trailing \r\n
-        let fileData = part.subarray(headerEnd + 4);
-        if (fileData[fileData.length - 1] === 10 && fileData[fileData.length - 2] === 13) {
-          fileData = fileData.subarray(0, fileData.length - 2);
-        }
-
-        fs.writeFileSync(HERO_IMAGE_PATH, fileData);
-        return res.json({ ok: true, size: fileData.length });
-      }
-
-      return res.status(400).json({ error: "No file found in upload" });
-    });
+      // Strip data URL prefix if present (e.g. "data:image/png;base64,...")
+      const base64 = data.includes(",") ? data.split(",")[1] : data;
+      const buf = Buffer.from(base64, "base64");
+      fs.writeFileSync(HERO_IMAGE_PATH, buf);
+      return res.json({ ok: true, size: buf.length });
+    } catch {
+      return res.status(400).json({ error: "Invalid image data" });
+    }
   });
 
   // Admin: check if hero image exists
