@@ -17,6 +17,26 @@ export default function Admin() {
 
   useEffect(() => { checkHero(); }, [checkHero]);
 
+  const compressImage = (file: File, maxWidth = 1920, quality = 0.85): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        let { width, height } = img;
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext("2d")!.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.onerror = () => reject(new Error("Failed to load image"));
+      img.src = URL.createObjectURL(file);
+    });
+  };
+
   const upload = async (file: File) => {
     if (!file.type.startsWith("image/")) {
       setMessage("Please select an image file.");
@@ -25,18 +45,18 @@ export default function Admin() {
     setUploading(true);
     setMessage("");
     try {
-      const buf = await file.arrayBuffer();
+      const dataUrl = await compressImage(file);
       const url = new URL("/api/admin/hero-image", window.location.origin).href;
       const data: { ok?: boolean; size?: number; error?: string } = await new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         xhr.open("POST", url);
-        xhr.setRequestHeader("Content-Type", "application/octet-stream");
+        xhr.setRequestHeader("Content-Type", "application/json");
         xhr.onload = () => {
           try { resolve(JSON.parse(xhr.responseText)); }
           catch { reject(new Error("Server returned (status " + xhr.status + "): " + xhr.responseText.slice(0, 200))); }
         };
         xhr.onerror = () => reject(new Error("Network error"));
-        xhr.send(buf);
+        xhr.send(JSON.stringify({ data: dataUrl }));
       });
       if (data.ok) {
         setMessage(`Uploaded (${((data.size ?? 0) / 1024).toFixed(0)} KB)`);
