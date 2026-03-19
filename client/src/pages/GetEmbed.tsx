@@ -113,6 +113,10 @@ export default function GetEmbed() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [logoError, setLogoError] = useState<string | null>(null);
+  const [logoTab, setLogoTab] = useState<"upload" | "url">("upload");
+  const [logoUploading, setLogoUploading] = useState(false);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [logoFileName, setLogoFileName] = useState<string | null>(null);
 
   // Result state
   const [partnerId, setPartnerId] = useState("");
@@ -160,6 +164,67 @@ export default function GetEmbed() {
     }
   }, [form.logoUrl]);
 
+  /* ---- Logo file upload ---- */
+  const handleLogoFile = useCallback(
+    async (file: File) => {
+      if (file.size > 500 * 1024) {
+        setLogoError("Logo must be under 500 KB");
+        return;
+      }
+      if (!file.type.match(/^image\/(png|jpeg|svg\+xml|webp)$/)) {
+        setLogoError("Please upload a PNG, JPG, SVG, or WebP image");
+        return;
+      }
+      setLogoUploading(true);
+      setLogoError(null);
+
+      try {
+        const res = await fetch("/api/upload-logo", {
+          method: "POST",
+          headers: { "Content-Type": file.type },
+          body: file,
+        });
+        const data = await res.json();
+        if (!res.ok || !data.url) {
+          setLogoError(data.error || "Upload failed — try again or paste a URL instead");
+          setLogoUploading(false);
+          return;
+        }
+        setField("logoUrl", data.url);
+        setLogoPreview(URL.createObjectURL(file));
+        setLogoFileName(file.name);
+      } catch {
+        setLogoError("Upload failed — try again or paste a URL instead");
+      }
+      setLogoUploading(false);
+    },
+    [setField],
+  );
+
+  const handleRemoveLogo = useCallback(() => {
+    setField("logoUrl", "");
+    if (logoPreview) {
+      URL.revokeObjectURL(logoPreview);
+    }
+    setLogoPreview(null);
+    setLogoFileName(null);
+    setLogoError(null);
+  }, [setField, logoPreview]);
+
+  const handleLogoTabSwitch = useCallback(
+    (tab: "upload" | "url") => {
+      setLogoTab(tab);
+      setField("logoUrl", "");
+      setLogoError(null);
+      if (logoPreview) {
+        URL.revokeObjectURL(logoPreview);
+      }
+      setLogoPreview(null);
+      setLogoFileName(null);
+    },
+    [setField, logoPreview],
+  );
+
   /* ---- Submit handler ---- */
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
@@ -174,7 +239,7 @@ export default function GetEmbed() {
       } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
         newErrors.email = "Please enter a valid email address.";
       }
-      if (form.logoUrl.trim() && !form.logoUrl.trim().startsWith("https://")) {
+      if (logoTab === "url" && form.logoUrl.trim() && !form.logoUrl.trim().startsWith("https://")) {
         newErrors.logoUrl = "Logo URL must start with https://";
       }
       if (form.websiteUrl.trim()) {
@@ -275,6 +340,11 @@ export default function GetEmbed() {
     setErrors({});
     setSubmitError(null);
     setLogoError(null);
+    setLogoTab("upload");
+    setLogoUploading(false);
+    if (logoPreview) URL.revokeObjectURL(logoPreview);
+    setLogoPreview(null);
+    setLogoFileName(null);
     setPartnerId("");
     setResultName("");
     setCopied(false);
@@ -442,17 +512,100 @@ export default function GetEmbed() {
                 </div>
               </div>
 
-              {/* Logo URL */}
+              {/* Logo */}
               <div className="mb-5">
-                <label className="block text-sm font-medium mb-1.5">Logo URL</label>
-                <input
-                  type="text"
-                  placeholder="https://yoursite.com/logo.png"
-                  value={form.logoUrl}
-                  onChange={(e) => setField("logoUrl", e.target.value)}
-                  onBlur={validateLogoOnBlur}
-                  className={`w-full px-3 py-2 rounded-lg border text-sm outline-none focus:ring-2 focus:ring-[#3d8a7c]/40 transition ${inputBg}`}
-                />
+                <label className="block text-sm font-medium mb-1.5">Logo</label>
+                {/* Tab toggle */}
+                <div className={`inline-flex rounded-lg border ${border} overflow-hidden mb-3`}>
+                  {(["upload", "url"] as const).map((tab) => (
+                    <button
+                      key={tab}
+                      type="button"
+                      onClick={() => handleLogoTabSwitch(tab)}
+                      className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                        logoTab === tab
+                          ? "bg-[#3d8a7c] text-white"
+                          : `${isDark ? "hover:bg-[#2e2e2a] text-[#a09a8c]" : "hover:bg-[#f0ede6] text-[#6b6457]"}`
+                      }`}
+                    >
+                      {tab === "upload" ? "Upload" : "Paste URL"}
+                    </button>
+                  ))}
+                </div>
+
+                {logoTab === "upload" ? (
+                  logoPreview ? (
+                    /* Uploaded preview */
+                    <div className={`flex items-center gap-3 p-3 rounded-lg border ${border} ${cardBg}`}>
+                      <img
+                        src={logoPreview}
+                        alt="Logo preview"
+                        className="h-10 max-w-[120px] object-contain rounded"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm truncate">{logoFileName}</p>
+                        <p className={`text-xs ${muted}`}>Uploaded</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleRemoveLogo}
+                        className="text-xs text-red-500 hover:underline shrink-0"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ) : (
+                    /* Drop zone */
+                    <label
+                      className={`flex flex-col items-center justify-center gap-2 p-6 rounded-lg border-2 border-dashed cursor-pointer transition-colors ${
+                        isDark
+                          ? "border-[#3e3e3a] hover:border-[#5ba89a] hover:bg-[#2e2e2a]/50"
+                          : "border-[#d8d2c4] hover:border-[#3d8a7c] hover:bg-[#f0ede6]/50"
+                      } ${logoUploading ? "pointer-events-none opacity-60" : ""}`}
+                      onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const file = e.dataTransfer.files[0];
+                        if (file) handleLogoFile(file);
+                      }}
+                    >
+                      {logoUploading ? (
+                        <div className="w-6 h-6 border-2 border-[#3d8a7c] border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5" className={muted}>
+                          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+                          <polyline points="17 8 12 3 7 8" />
+                          <line x1="12" y1="3" x2="12" y2="15" />
+                        </svg>
+                      )}
+                      <span className={`text-sm ${muted}`}>
+                        {logoUploading ? "Uploading..." : "Drop your logo here or click to browse"}
+                      </span>
+                      <span className={`text-xs ${muted}`}>PNG, JPG, SVG, or WebP. Max 500 KB.</span>
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/svg+xml,image/webp"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleLogoFile(file);
+                          e.target.value = "";
+                        }}
+                      />
+                    </label>
+                  )
+                ) : (
+                  /* URL input */
+                  <input
+                    type="text"
+                    placeholder="https://yoursite.com/logo.png"
+                    value={form.logoUrl}
+                    onChange={(e) => setField("logoUrl", e.target.value)}
+                    onBlur={validateLogoOnBlur}
+                    className={`w-full px-3 py-2 rounded-lg border text-sm outline-none focus:ring-2 focus:ring-[#3d8a7c]/40 transition ${inputBg}`}
+                  />
+                )}
                 {(errors.logoUrl || logoError) && (
                   <p className="text-red-500 text-xs mt-1">{errors.logoUrl || logoError}</p>
                 )}
