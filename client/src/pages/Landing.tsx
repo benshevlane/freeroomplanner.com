@@ -9,35 +9,35 @@ const features = [
       <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="3" x2="9" y2="9"/></svg>
     ),
     title: "Snap-to-grid",
-    desc: "Every wall snaps to a 10 cm grid so your dimensions stay accurate without effort.",
+    desc: "Every wall snaps to a 10cm grid — so the dimensions you send to a supplier are actually accurate.",
   },
   {
     icon: (
       <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="12" x2="16" y2="14"/></svg>
     ),
     title: "Live measurements",
-    desc: "Wall lengths update in real time as you draw — in metres, centimetres, millimetres, or feet.",
+    desc: "Wall lengths update in real time as you draw, in metres, centimetres, or feet.",
   },
   {
     icon: (
       <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><rect x="3" y="7" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="6" rx="1"/><rect x="7" y="14" width="5" height="4" rx="1"/></svg>
     ),
     title: "30+ furniture items",
-    desc: "Sofas, beds, kitchen units, doors, windows — drag and drop from the library.",
+    desc: "Sofas, beds, kitchen units, doors, windows — drag from the library and resize to fit your exact space.",
   },
   {
     icon: (
       <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
     ),
     title: "Export as image",
-    desc: "Download a clean PNG of your floor plan to share with builders, designers, or family.",
+    desc: "Download a clean PNG and send it to your fitter, kitchen maker, or architect. They don't need an account to view it.",
   },
   {
     icon: (
       <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path d="M3 12l9-9 9 9"/><path d="M9 21V12h6v9"/></svg>
     ),
     title: "Room labels",
-    desc: "Name each space — kitchen, lounge, en-suite — so your plan reads clearly at a glance.",
+    desc: "Name each space so your plan reads clearly at a glance — kitchen, lounge, en-suite.",
   },
   {
     icon: (
@@ -49,31 +49,34 @@ const features = [
 ];
 
 const steps = [
-  { num: "1", title: "Draw your walls", desc: "Click to place points and chain walls together. Alignment guides keep everything straight." },
-  { num: "2", title: "Add furniture", desc: "Drag items from the library, resize them, and rotate to fit your space." },
-  { num: "3", title: "Export and share", desc: "Download a PNG and share it with whoever needs to see it." },
+  { num: "1", title: "Draw your walls", desc: "Click to place points and connect them. Walls snap to a 10cm grid automatically." },
+  { num: "2", title: "Add furniture", desc: "Drag sofas, units, appliances, and doors from the library. Resize to your exact dimensions." },
+  { num: "3", title: "Export and send", desc: "Download a clean PNG and send it to your fitter, supplier, or architect. They don't need an account." },
 ];
 
 const useCases = [
-  { title: "Kitchen renovations", desc: "Show your fitter exactly where units, appliances, and the island go." },
-  { title: "Bathroom refits", desc: "Plan sanitaryware positions before the plumber arrives." },
-  { title: "Extensions", desc: "Brief architects with a clear sketch of what you have in mind." },
+  { title: "Getting quotes", desc: "Share an accurate floor plan with multiple suppliers so you're comparing like for like — not guessing." },
+  { title: "Kitchen renovations", desc: "Show your fitter exactly where units, appliances, and the island go — before anything is ordered." },
+  { title: "Bathroom refits", desc: "Plan sanitaryware positions before the plumber arrives. Move things around on screen, not on site." },
+  { title: "Extensions", desc: "Brief your architect with a clear sketch of what you have in mind before the expensive conversations start." },
   { title: "Room rearrangements", desc: "Try different furniture layouts without lifting a single thing." },
 ];
 
 const faqs = [
-  { q: "Is it really free?", a: "Yes — completely free, no account required, no credit card, no catch." },
-  { q: "Does it work on mobile?", a: "Yes. The tool works on tablet and mobile, though a desktop gives you the most space to draw." },
-  { q: "Can I save my plan?", a: "Yes. Use the save button to download a JSON file you can reload later, or export a PNG to share with others." },
-  { q: "What units does it support?", a: "Metres, centimetres, millimetres, and feet & inches. Switch between them with the units button in the toolbar." },
-  { q: "Do I need to install anything?", a: "No. It runs entirely in your browser — just open the link and start drawing." },
-  { q: "Can I add doors and windows?", a: "Yes — doors and windows are in the Structure category of the furniture library." },
+  { q: "Is it really free?", a: "Yes. No trial period, no credit card, no premium tier hiding the good stuff. Free means free." },
+  { q: "Do I need to give my email?", a: "No. Open the planner and start immediately. We don't ask for your email, your name, or anything else." },
+  { q: "Does it work on mobile?", a: "Designed for desktop and tablet, where you have the space to work properly — though it runs on mobile too." },
+  { q: "Can I save my plan?", a: "Yes — export it as a PNG to save locally or share directly with whoever needs it." },
+  { q: "Is it accurate enough to share with a professional?", a: "Yes. Everything snaps to a 10cm grid and measurements display in real time. Export as a PNG and send it directly — they don't need an account to view it." },
+  { q: "What units does it support?", a: "Metres, centimetres, millimetres, and feet." },
+  { q: "Do I need to install anything?", a: "Nothing. It runs entirely in your browser — no app, no download, no plugin." },
+  { q: "Can I add doors and windows?", a: "Yes. Doors and windows are in the furniture library — drag, drop, and resize to match your actual room." },
 ];
 
 export default function Landing() {
   useDocumentMeta({
-    title: "Free Room Planner — Design Any Room Layout Online",
-    description: "Plan any room for free — kitchens, bathrooms, bedrooms and living rooms. Draw walls, drag furniture, and export your floor plan as PNG. No login required.",
+    title: "Free Room Planner — Draw Your Floor Plan, No Sign-Up",
+    description: "Draw an accurate floor plan in minutes. Snap-to-grid walls, 30+ furniture items, live measurements. Free, forever. No email or download required.",
   });
   const [, navigate] = useLocation();
   const [openFaq, setOpenFaq] = useState<number | null>(0);
@@ -163,7 +166,7 @@ export default function Landing() {
               onClick={goToApp}
               className="px-7 py-3 rounded-xl text-base font-semibold bg-[#3d8a7c] hover:bg-[#327368] text-white transition-colors shadow-sm"
             >
-              Start planning — it's free
+              Start planning — no sign-up needed
             </button>
             <a
               href="#how-it-works"
@@ -185,52 +188,8 @@ export default function Landing() {
               <span className="w-2.5 h-2.5 rounded-full bg-[#28c840]"/>
               <span className={`ml-3 text-xs ${isDark ? "text-[#5a5a52]" : "text-[#9a9488]"}`}>freeroomplanner.com/app</span>
             </div>
-            {/* Floor plan SVG */}
-            <svg viewBox="0 0 480 280" className="w-full" style={{ background: isDark ? "#222220" : "#faf8f4" }}>
-              <defs>
-                <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
-                  <path d="M 20 0 L 0 0 0 20" fill="none" stroke={isDark ? "#2a2a28" : "#e8e3d8"} strokeWidth="0.5"/>
-                </pattern>
-              </defs>
-              <rect width="480" height="280" fill="url(#grid)"/>
-              <rect x="60" y="40" width="240" height="180" fill={isDark ? "rgba(61,138,124,0.08)" : "rgba(61,138,124,0.06)"} stroke={isDark ? "#5ba89a" : "#3d8a7c"} strokeWidth="2.5" rx="1"/>
-              <line x1="60" y1="140" x2="180" y2="140" stroke={isDark ? "#5ba89a" : "#3d8a7c"} strokeWidth="2.5"/>
-              <line x1="180" y1="140" x2="180" y2="220" stroke={isDark ? "#5ba89a" : "#3d8a7c"} strokeWidth="2.5"/>
-              <path d="M 180 140 A 24 24 0 0 1 204 140" stroke={isDark ? "#5ba89a" : "#3d8a7c"} strokeWidth="1.5" fill="none" strokeDasharray="3 2"/>
-              <line x1="180" y1="140" x2="180" y2="116" stroke={isDark ? "#5ba89a" : "#3d8a7c"} strokeWidth="1"/>
-              <rect x="80" y="60" width="80" height="36" rx="4" fill={isDark ? "#3a3a36" : "#e8e3d8"} stroke={isDark ? "#5a5a52" : "#c8c0b0"} strokeWidth="1"/>
-              <rect x="82" y="62" width="20" height="32" rx="3" fill={isDark ? "#4a4a44" : "#d8d2c0"}/>
-              <rect x="138" y="62" width="20" height="32" rx="3" fill={isDark ? "#4a4a44" : "#d8d2c0"}/>
-              <rect x="100" y="106" width="40" height="24" rx="3" fill={isDark ? "#4a4a44" : "#d4cebe"} stroke={isDark ? "#5a5a52" : "#b8b0a0"} strokeWidth="1"/>
-              <rect x="200" y="150" width="80" height="55" rx="3" fill={isDark ? "#3a3a36" : "#e8e3d8"} stroke={isDark ? "#5a5a52" : "#c8c0b0"} strokeWidth="1"/>
-              <rect x="200" y="150" width="80" height="16" rx="2" fill={isDark ? "#4a4a44" : "#d0cabe"}/>
-              <ellipse cx="218" cy="158" rx="9" ry="6" fill={isDark ? "#5a5a52" : "#c0b8a8"}/>
-              <ellipse cx="262" cy="158" rx="9" ry="6" fill={isDark ? "#5a5a52" : "#c0b8a8"}/>
-              <text x="170" y="237" textAnchor="middle" fontSize="9" fill={isDark ? "#5ba89a" : "#3d8a7c"} fontFamily="sans-serif">6.00 m</text>
-              <line x1="60" y1="233" x2="300" y2="233" stroke={isDark ? "#5ba89a" : "#3d8a7c"} strokeWidth="1"/>
-              <line x1="60" y1="229" x2="60" y2="237" stroke={isDark ? "#5ba89a" : "#3d8a7c"} strokeWidth="1"/>
-              <line x1="300" y1="229" x2="300" y2="237" stroke={isDark ? "#5ba89a" : "#3d8a7c"} strokeWidth="1"/>
-              <text x="322" y="130" textAnchor="start" fontSize="9" fill={isDark ? "#5ba89a" : "#3d8a7c"} fontFamily="sans-serif">4.50 m</text>
-              <line x1="315" y1="40" x2="315" y2="220" stroke={isDark ? "#5ba89a" : "#3d8a7c"} strokeWidth="1"/>
-              <line x1="311" y1="40" x2="319" y2="40" stroke={isDark ? "#5ba89a" : "#3d8a7c"} strokeWidth="1"/>
-              <line x1="311" y1="220" x2="319" y2="220" stroke={isDark ? "#5ba89a" : "#3d8a7c"} strokeWidth="1"/>
-              <text x="110" y="165" textAnchor="middle" fontSize="10" fill={isDark ? "#a09a8c" : "#6b6457"} fontFamily="sans-serif" fontStyle="italic">Living room</text>
-              <text x="246" y="135" textAnchor="middle" fontSize="10" fill={isDark ? "#a09a8c" : "#6b6457"} fontFamily="sans-serif" fontStyle="italic">Bedroom</text>
-              <circle cx="340" cy="90" r="4" fill={isDark ? "#5ba89a" : "#3d8a7c"} opacity="0.7">
-                <animate attributeName="opacity" values="0.7;0.3;0.7" dur="2s" repeatCount="indefinite"/>
-              </circle>
-              <rect x="360" y="50" width="90" height="180" rx="8" fill={isDark ? "#1e1e1c" : "#f0ede6"} stroke={isDark ? "#2e2e2a" : "#d8d2c4"} strokeWidth="1"/>
-              <text x="405" y="70" textAnchor="middle" fontSize="8" fill={isDark ? "#a09a8c" : "#6b6457"} fontFamily="sans-serif">Tools</text>
-              {["Walls","Select","Eraser","Labels"].map((t, i) => (
-                <g key={t}>
-                  <rect x="368" y={78 + i * 28} width="74" height="22" rx="4"
-                    fill={i === 0 ? (isDark ? "#3d8a7c" : "#3d8a7c") : "transparent"}
-                    stroke={isDark ? "#2e2e2a" : "#d8d2c4"} strokeWidth="0.5"/>
-                  <text x="405" y={93 + i * 28} textAnchor="middle" fontSize="8"
-                    fill={i === 0 ? "#fff" : (isDark ? "#a09a8c" : "#6b6457")} fontFamily="sans-serif">{t}</text>
-                </g>
-              ))}
-            </svg>
+            {/* Floor plan screenshot */}
+            <img src="/hero-kitchen.png" alt="Kitchen floor plan created with Free Room Planner showing furniture layout, measurements, and room labels" className="w-full" />
           </div>
         </div>
       </section>
@@ -242,7 +201,7 @@ export default function Landing() {
             { val: "1,200+", label: "plans created" },
             { val: "30+", label: "furniture items" },
             { val: "4.8 / 5", label: "user rating" },
-            { val: "100%", label: "free, forever" },
+            { val: "0", label: "emails required" },
           ].map((s) => (
             <div key={s.val} className="text-center">
               <div className={`text-xl font-bold ${isDark ? "text-[#5ba89a]" : "text-[#3d8a7c]"}`}>{s.val}</div>
@@ -256,7 +215,7 @@ export default function Landing() {
       <section id="how-it-works" className="max-w-5xl mx-auto px-5 py-20">
         <div className="rs-fade opacity-0 translate-y-4 transition-all duration-700 text-center mb-12">
           <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mb-3">How it works</h2>
-          <p className={`${isDark ? "text-[#a09a8c]" : "text-[#6b6457]"}`}>Three steps from blank page to shared plan.</p>
+          <p className={`${isDark ? "text-[#a09a8c]" : "text-[#6b6457]"}`}>From blank page to shareable plan in under five minutes.</p>
         </div>
         <div className="grid sm:grid-cols-3 gap-8">
           {steps.map((s, i) => (
@@ -293,8 +252,8 @@ export default function Landing() {
       {/* Use cases */}
       <section className="max-w-5xl mx-auto px-5 py-20">
         <div className="rs-fade opacity-0 translate-y-4 transition-all duration-700 text-center mb-12">
-          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mb-3">Built for real projects</h2>
-          <p className={`${isDark ? "text-[#a09a8c]" : "text-[#6b6457]"}`}>Homeowners use Free Room Planner to communicate clearly before work starts.</p>
+          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mb-3">Plan it properly before a single unit is ordered or a wall is touched.</h2>
+          <p className={`${isDark ? "text-[#a09a8c]" : "text-[#6b6457]"}`}>Homeowners use Free Room Planner to go into supplier and contractor conversations fully prepared.</p>
         </div>
         <div className="grid sm:grid-cols-2 gap-5">
           {useCases.map((u, i) => (
@@ -338,16 +297,30 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* For businesses */}
+      <section className={`${isDark ? "bg-[#1a1a18]" : "bg-[#faf8f4]"} py-20`}>
+        <div className="rs-fade opacity-0 translate-y-4 transition-all duration-700 max-w-2xl mx-auto px-5 text-center">
+          <h2 className={`text-2xl sm:text-3xl font-bold tracking-tight mb-3 ${isDark ? "text-[#f0ede6]" : "text-[#1a1a18]"}`}>Add Free Room Planner to your website</h2>
+          <p className={`mb-8 ${isDark ? "text-[#a09a8c]" : "text-[#6b6457]"}`}>Embed a branded room planner on your site — free. Let your customers visualize their space before they buy.</p>
+          <button
+            onClick={() => navigate("/get-embed")}
+            className={`px-8 py-3.5 rounded-xl text-base font-semibold transition-colors shadow-md ${isDark ? "bg-[#2e2e2a] hover:bg-[#3a3a36] text-[#f0ede6]" : "bg-[#1a1a18] hover:bg-[#2e2e2a] text-white"}`}
+          >
+            Get your embed code
+          </button>
+        </div>
+      </section>
+
       {/* Final CTA */}
       <section className={`${isDark ? "bg-[#222220]" : "bg-[#1a1a18]"} py-16`}>
         <div className="rs-fade opacity-0 translate-y-4 transition-all duration-700 max-w-xl mx-auto px-5 text-center">
-          <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight mb-3">Ready to draw your plan?</h2>
-          <p className="text-[#a09a8c] mb-8">Free. Fast. No fluff.</p>
+          <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight mb-3">Ready to plan your renovation?</h2>
+          <p className="text-[#a09a8c] mb-8">Free. No download. No email. No fluff.</p>
           <button
             onClick={goToApp}
             className="px-8 py-3.5 rounded-xl text-base font-semibold bg-[#3d8a7c] hover:bg-[#327368] text-white transition-colors shadow-md"
           >
-            Open Free Room Planner
+            Start planning — no sign-up needed
           </button>
         </div>
       </section>
@@ -359,6 +332,7 @@ export default function Landing() {
             <FreeRoomPlannerLogo size={16} className={isDark ? "text-[#5a5a52]" : "text-[#9a9488]"} />
             <span>Free Room Planner</span>
           </div>
+          <a href="/get-embed" onClick={(e) => { e.preventDefault(); navigate("/get-embed"); }} className={`${isDark ? "text-[#5a5a52] hover:text-[#a09a8c]" : "text-[#9a9488] hover:text-[#6b6457]"} transition-colors`}>For businesses</a>
           <span>© {new Date().getFullYear()} Free Room Planner. Free to use.</span>
         </div>
       </footer>
