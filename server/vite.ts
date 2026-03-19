@@ -31,9 +31,20 @@ export async function setupVite(server: Server, app: Express) {
 
   app.use(vite.middlewares);
 
+  // Serve static .html pages from client/public/ for clean URLs
+  // (mirrors production express.static({ extensions: ["html"] }))
   app.use("/{*path}", async (req, res, next) => {
-    const url = req.originalUrl;
+    const url = req.originalUrl.split("?")[0];
+    const publicDir = path.resolve(import.meta.dirname, "..", "client", "public");
+    const htmlFile = path.join(publicDir, `${url}.html`);
 
+    // If a matching .html file exists in public/, serve it directly
+    if (!url.includes(".") && url !== "/" && fs.existsSync(htmlFile)) {
+      return res.status(200).set({ "Content-Type": "text/html" })
+        .end(await fs.promises.readFile(htmlFile, "utf-8"));
+    }
+
+    // Otherwise fall through to SPA
     try {
       const clientTemplate = path.resolve(
         import.meta.dirname,
