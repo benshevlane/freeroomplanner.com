@@ -50,13 +50,14 @@ export default function Admin() {
       const data: { ok?: boolean; size?: number; error?: string } = await new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         xhr.open("POST", url);
-        xhr.setRequestHeader("Content-Type", "application/json");
+        // Use text/plain to avoid CORS preflight
+        xhr.setRequestHeader("Content-Type", "text/plain");
         xhr.onload = () => {
           try { resolve(JSON.parse(xhr.responseText)); }
           catch { reject(new Error("Server returned (status " + xhr.status + "): " + xhr.responseText.slice(0, 200))); }
         };
         xhr.onerror = () => reject(new Error("Network error"));
-        xhr.send(JSON.stringify({ data: dataUrl }));
+        xhr.send(dataUrl);
       });
       if (data.ok) {
         setMessage(`Uploaded (${((data.size ?? 0) / 1024).toFixed(0)} KB)`);
