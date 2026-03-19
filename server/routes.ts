@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import path from "path";
 import fs from "fs";
+import multer from "multer";
 
 // In production the server runs from dist/ and serves dist/public/.
 // In dev, Vite serves from client/public/. Write to both so the file
@@ -56,18 +57,16 @@ export async function registerRoutes(
     res.json(plan);
   });
 
-  // Admin: upload hero image (accepts JSON with base64 data)
-  app.post("/api/admin/hero-image", (req, res) => {
+  // Admin: upload hero image (accepts multipart form data)
+  const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
+  app.post("/api/admin/hero-image", upload.single("image"), (req, res) => {
     try {
-      const { data } = req.body;
-      if (!data || typeof data !== "string") {
-        return res.status(400).json({ error: "Missing image data" });
+      const file = req.file;
+      if (!file) {
+        return res.status(400).json({ error: "Missing image file" });
       }
-      // Strip data URL prefix if present (e.g. "data:image/png;base64,...")
-      const base64 = data.includes(",") ? data.split(",")[1] : data;
-      const buf = Buffer.from(base64, "base64");
-      writeHeroImage(buf);
-      return res.json({ ok: true, size: buf.length });
+      writeHeroImage(file.buffer);
+      return res.json({ ok: true, size: file.size });
     } catch {
       return res.status(400).json({ error: "Invalid image data" });
     }

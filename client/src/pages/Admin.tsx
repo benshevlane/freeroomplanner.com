@@ -25,16 +25,11 @@ export default function Admin() {
     setUploading(true);
     setMessage("");
     try {
-      const dataUrl = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
+      const formData = new FormData();
+      formData.append("image", file);
       const res = await fetch("/api/admin/hero-image", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ data: dataUrl }),
+        body: formData,
       });
       const data = await res.json();
       if (data.ok) {
