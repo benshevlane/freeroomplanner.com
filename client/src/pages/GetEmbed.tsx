@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useLocation } from "wouter";
 import { supabase } from "@/lib/supabase";
 import { useDocumentMeta } from "@/hooks/use-document-meta";
@@ -132,8 +132,13 @@ export default function GetEmbed() {
     document.documentElement.classList.toggle("dark", isDark);
   }, [isDark]);
 
-  // Scroll to top on stage change
+  // Scroll to top on stage change (skip initial mount)
+  const isFirstRender = useRef(true);
   useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [stage]);
 
