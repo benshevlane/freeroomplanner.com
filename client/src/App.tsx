@@ -8,6 +8,7 @@ import Editor from "@/pages/Editor";
 import Embed from "@/pages/Embed";
 import Landing from "@/pages/Landing";
 import GetEmbed from "@/pages/GetEmbed";
+import Admin from "@/pages/Admin";
 
 function AppRouter() {
   return (
@@ -16,6 +17,7 @@ function AppRouter() {
       <Route path="/app" component={Editor} />
       <Route path="/embed" component={Embed} />
       <Route path="/get-embed" component={GetEmbed} />
+      <Route path="/admin" component={Admin} />
       <Route component={NotFound} />
     </Switch>
   );
