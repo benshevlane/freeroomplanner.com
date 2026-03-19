@@ -4,6 +4,7 @@ export async function trackEmbedEvent(
   partnerId: string,
   eventType: "embed_loaded" | "plan_exported" | "badge_clicked",
 ): Promise<void> {
+  if (!supabase) return;
   try {
     const referrer = (document.referrer || "").slice(0, 500);
     await supabase.from("embed_events").insert({

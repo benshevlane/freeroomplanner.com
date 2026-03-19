@@ -193,51 +193,53 @@ export default function GetEmbed() {
       const baseSlug = generatePartnerId(form.businessName);
       let finalId = baseSlug;
 
-      try {
-        for (let attempt = 0; attempt < 3; attempt++) {
-          const candidateId =
-            attempt === 0
-              ? baseSlug
-              : `${baseSlug}-${String(Math.floor(1000 + Math.random() * 9000))}`;
+      if (supabase) {
+        try {
+          for (let attempt = 0; attempt < 3; attempt++) {
+            const candidateId =
+              attempt === 0
+                ? baseSlug
+                : `${baseSlug}-${String(Math.floor(1000 + Math.random() * 9000))}`;
 
-          const { data: existing, error: selectErr } = await supabase
-            .from("partners")
-            .select("id")
-            .eq("partner_id", candidateId)
-            .maybeSingle();
+            const { data: existing, error: selectErr } = await supabase
+              .from("partners")
+              .select("id")
+              .eq("partner_id", candidateId)
+              .maybeSingle();
 
-          if (selectErr) {
-            console.warn("Supabase select error:", selectErr.message);
-            finalId = candidateId;
-            break;
-          }
-
-          if (!existing) {
-            // No collision — write
-            const brandChanged = form.brandColor !== DEFAULT_BRAND_COLOR;
-            const { error: insertErr } = await supabase.from("partners").insert({
-              partner_id: candidateId,
-              business_name: form.businessName.trim(),
-              email: form.email.trim(),
-              website_url: form.websiteUrl.trim() || null,
-              brand_color: brandChanged ? form.brandColor.replace("#", "") : null,
-              logo_url: form.logoUrl.trim() || null,
-              units: form.units,
-            });
-
-            if (insertErr) {
-              console.warn("Supabase insert error:", insertErr.message);
-              setSubmitError("Something went wrong — please try again.");
+            if (selectErr) {
+              console.warn("Supabase select error:", selectErr.message);
+              finalId = candidateId;
+              break;
             }
+
+            if (!existing) {
+              // No collision — write
+              const brandChanged = form.brandColor !== DEFAULT_BRAND_COLOR;
+              const { error: insertErr } = await supabase.from("partners").insert({
+                partner_id: candidateId,
+                business_name: form.businessName.trim(),
+                email: form.email.trim(),
+                website_url: form.websiteUrl.trim() || null,
+                brand_color: brandChanged ? form.brandColor.replace("#", "") : null,
+                logo_url: form.logoUrl.trim() || null,
+                units: form.units,
+              });
+
+              if (insertErr) {
+                console.warn("Supabase insert error:", insertErr.message);
+                setSubmitError("Something went wrong — please try again.");
+              }
+              finalId = candidateId;
+              break;
+            }
+            // Collision — try next attempt
             finalId = candidateId;
-            break;
           }
-          // Collision — try next attempt
-          finalId = candidateId;
+        } catch (err) {
+          console.warn("Supabase error:", err);
+          setSubmitError("Something went wrong — please try again.");
         }
-      } catch (err) {
-        console.warn("Supabase error:", err);
-        setSubmitError("Something went wrong — please try again.");
       }
 
       // Always proceed to Stage 2
