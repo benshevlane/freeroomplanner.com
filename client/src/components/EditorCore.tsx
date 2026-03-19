@@ -99,13 +99,6 @@ export default function EditorCore({
   const selectedArrow = state.arrows.find((a) => a.id === state.selectedItemId) || null;
   const hasSelection = !!(selectedWall || selectedFurniture || selectedLabel || selectedTextBox || selectedArrow);
 
-  // Auto-open properties sheet on mobile when something is selected
-  useEffect(() => {
-    if (isMobile) {
-      if (hasSelection) setPropertiesPanelOpen(true);
-      else setPropertiesPanelOpen(false);
-    }
-  }, [isMobile, hasSelection]);
 
   // Copy/paste/duplicate handlers
   const handleCopy = useCallback(() => {
