@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import path from "path";
@@ -57,22 +58,22 @@ export async function registerRoutes(
     res.json(plan);
   });
 
-  // Admin: upload hero image (accepts JSON with base64 data)
-  app.post("/api/admin/hero-image", (req, res) => {
-    try {
-      const { data } = req.body;
-      if (!data || typeof data !== "string") {
-        return res.status(400).json({ error: "Missing image data" });
+  // Admin: upload hero image (accepts raw binary)
+  app.post("/api/admin/hero-image",
+    express.raw({ type: "application/octet-stream", limit: "20mb" }),
+    (req, res) => {
+      try {
+        const buf = req.body;
+        if (!Buffer.isBuffer(buf) || buf.length === 0) {
+          return res.status(400).json({ error: "Missing image data" });
+        }
+        writeHeroImage(buf);
+        return res.json({ ok: true, size: buf.length });
+      } catch {
+        return res.status(400).json({ error: "Invalid image data" });
       }
-      // Strip data URL prefix if present (e.g. "data:image/png;base64,...")
-      const base64 = data.includes(",") ? data.split(",")[1] : data;
-      const buf = Buffer.from(base64, "base64");
-      writeHeroImage(buf);
-      return res.json({ ok: true, size: buf.length });
-    } catch {
-      return res.status(400).json({ error: "Invalid image data" });
     }
-  });
+  );
 
   // Admin: check if hero image exists
   app.get("/api/admin/hero-image", (_req, res) => {

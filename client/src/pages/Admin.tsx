@@ -25,23 +25,18 @@ export default function Admin() {
     setUploading(true);
     setMessage("");
     try {
-      const dataUrl = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
+      const buf = await file.arrayBuffer();
       const url = new URL("/api/admin/hero-image", window.location.origin).href;
       const data: { ok?: boolean; size?: number; error?: string } = await new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         xhr.open("POST", url);
-        xhr.setRequestHeader("Content-Type", "application/json");
+        xhr.setRequestHeader("Content-Type", "application/octet-stream");
         xhr.onload = () => {
           try { resolve(JSON.parse(xhr.responseText)); }
-          catch { reject(new Error("Server returned: " + xhr.responseText.slice(0, 100))); }
+          catch { reject(new Error("Server returned (status " + xhr.status + "): " + xhr.responseText.slice(0, 200))); }
         };
         xhr.onerror = () => reject(new Error("Network error"));
-        xhr.send(JSON.stringify({ data: dataUrl }));
+        xhr.send(buf);
       });
       if (data.ok) {
         setMessage(`Uploaded (${((data.size ?? 0) / 1024).toFixed(0)} KB)`);
