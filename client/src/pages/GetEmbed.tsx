@@ -184,7 +184,9 @@ export default function GetEmbed() {
       } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
         newErrors.email = "Please enter a valid email address.";
       }
-      if (form.websiteUrl.trim()) {
+      if (!form.websiteUrl.trim()) {
+        newErrors.websiteUrl = "Website URL is required.";
+      } else {
         try {
           new URL(form.websiteUrl.trim());
         } catch {
@@ -414,7 +416,9 @@ export default function GetEmbed() {
 
               {/* Website URL */}
               <div className="mb-5">
-                <label className="block text-sm font-medium mb-1.5">Website URL</label>
+                <label className="block text-sm font-medium mb-1.5">
+                  Website URL <span className="text-red-500">*</span>
+                </label>
                 <input
                   type="text"
                   placeholder="https://yoursite.com"
