@@ -194,7 +194,7 @@ export default function Landing() {
             Draw your room.<br />Share your plan.
           </h1>
           <p className={`text-lg max-w-xl mx-auto mb-8 ${isDark ? "text-[#a09a8c]" : "text-[#6b6457]"}`}>
-            A browser-based floor planner built for homeowners across the UK and US. Brief kitchen makers, bathroom fitters, architects, and contractors — fast.
+            A browser-based floor planner built for homeowners. Brief kitchen makers, bathroom fitters, architects, and contractors — fast.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <button
