@@ -93,7 +93,7 @@ export default function Editor() {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-background overflow-hidden" data-testid="editor-page">
+    <div className="fixed inset-0 flex flex-col bg-background overflow-hidden overscroll-none" data-testid="editor-page">
       <EditorCore
         storageKey="freeroomplanner-autosave"
         isDark={isDark}
