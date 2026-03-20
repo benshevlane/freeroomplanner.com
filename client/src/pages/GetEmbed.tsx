@@ -207,6 +207,11 @@ export default function GetEmbed() {
     document.documentElement.classList.toggle("dark", isDark);
   }, [isDark]);
 
+  // Scroll to top on initial mount (fixes mobile opening scrolled down)
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
   // Scroll to top on stage change (skip initial mount)
   const isFirstRender = useRef(true);
   useEffect(() => {
