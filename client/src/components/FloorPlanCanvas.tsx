@@ -255,9 +255,6 @@ export default function FloorPlanCanvas({
     // Walls
     drawWalls(ctx, state.walls, state.gridSize, state.zoom, state.panOffset, isDark, state.selectedItemId, state.units, measureMode, state.furniture, rooms);
 
-    // Segment measurements for walls with doors/windows
-    drawWallSegmentMeasurements(ctx, state.walls, state.furniture, state.gridSize, state.zoom, state.panOffset, isDark, state.units, measureMode);
-
     // Measurement indicator lines (on top of walls, below labels/furniture)
     drawMeasurementIndicatorLines(ctx, state.walls, rooms, state.gridSize, state.zoom, state.panOffset, measureMode);
 
@@ -343,6 +340,9 @@ export default function FloorPlanCanvas({
     // Doors & windows render on top of walls so they overlay correctly
     const doorWindowItems = state.furniture.filter((f) => f.type === "door" || f.type === "door_double" || f.type === "window" || f.type === "bay_window");
     drawFurniture(ctx, doorWindowItems, state.gridSize, state.zoom, state.panOffset, isDark, state.selectedItemId);
+
+    // Segment measurements for walls with doors/windows (drawn after furniture so worktops don't obscure them)
+    drawWallSegmentMeasurements(ctx, state.walls, state.furniture, state.gridSize, state.zoom, state.panOffset, isDark, state.units, measureMode);
 
     // Wall snap indicator lines (during drag)
     if (isDragging && wallSnapEdges.length > 0) {

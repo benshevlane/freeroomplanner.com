@@ -763,6 +763,9 @@ export function drawWallSegmentMeasurements(
   const doorsWindows = furniture.filter((f) => f.type === "door" || f.type === "door_double" || f.type === "window");
   if (doorsWindows.length === 0) return;
 
+  // Non-door/window furniture (worktops, etc.) used as label-positioning obstacles for total dimension line
+  const otherFurniture = furniture.filter((f) => f.type !== "door" && f.type !== "door_double" && f.type !== "window" && f.type !== "bay_window");
+
   // Find collinear wall groups so we measure segments against the full merged wall
   const collinearGroups = findCollinearGroups(walls);
   const mergedWallIds = new Set<string>();
@@ -933,10 +936,14 @@ export function drawWallSegmentMeasurements(
     const displayLengthCm = measureMode === "inside"
       ? Math.max(0, wallLen - wallThick)
       : wallLen + segStartExt + segEndExt;
+    // Include wall-adjacent furniture (worktops, etc.) as label-positioning obstacles
+    // so the total dimension label avoids being placed behind them
+    const furnitureOccupants = getWallOccupants(wallStart, wallEnd, wallThick, otherFurniture);
+    const allOccupants = [...occupants, ...furnitureOccupants].sort((a, b) => a.along - b.along);
     drawTotalWallDimensionLine(
       ctx, wallStart, wallEnd, displayLengthCm, wallThick,
       pxPerCm, panOffset, zoom, isDark, units, color, measureMode,
-      occupants, segStartExt, segEndExt
+      allOccupants, segStartExt, segEndExt
     );
   }
 }
