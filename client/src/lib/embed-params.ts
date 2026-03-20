@@ -6,6 +6,9 @@ export interface EmbedParams {
   dark: boolean | null;
   units: UnitSystem;
   hideToolbar: boolean;
+  embed: boolean;
+  source: string | null;
+  type: "fullpage" | "homepage" | null;
 }
 
 export function parseEmbedParams(searchString: string): EmbedParams {
@@ -41,6 +44,24 @@ export function parseEmbedParams(searchString: string): EmbedParams {
   // hideToolbar: default false
   const hideToolbar = params.get("hide_toolbar") === "1";
 
+  // embed: marks iframe context
+  const rawEmbed = params.get("embed");
+  const embed = rawEmbed === "true" || rawEmbed === "1";
+
+  // source: campaign/referral tracking slug
+  let source: string | null = null;
+  const rawSource = params.get("source");
+  if (rawSource && /^[a-zA-Z0-9_-]{1,64}$/.test(rawSource)) {
+    source = rawSource;
+  }
+
+  // type: layout mode
+  let type: "fullpage" | "homepage" | null = null;
+  const rawType = params.get("type");
+  if (rawType === "fullpage" || rawType === "homepage") {
+    type = rawType;
+  }
+
   // Silently ignore any badge-hiding parameters
   // (hide_badge, no_badge, disable_badge, etc. are never parsed)
 
@@ -50,5 +71,8 @@ export function parseEmbedParams(searchString: string): EmbedParams {
     dark,
     units,
     hideToolbar,
+    embed,
+    source,
+    type,
   };
 }

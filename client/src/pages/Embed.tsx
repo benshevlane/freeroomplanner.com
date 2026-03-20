@@ -18,9 +18,10 @@ export default function Embed() {
     return window.matchMedia("(prefers-color-scheme: dark)").matches;
   });
 
-  // Welcome screen state — show once per session
+  // Welcome screen state — show once per session; skip on direct navigation
   const [started, setStarted] = useState(() => {
     if (!params.partner) return true; // skip if no partner
+    if (!params.embed) return true; // skip welcome on direct navigation
     return sessionStorage.getItem(`frp-embed-started-${params.partner}`) === "1";
   });
   const [welcomeFading, setWelcomeFading] = useState(false);
@@ -31,10 +32,12 @@ export default function Embed() {
       sessionStorage.setItem(`frp-embed-started-${params.partner}`, "1");
       trackEmbedEvent(params.partner, "embed_loaded");
     }
-    // Signal parent page to expand iframe (homepage embed)
-    try {
-      window.parent.postMessage({ type: "frp-expand" }, "*");
-    } catch {}
+    // Signal parent page to expand iframe (homepage embed only)
+    if (params.type === "homepage" || params.type === null) {
+      try {
+        window.parent.postMessage({ type: "frp-expand" }, "*");
+      } catch {}
+    }
     setTimeout(() => setStarted(true), 400);
   }, [params.partner]);
 
@@ -49,6 +52,8 @@ export default function Embed() {
       trackEvent("embed_loaded", {
         partner: params.partner,
         referrer: document.referrer,
+        ...(params.source ? { source: params.source } : {}),
+        ...(params.type ? { type: params.type } : {}),
       });
     }
   }, [params.partner, started, welcomeFading]);

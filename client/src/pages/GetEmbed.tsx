@@ -59,6 +59,10 @@ function buildEmbedSrc(partnerId: string, form: FormState): string {
   if (form.units === "ft") {
     params.set("units", "ft");
   }
+  params.set("embed", "true");
+  if (form.embedType === "fullpage" || form.embedType === "homepage") {
+    params.set("type", form.embedType);
+  }
   return `https://freeroomplanner.com/embed?${params.toString()}`;
 }
 
@@ -141,6 +145,10 @@ function buildPreviewSrc(partnerId: string, form: FormState): string {
   if (form.units === "ft") {
     params.set("units", "ft");
   }
+  params.set("embed", "true");
+  if (form.embedType === "fullpage" || form.embedType === "homepage") {
+    params.set("type", form.embedType);
+  }
   return `/embed?${params.toString()}`;
 }
 
@@ -173,6 +181,8 @@ export default function GetEmbed() {
 
   // Preview loading state
   const [previewLoaded, setPreviewLoaded] = useState(false);
+  const [showPreview, setShowPreview] = useState(true);
+  const [platformTab, setPlatformTab] = useState<"wordpress" | "squarespace" | "wix" | "html">("wordpress");
 
   // Dark mode
   useEffect(() => {
@@ -334,6 +344,8 @@ export default function GetEmbed() {
     setResultName("");
     setCopied(false);
     setPreviewLoaded(false);
+    setShowPreview(true);
+    setPlatformTab("wordpress");
   }, []);
 
   /* ---- Shared styles ---- */
@@ -520,55 +532,138 @@ export default function GetEmbed() {
                 </div>
               </div>
 
-              {/* Embed type */}
+              {/* Embed type — visual cards */}
               <div className="mb-6">
                 <label className="block text-sm font-medium mb-2">Embed type</label>
-                <div className="grid grid-cols-1 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   {([
                     {
                       value: "fullpage" as const,
                       title: "Full page",
-                      desc: "Best for a dedicated room planner page. The planner fills the full screen immediately.",
+                      desc: "Fills the entire page",
+                      bestFor: "Dedicated planner pages",
+                      icon: (
+                        <svg width="48" height="36" viewBox="0 0 48 36" fill="none" className="mx-auto mb-2">
+                          <rect x="1" y="1" width="46" height="34" rx="3" stroke="currentColor" strokeWidth="1.5" opacity="0.3" />
+                          <rect x="3" y="5" width="42" height="28" rx="2" fill="currentColor" opacity="0.15" />
+                          <rect x="3" y="1" width="42" height="4" rx="1" fill="currentColor" opacity="0.1" />
+                          <circle cx="6" cy="3" r="1" fill="currentColor" opacity="0.3" />
+                          <circle cx="10" cy="3" r="1" fill="currentColor" opacity="0.3" />
+                        </svg>
+                      ),
                     },
                     {
                       value: "homepage" as const,
                       title: "Homepage embed",
-                      desc: "Best for embedding alongside other content. Starts compact and expands to full screen when your customer starts planning.",
+                      desc: "Compact, expands on use",
+                      bestFor: "Embedding alongside content",
+                      icon: (
+                        <svg width="48" height="36" viewBox="0 0 48 36" fill="none" className="mx-auto mb-2">
+                          <rect x="1" y="1" width="46" height="34" rx="3" stroke="currentColor" strokeWidth="1.5" opacity="0.3" />
+                          <rect x="5" y="4" width="38" height="3" rx="1" fill="currentColor" opacity="0.1" />
+                          <rect x="5" y="10" width="38" height="18" rx="2" fill="currentColor" opacity="0.15" />
+                          <rect x="5" y="31" width="38" height="2" rx="1" fill="currentColor" opacity="0.1" />
+                        </svg>
+                      ),
                     },
                     {
                       value: "homepage-link" as const,
                       title: "Homepage link",
-                      desc: "A compact banner linking to your room planner page. No iframe — just paste the HTML on your homepage.",
+                      desc: "Static banner with link",
+                      bestFor: "Promoting from your homepage",
+                      icon: (
+                        <svg width="48" height="36" viewBox="0 0 48 36" fill="none" className="mx-auto mb-2">
+                          <rect x="1" y="1" width="46" height="34" rx="3" stroke="currentColor" strokeWidth="1.5" opacity="0.3" />
+                          <rect x="5" y="4" width="38" height="3" rx="1" fill="currentColor" opacity="0.1" />
+                          <rect x="8" y="14" width="32" height="10" rx="5" stroke="currentColor" strokeWidth="1.5" opacity="0.25" />
+                          <rect x="28" y="16" width="10" height="6" rx="3" fill="currentColor" opacity="0.2" />
+                          <rect x="5" y="31" width="38" height="2" rx="1" fill="currentColor" opacity="0.1" />
+                        </svg>
+                      ),
                     },
                   ]).map((opt) => (
                     <button
                       key={opt.value}
                       type="button"
                       onClick={() => setField("embedType", opt.value)}
-                      className={`text-left p-3 rounded-lg border transition-colors ${
+                      className={`text-center p-4 rounded-lg border transition-colors ${
                         form.embedType === opt.value
                           ? `border-[#3d8a7c] ${isDark ? "bg-[#1a332e]" : "bg-[#e8f4f1]"}`
                           : `${border} ${isDark ? "hover:bg-[#2e2e2a]" : "hover:bg-[#f5f3ee]"}`
                       }`}
                     >
-                      <div className="flex items-center gap-2 mb-0.5">
-                        <div
-                          className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                            form.embedType === opt.value
-                              ? "border-[#3d8a7c]"
-                              : isDark ? "border-[#6b6457]" : "border-[#a09a8c]"
-                          }`}
-                        >
-                          {form.embedType === opt.value && (
-                            <div className="w-2 h-2 rounded-full bg-[#3d8a7c]" />
-                          )}
-                        </div>
-                        <span className="text-sm font-semibold">{opt.title}</span>
+                      <div className={form.embedType === opt.value ? "text-[#3d8a7c]" : muted}>
+                        {opt.icon}
                       </div>
-                      <p className={`text-xs ml-6 ${muted}`}>{opt.desc}</p>
+                      <span className="text-sm font-semibold block">{opt.title}</span>
+                      <p className={`text-xs mt-0.5 ${muted}`}>{opt.desc}</p>
+                      <p className={`text-[11px] mt-1.5 font-medium ${form.embedType === opt.value ? "text-[#3d8a7c]" : muted}`}>
+                        Best for: {opt.bestFor}
+                      </p>
                     </button>
                   ))}
                 </div>
+              </div>
+
+              {/* How it works — contextual per embed type */}
+              <div className={`mb-6 rounded-lg border p-4 ${border} ${isDark ? "bg-[#1e1e1c]" : "bg-[#f9f7f3]"}`}>
+                <p className="text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: "#3d8a7c" }}>
+                  How it works
+                </p>
+                <div className="space-y-2.5">
+                  {(form.embedType === "fullpage"
+                    ? [
+                        "Create a new page on your website (e.g. /room-planner)",
+                        "Paste the embed code \u2014 it fills the whole page",
+                        "Your customers can plan their room immediately",
+                      ]
+                    : form.embedType === "homepage"
+                    ? [
+                        "Paste the embed code on any page alongside your content",
+                        "It starts as a compact widget on your page",
+                        "When your customer starts planning, it expands to full screen",
+                      ]
+                    : [
+                        "Set up the full page embed on a dedicated page first",
+                        "Paste this banner on your homepage",
+                        "It links visitors to your room planner page",
+                      ]
+                  ).map((step, i) => (
+                    <div key={i} className="flex items-start gap-2.5">
+                      <span
+                        className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold text-white"
+                        style={{ backgroundColor: "#3d8a7c" }}
+                      >
+                        {i + 1}
+                      </span>
+                      <span className={`text-sm ${muted}`}>{step}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Decision guide */}
+              <div className="mb-6">
+                <Accordion type="single" collapsible className="w-full">
+                  <AccordionItem value="decision-guide" className={border}>
+                    <AccordionTrigger className={`${muted} text-sm hover:no-underline`}>
+                      Not sure which to choose?
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      <div className={`space-y-2 text-sm ${muted}`}>
+                        <p>
+                          <strong className={text}>Full page</strong> — Best if you want a dedicated room planner page. Maximum screen space for your customers.
+                        </p>
+                        <p>
+                          <strong className={text}>Homepage embed</strong> — Best if you want the planner alongside other content. Starts compact, expands when used.
+                        </p>
+                        <p>
+                          <strong className={text}>Homepage link</strong> — Best if you already have the full page embed and want to promote it from your homepage.
+                        </p>
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                </Accordion>
               </div>
 
               {/* Planner page URL — only for homepage-link */}
@@ -612,7 +707,7 @@ export default function GetEmbed() {
           /* ========================================================= */
           /*  STAGE 2: Snippet + Preview                               */
           /* ========================================================= */
-          <section className="py-10">
+          <section className="py-10 max-w-3xl mx-auto">
             {/* Confirmation banner */}
             <div
               className={`rounded-xl px-5 py-4 mb-6 ${isDark ? "bg-[#1a332e] border border-[#2a4a42]" : "bg-[#e8f4f1] border border-[#c0ddd5]"}`}
@@ -635,157 +730,210 @@ export default function GetEmbed() {
               &larr; Start over
             </button>
 
-            {/* Two-column layout */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-12">
-              {/* LEFT: Code snippet */}
-              <div className={`rounded-xl border p-5 sm:p-6 ${cardBg} ${border}`}>
-                <h2 className="text-lg font-semibold mb-1">Your embed code</h2>
-                <p className={`text-sm mb-4 ${muted}`}>
-                  {form.embedType === "homepage-link"
-                    ? "Paste this on your homepage"
-                    : "Paste this into any page on your website"}
-                </p>
-
-                {/* Code block */}
-                <div className="relative">
-                  <pre className="bg-[#1a1a18] text-[#e8e3d8] rounded-lg p-4 text-sm overflow-x-auto font-mono leading-relaxed">
-                    <code>{buildSnippet(partnerId, form)}</code>
-                  </pre>
-                  <button
-                    onClick={handleCopy}
-                    className={`absolute top-2 right-2 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                      copied
-                        ? "bg-[#3d8a7c] text-white"
-                        : "bg-[#2e2e2a] hover:bg-[#3e3e3a] text-[#a09a8c]"
-                    }`}
-                  >
-                    {copied ? "Copied! \u2713" : "Copy code"}
-                  </button>
-                </div>
-
-                <p className={`text-xs mt-4 ${muted}`}>
-                  This is your unique embed code. It will always show the &lsquo;Powered by
-                  freeroomplanner.com&rsquo; badge.
-                </p>
-                <p className={`text-xs mt-2 ${muted}`}>
-                  Want to remove the badge or use your own branding?{" "}
-                  <a
-                    href="mailto:hello@freeroomplanner.com"
-                    className={`${teal} hover:underline`}
-                  >
-                    Contact us about our partner plan &rarr;
-                  </a>
+            {/* Homepage-link callout */}
+            {form.embedType === "homepage-link" && (
+              <div
+                className={`rounded-xl px-5 py-4 mb-6 border ${isDark ? "bg-[#2e2a1a] border-[#4a4230]" : "bg-[#fef9e8] border-[#e8ddb0]"}`}
+              >
+                <p className={`text-sm font-medium ${isDark ? "text-[#d4c87a]" : "text-[#8a7a30]"}`}>
+                  This is step 2 of 2. Make sure you&rsquo;ve already set up the{" "}
+                  <strong>full page embed</strong> on your planner page first.
                 </p>
               </div>
+            )}
 
-              {/* RIGHT: Live preview */}
-              <div className={`rounded-xl border p-5 sm:p-6 ${cardBg} ${border}`}>
-                <h2 className="text-lg font-semibold mb-1">Preview</h2>
-                <p className={`text-sm mb-4 ${muted}`}>
-                  This is exactly what your customers will see
-                </p>
+            {/* Step 1: Copy your code */}
+            <div className={`rounded-xl border p-5 sm:p-6 mb-6 ${cardBg} ${border}`}>
+              <div className="flex items-center gap-2.5 mb-3">
+                <span
+                  className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white"
+                  style={{ backgroundColor: "#3d8a7c" }}
+                >
+                  1
+                </span>
+                <h2 className="text-lg font-semibold">Copy your code</h2>
+              </div>
+              <p className={`text-sm mb-4 ${muted}`}>
+                {form.embedType === "homepage-link"
+                  ? "Paste this HTML on your homepage."
+                  : "Paste this into any page on your website."}
+              </p>
 
-                {form.embedType === "homepage-link" ? (
-                  <div
-                    className={`rounded-lg border p-6 flex items-center justify-center ${border}`}
-                    style={{ minHeight: 140 }}
+              {/* Code block */}
+              <div className="relative">
+                <pre className="bg-[#1a1a18] text-[#e8e3d8] rounded-lg p-4 text-sm overflow-x-auto font-mono leading-relaxed">
+                  <code>{buildSnippet(partnerId, form)}</code>
+                </pre>
+                <button
+                  onClick={handleCopy}
+                  className={`absolute top-2 right-2 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                    copied
+                      ? "bg-[#3d8a7c] text-white"
+                      : "bg-[#2e2e2a] hover:bg-[#3e3e3a] text-[#a09a8c]"
+                  }`}
+                >
+                  {copied ? "Copied! \u2713" : "Copy code"}
+                </button>
+              </div>
+
+              <p className={`text-xs mt-4 ${muted}`}>
+                This is your unique embed code. It will always show the &lsquo;Powered by
+                freeroomplanner.com&rsquo; badge.
+              </p>
+              <p className={`text-xs mt-2 ${muted}`}>
+                Want to remove the badge or use your own branding?{" "}
+                <a
+                  href="mailto:hello@freeroomplanner.com"
+                  className={`${teal} hover:underline`}
+                >
+                  Contact us about our partner plan &rarr;
+                </a>
+              </p>
+            </div>
+
+            {/* Step 2: Choose your platform */}
+            <div className={`rounded-xl border p-5 sm:p-6 mb-6 ${cardBg} ${border}`}>
+              <div className="flex items-center gap-2.5 mb-3">
+                <span
+                  className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white"
+                  style={{ backgroundColor: "#3d8a7c" }}
+                >
+                  2
+                </span>
+                <h2 className="text-lg font-semibold">Add it to your site</h2>
+              </div>
+
+              {/* Platform tabs */}
+              <div className={`flex gap-1 mb-4 rounded-lg p-1 ${isDark ? "bg-[#2e2e2a]" : "bg-[#f0ede6]"}`}>
+                {(["wordpress", "squarespace", "wix", "html"] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => setPlatformTab(tab)}
+                    className={`flex-1 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                      platformTab === tab
+                        ? `${cardBg} shadow-sm ${text}`
+                        : `${muted} hover:${text}`
+                    }`}
                   >
-                    <div dangerouslySetInnerHTML={{ __html: buildSnippet(partnerId, form) }} />
-                  </div>
-                ) : (
-                  <div
-                    className={`relative rounded-lg border overflow-hidden ${border}`}
-                    style={{ height: form.embedType === "fullpage" ? 700 : 500 }}
-                  >
-                    {!previewLoaded && (
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <div className="w-8 h-8 border-2 border-[#3d8a7c] border-t-transparent rounded-full animate-spin" />
-                      </div>
-                    )}
-                    <iframe
-                      src={buildPreviewSrc(partnerId, form)}
-                      width="100%"
-                      height="100%"
-                      style={{ border: "none", borderRadius: 8 }}
-                      title="Free Room Planner Preview"
-                      loading="lazy"
-                      onLoad={() => setPreviewLoaded(true)}
-                    />
-                  </div>
+                    {tab === "wordpress"
+                      ? "WordPress"
+                      : tab === "squarespace"
+                      ? "Squarespace"
+                      : tab === "wix"
+                      ? "Wix"
+                      : "HTML"}
+                  </button>
+                ))}
+              </div>
+
+              {/* Platform instructions */}
+              <div className={`text-sm ${muted}`}>
+                {platformTab === "wordpress" && (
+                  <ol className="list-decimal list-inside space-y-1.5">
+                    <li>Go to the page or post you want to add it to</li>
+                    <li>Add a &ldquo;Custom HTML&rdquo; block</li>
+                    <li>Paste the embed code</li>
+                    <li>Publish</li>
+                  </ol>
                 )}
-
-                <p className={`text-xs mt-3 ${muted}`}>
-                  {form.embedType === "homepage-link"
-                    ? "This is the banner your visitors will see on your homepage."
-                    : "The \u2018Powered by freeroomplanner.com\u2019 badge appears in the bottom-right corner."}
-                </p>
+                {platformTab === "squarespace" && (
+                  <ol className="list-decimal list-inside space-y-1.5">
+                    <li>Edit the page where you want to add it</li>
+                    <li>Add a &ldquo;Code&rdquo; block</li>
+                    <li>Paste the embed code</li>
+                    <li>Save and publish</li>
+                  </ol>
+                )}
+                {platformTab === "wix" && (
+                  <ol className="list-decimal list-inside space-y-1.5">
+                    <li>Open the Wix Editor on the page you want</li>
+                    <li>Click Add &rarr; Embed &rarr; Custom Code</li>
+                    <li>Paste the embed code</li>
+                    <li>Publish</li>
+                  </ol>
+                )}
+                {platformTab === "html" && (
+                  <p>
+                    Paste the embed code directly into your HTML where you want the planner to
+                    appear.
+                  </p>
+                )}
               </div>
             </div>
 
-            {/* Installation instructions */}
+            {/* Step 3: Test it */}
+            <div className={`rounded-xl border p-5 sm:p-6 mb-8 ${cardBg} ${border}`}>
+              <div className="flex items-center gap-2.5 mb-3">
+                <span
+                  className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white"
+                  style={{ backgroundColor: "#3d8a7c" }}
+                >
+                  3
+                </span>
+                <h2 className="text-lg font-semibold">Test it</h2>
+              </div>
+              <p className={`text-sm ${muted}`}>
+                Visit your page and check the planner loads correctly. The &lsquo;Powered by
+                freeroomplanner.com&rsquo; badge should appear in the bottom-right corner.
+              </p>
+            </div>
+
+            {/* Preview section with toggle */}
             <div className={`rounded-xl border p-5 sm:p-6 ${cardBg} ${border}`}>
-              <h2 className="text-lg font-semibold mb-4">How to add this to your website</h2>
-              {form.embedType === "homepage-link" && (
-                <p className={`text-sm mb-3 ${muted}`}>
-                  Paste the homepage link on your homepage, then use the{" "}
-                  <strong className={text}>full page embed</strong> on the page it links to.
-                </p>
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-lg font-semibold">Preview</h2>
+                <button
+                  onClick={() => setShowPreview((v) => !v)}
+                  className={`text-sm font-medium px-3 py-1 rounded-lg transition-colors ${
+                    isDark ? "hover:bg-[#2e2e2a]" : "hover:bg-[#f0ede6]"
+                  } ${teal}`}
+                >
+                  {showPreview ? "Hide preview" : "Show preview"}
+                </button>
+              </div>
+
+              {showPreview && (
+                <>
+                  <p className={`text-sm mb-4 ${muted}`}>
+                    This is exactly what your customers will see.
+                  </p>
+
+                  {form.embedType === "homepage-link" ? (
+                    <div
+                      className={`rounded-lg border p-6 flex items-center justify-center ${border}`}
+                      style={{ minHeight: 140 }}
+                    >
+                      <div dangerouslySetInnerHTML={{ __html: buildSnippet(partnerId, form) }} />
+                    </div>
+                  ) : (
+                    <div
+                      className={`relative rounded-lg border overflow-hidden ${border}`}
+                      style={{ height: form.embedType === "fullpage" ? 700 : 500 }}
+                    >
+                      {!previewLoaded && (
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <div className="w-8 h-8 border-2 border-[#3d8a7c] border-t-transparent rounded-full animate-spin" />
+                        </div>
+                      )}
+                      <iframe
+                        src={buildPreviewSrc(partnerId, form)}
+                        width="100%"
+                        height="100%"
+                        style={{ border: "none", borderRadius: 8 }}
+                        title="Free Room Planner Preview"
+                        loading="lazy"
+                        onLoad={() => setPreviewLoaded(true)}
+                      />
+                    </div>
+                  )}
+
+                  <p className={`text-xs mt-3 ${muted}`}>
+                    {form.embedType === "homepage-link"
+                      ? "This is the banner your visitors will see on your homepage."
+                      : "The \u2018Powered by freeroomplanner.com\u2019 badge appears in the bottom-right corner."}
+                  </p>
+                </>
               )}
-              <Accordion type="single" collapsible className="w-full">
-                <AccordionItem value="wordpress" className={border}>
-                  <AccordionTrigger className={`${text} hover:no-underline`}>
-                    WordPress
-                  </AccordionTrigger>
-                  <AccordionContent className={muted}>
-                    <ol className="list-decimal list-inside space-y-1.5 text-sm">
-                      <li>Go to the page or post you want to add it to</li>
-                      <li>Add a &ldquo;Custom HTML&rdquo; block</li>
-                      <li>Paste the embed code</li>
-                      <li>Publish</li>
-                    </ol>
-                  </AccordionContent>
-                </AccordionItem>
-
-                <AccordionItem value="squarespace" className={border}>
-                  <AccordionTrigger className={`${text} hover:no-underline`}>
-                    Squarespace
-                  </AccordionTrigger>
-                  <AccordionContent className={muted}>
-                    <ol className="list-decimal list-inside space-y-1.5 text-sm">
-                      <li>Edit the page where you want to add it</li>
-                      <li>Add a &ldquo;Code&rdquo; block</li>
-                      <li>Paste the embed code</li>
-                      <li>Save and publish</li>
-                    </ol>
-                  </AccordionContent>
-                </AccordionItem>
-
-                <AccordionItem value="wix" className={border}>
-                  <AccordionTrigger className={`${text} hover:no-underline`}>
-                    Wix
-                  </AccordionTrigger>
-                  <AccordionContent className={muted}>
-                    <ol className="list-decimal list-inside space-y-1.5 text-sm">
-                      <li>Open the Wix Editor on the page you want</li>
-                      <li>Click Add &rarr; Embed &rarr; Custom Code</li>
-                      <li>Paste the embed code</li>
-                      <li>Publish</li>
-                    </ol>
-                  </AccordionContent>
-                </AccordionItem>
-
-                <AccordionItem value="html" className={`border-b-0 ${border}`}>
-                  <AccordionTrigger className={`${text} hover:no-underline`}>
-                    Other / HTML
-                  </AccordionTrigger>
-                  <AccordionContent className={muted}>
-                    <p className="text-sm">
-                      Paste the embed code directly into your HTML where you want the planner to
-                      appear.
-                    </p>
-                  </AccordionContent>
-                </AccordionItem>
-              </Accordion>
             </div>
           </section>
         )}
