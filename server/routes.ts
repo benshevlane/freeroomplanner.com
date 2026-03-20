@@ -177,7 +177,7 @@ export async function registerRoutes(
       const resend = new Resend(process.env.RESEND_API_KEY);
       await resend.emails.send({
         from: process.env.EMAIL_FROM || "Free Room Planner <onboarding@resend.dev>",
-        to: process.env.CONTACT_EMAIL || "delivered@resend.dev",
+        to: process.env.CONTACT_EMAIL || "ben@freeroomplanner.com",
         replyTo: email,
         subject: `[Contact] ${subject}`,
         html: `<p><strong>Name:</strong> ${name}</p>
@@ -207,7 +207,7 @@ export async function registerRoutes(
       const resend = new Resend(process.env.RESEND_API_KEY);
       await resend.emails.send({
         from: process.env.EMAIL_FROM || "Free Room Planner <onboarding@resend.dev>",
-        to: process.env.CONTACT_EMAIL || "delivered@resend.dev",
+        to: process.env.CONTACT_EMAIL || "ben@freeroomplanner.com",
         ...(email ? { replyTo: email } : {}),
         subject: `[Feedback - ${type}] New feedback from Free Room Planner`,
         html: `<p><strong>Type:</strong> ${type}</p>
