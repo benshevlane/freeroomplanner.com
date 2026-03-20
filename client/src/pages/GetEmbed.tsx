@@ -450,13 +450,13 @@ export default function GetEmbed() {
             {/* Value proposition */}
             <div className="text-center mb-10">
               <h1 className="text-3xl sm:text-4xl font-bold tracking-tight leading-tight mb-4">
-                Add a free room planner to your website
+                Turn visitors into ready-to-quote leads
               </h1>
               <p className={`text-base max-w-md mx-auto mb-6 ${muted}`}>
-                Give your customers a tool to plan their space before they contact you. One line of code.
+                Customers who plan their room arrive at enquiry knowing their space. You spend less time measuring — and more time closing.
               </p>
               <div className="flex flex-wrap justify-center gap-2">
-                {["Up and running in minutes", "Your branding", "Powered by freeroomplanner.com"].map(
+                {["Higher quality enquiries", "Faster quotes", "Free to embed", "Live in minutes"].map(
                   (pill) => (
                     <span
                       key={pill}
@@ -650,13 +650,11 @@ export default function GetEmbed() {
                 <p className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: "#3d8a7c" }}>
                   How it works
                 </p>
-                <p className={`text-sm ${muted}`}>
-                  {form.embedType === "fullpage"
-                    ? "Your visitors land directly on the planner. No clicks needed \u2014 they\u2019re straight into designing."
-                    : form.embedType === "homepage"
-                    ? "A compact \u2018Start Planning\u2019 button sits on your page. When clicked, the planner opens full screen over your site and can be closed to return to browsing."
-                    : "A small banner or button on your page links visitors to a dedicated planner page. You\u2019ll get two code snippets \u2014 one for the link and one for the planner page it points to."}
-                </p>
+                <div className={`space-y-3 text-sm ${muted}`}>
+                  <p><span className={`font-semibold ${text}`}>Customer plans their room</span> — They use the planner on your website before contacting you</p>
+                  <p><span className={`font-semibold ${text}`}>They enquire with a layout ready</span> — Dimensions, space, and ideas mapped out before the first call</p>
+                  <p><span className={`font-semibold ${text}`}>You quote faster and convert more</span> — Less back-and-forth. Better-informed customers. More sales.</p>
+                </div>
               </div>
 
               {/* Decision guide */}
@@ -719,8 +717,11 @@ export default function GetEmbed() {
                 disabled={submitting}
                 className="w-full py-3 rounded-xl text-base font-semibold bg-[#3d8a7c] hover:bg-[#327368] text-white transition-colors shadow-sm disabled:opacity-60"
               >
-                {submitting ? "Generating..." : "Generate my embed code \u2192"}
+                {submitting ? "Generating..." : "Get my free embed code \u2192"}
               </button>
+              <p className={`text-xs text-center mt-3 ${muted}`}>
+                We'll send you one line of code to paste into your site. That's it.
+              </p>
             </form>
           </section>
         ) : (
