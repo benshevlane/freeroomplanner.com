@@ -115,6 +115,16 @@ export default function Landing() {
     })();
   }, []);
 
+  // Scroll to hash target on page load (for links like /#features from static pages)
+  useEffect(() => {
+    const hash = window.location.hash.slice(1);
+    if (hash) {
+      setTimeout(() => {
+        document.getElementById(hash)?.scrollIntoView({ behavior: "smooth" });
+      }, 100);
+    }
+  }, []);
+
   // Fade-in on scroll
   useEffect(() => {
     const observer = new IntersectionObserver(
