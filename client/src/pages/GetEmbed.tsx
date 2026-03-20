@@ -21,6 +21,7 @@ interface FormState {
   brandColor: string;
   logoUrl: string;
   units: "m" | "ft";
+  embedType: "fullpage" | "homepage";
 }
 
 const DEFAULT_BRAND_COLOR = "#6bbfa0";
@@ -32,6 +33,7 @@ const INITIAL_FORM: FormState = {
   brandColor: DEFAULT_BRAND_COLOR,
   logoUrl: "",
   units: "m",
+  embedType: "fullpage",
 };
 
 /* ------------------------------------------------------------------ */
@@ -65,13 +67,36 @@ function buildEmbedSrc(partnerId: string, form: FormState): string {
 
 function buildSnippet(partnerId: string, form: FormState): string {
   const src = buildEmbedSrc(partnerId, form);
-  return `<!-- Free Room Planner Embed -->
+
+  if (form.embedType === "homepage") {
+    return `<!-- Free Room Planner Embed — Homepage -->
+<!-- Free to use. Powered by freeroomplanner.com -->
+<div id="frp-embed" style="width: 100%; height: 700px; border-radius: 8px; overflow: hidden; transition: height 0.4s ease;">
+  <iframe
+    src="${src}"
+    width="100%"
+    height="100%"
+    style="border: none;"
+    title="Free Room Planner"
+    loading="lazy"
+  ></iframe>
+</div>
+<script>
+window.addEventListener("message", function(e) {
+  if (e.data && e.data.type === "frp-expand") {
+    document.getElementById("frp-embed").style.height = "100vh";
+  }
+});
+</script>`;
+  }
+
+  return `<!-- Free Room Planner Embed — Full Page -->
 <!-- Free to use. Powered by freeroomplanner.com -->
 <iframe
   src="${src}"
   width="100%"
-  height="700"
-  style="border: none; border-radius: 8px;"
+  height="100%"
+  style="border: none; min-height: 100vh;"
   title="Free Room Planner"
   loading="lazy"
 ></iframe>`;
@@ -486,6 +511,52 @@ export default function GetEmbed() {
                 </div>
               </div>
 
+              {/* Embed type */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium mb-2">Embed type</label>
+                <div className="grid grid-cols-1 gap-3">
+                  {([
+                    {
+                      value: "fullpage" as const,
+                      title: "Full page",
+                      desc: "Best for a dedicated room planner page. The planner fills the full screen immediately.",
+                    },
+                    {
+                      value: "homepage" as const,
+                      title: "Homepage",
+                      desc: "Best for embedding alongside other content. Starts compact and expands to full screen when your customer starts planning.",
+                    },
+                  ]).map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setField("embedType", opt.value)}
+                      className={`text-left p-3 rounded-lg border transition-colors ${
+                        form.embedType === opt.value
+                          ? `border-[#3d8a7c] ${isDark ? "bg-[#1a332e]" : "bg-[#e8f4f1]"}`
+                          : `${border} ${isDark ? "hover:bg-[#2e2e2a]" : "hover:bg-[#f5f3ee]"}`
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <div
+                          className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                            form.embedType === opt.value
+                              ? "border-[#3d8a7c]"
+                              : isDark ? "border-[#6b6457]" : "border-[#a09a8c]"
+                          }`}
+                        >
+                          {form.embedType === opt.value && (
+                            <div className="w-2 h-2 rounded-full bg-[#3d8a7c]" />
+                          )}
+                        </div>
+                        <span className="text-sm font-semibold">{opt.title}</span>
+                      </div>
+                      <p className={`text-xs ml-6 ${muted}`}>{opt.desc}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {/* Submit error */}
               {submitError && (
                 <p className="text-red-500 text-sm mb-4">{submitError}</p>
@@ -578,7 +649,7 @@ export default function GetEmbed() {
 
                 <div
                   className={`relative rounded-lg border overflow-hidden ${border}`}
-                  style={{ height: 600 }}
+                  style={{ height: form.embedType === "fullpage" ? 700 : 500 }}
                 >
                   {!previewLoaded && (
                     <div className="absolute inset-0 flex items-center justify-center">

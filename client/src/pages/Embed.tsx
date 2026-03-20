@@ -31,6 +31,10 @@ export default function Embed() {
       sessionStorage.setItem(`frp-embed-started-${params.partner}`, "1");
       trackEmbedEvent(params.partner, "embed_loaded");
     }
+    // Signal parent page to expand iframe (homepage embed)
+    try {
+      window.parent.postMessage({ type: "frp-expand" }, "*");
+    } catch {}
     setTimeout(() => setStarted(true), 400);
   }, [params.partner]);
 
