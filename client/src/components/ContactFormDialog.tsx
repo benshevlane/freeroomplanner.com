@@ -53,8 +53,8 @@ export default function ContactFormDialog({ open, onOpenChange }: ContactFormDia
       <DialogContent className="sm:max-w-md">
         {success ? (
           <div className="py-6 text-center">
-            <p className="text-lg font-medium">Thank you!</p>
-            <p className="text-sm text-muted-foreground mt-1">We've received your message and will be in touch soon.</p>
+            <p className="text-lg font-medium">Message Sent</p>
+            <p className="text-sm text-muted-foreground mt-1">We'll be in touch soon.</p>
             <Button className="mt-4" variant="outline" onClick={() => onOpenChange(false)}>
               Close
             </Button>
