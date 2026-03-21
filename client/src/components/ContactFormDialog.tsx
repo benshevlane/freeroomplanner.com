@@ -51,13 +51,6 @@ export default function ContactFormDialog({ open, onOpenChange }: ContactFormDia
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Contact Us</DialogTitle>
-          <DialogDescription>
-            Have a question or want to get in touch? Send us a message and we'll get back to you.
-          </DialogDescription>
-        </DialogHeader>
-
         {success ? (
           <div className="py-6 text-center">
             <p className="text-lg font-medium">Thank you!</p>
@@ -67,6 +60,13 @@ export default function ContactFormDialog({ open, onOpenChange }: ContactFormDia
             </Button>
           </div>
         ) : (
+          <>
+          <DialogHeader>
+            <DialogTitle>Contact Us</DialogTitle>
+            <DialogDescription>
+              Have a question or want to get in touch? Send us a message and we'll get back to you.
+            </DialogDescription>
+          </DialogHeader>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="contact-name">Name</Label>
@@ -110,6 +110,7 @@ export default function ContactFormDialog({ open, onOpenChange }: ContactFormDia
               </Button>
             </DialogFooter>
           </form>
+          </>
         )}
       </DialogContent>
     </Dialog>
