@@ -29,7 +29,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const resend = new Resend(apiKey);
     const { error } = await resend.emails.send({
-      from: process.env.EMAIL_FROM || "Free Room Planner <onboarding@resend.dev>",
+      from: process.env.EMAIL_FROM || "Free Room Planner <noreply@send.freeroomplanner.com>",
       to: process.env.CONTACT_EMAIL || "ben@freeroomplanner.com",
       replyTo: email,
       subject: `[Contact] ${subject}`,
