@@ -198,6 +198,12 @@ export default function FloorPlanCanvas({
   // Arrow drawing state
   const [arrowDrawingStart, setArrowDrawingStart] = useState<Point | null>(null);
   const [arrowDraggingEndpoint, setArrowDraggingEndpoint] = useState<{ id: string; endpoint: "start" | "end"; } | null>(null);
+  const [arrowBodyDragStart, setArrowBodyDragStart] = useState<{
+    id: string;
+    startX: number; startY: number;
+    endX: number; endY: number;
+    mouseWorldX: number; mouseWorldY: number;
+  } | null>(null);
 
   // Reset arrow drawing state when tool changes away from arrow
   useEffect(() => {
@@ -718,10 +724,18 @@ export default function FloorPlanCanvas({
           }
         }
 
-        // Check arrow body hit
+        // Check arrow body hit — select and start whole-body drag
         const hitArrow = hitTestArrow(pos.x, pos.y, state.arrows, state.gridSize, state.zoom, state.panOffset);
         if (hitArrow) {
           onSelectItem(hitArrow.id);
+          onPushUndo();
+          const world = screenToWorld(pos.x, pos.y, state.gridSize, state.zoom, state.panOffset);
+          setArrowBodyDragStart({
+            id: hitArrow.id,
+            startX: hitArrow.startX, startY: hitArrow.startY,
+            endX: hitArrow.endX, endY: hitArrow.endY,
+            mouseWorldX: world.x, mouseWorldY: world.y,
+          });
           return;
         }
 
@@ -891,6 +905,25 @@ export default function FloorPlanCanvas({
         } else {
           onUpdateArrow(arrowDraggingEndpoint.id, { endX: snapped.x, endY: snapped.y });
         }
+        return;
+      }
+
+      // Handle arrow body dragging (move entire arrow)
+      if (arrowBodyDragStart) {
+        const world = screenToWorld(pos.x, pos.y, state.gridSize, state.zoom, state.panOffset);
+        const dx = world.x - arrowBodyDragStart.mouseWorldX;
+        const dy = world.y - arrowBodyDragStart.mouseWorldY;
+        // Snap the start point to grid, then apply same offset to end
+        const newStartX = Math.round((arrowBodyDragStart.startX + dx) / 10) * 10;
+        const newStartY = Math.round((arrowBodyDragStart.startY + dy) / 10) * 10;
+        const snappedDx = newStartX - arrowBodyDragStart.startX;
+        const snappedDy = newStartY - arrowBodyDragStart.startY;
+        onUpdateArrow(arrowBodyDragStart.id, {
+          startX: arrowBodyDragStart.startX + snappedDx,
+          startY: arrowBodyDragStart.startY + snappedDy,
+          endX: arrowBodyDragStart.endX + snappedDx,
+          endY: arrowBodyDragStart.endY + snappedDy,
+        });
         return;
       }
 
@@ -1173,7 +1206,7 @@ export default function FloorPlanCanvas({
         setEraserHoverId(null);
       }
     },
-    [state, isPanning, isDragging, isDraggingLabel, draggingLabelId, labelDragStart, isDraggingRoomLabel, draggingRoomKey, roomLabelDragStart, isResizing, isRotating, rotateStartAngle, rotateItemStartRot, resizeStart, resizeCorner, dragStart, dragItemOffset, eraserHoverId, arrowDraggingEndpoint, isRotatingLabel, rotatingLabelId, labelRotateStartAngle, labelRotateItemStartRot, isResizingLabel, resizingLabelId, labelResizeStart, getCanvasPos, onSetPan, onSetZoom, onMoveFurniture, onMoveLabel, onUpdateFurniture, onUpdateArrow, onSetLabelOffset, onSetRoomLabelOffset]
+    [state, isPanning, isDragging, isDraggingLabel, draggingLabelId, labelDragStart, isDraggingRoomLabel, draggingRoomKey, roomLabelDragStart, isResizing, isRotating, rotateStartAngle, rotateItemStartRot, resizeStart, resizeCorner, dragStart, dragItemOffset, eraserHoverId, arrowDraggingEndpoint, arrowBodyDragStart, isRotatingLabel, rotatingLabelId, labelRotateStartAngle, labelRotateItemStartRot, isResizingLabel, resizingLabelId, labelResizeStart, getCanvasPos, onSetPan, onSetZoom, onMoveFurniture, onMoveLabel, onUpdateFurniture, onUpdateArrow, onSetLabelOffset, onSetRoomLabelOffset]
   );
 
   const handlePointerUp = useCallback(
@@ -1252,6 +1285,7 @@ export default function FloorPlanCanvas({
       setResizeCorner(null);
       setResizeStart(null);
       setArrowDraggingEndpoint(null);
+      setArrowBodyDragStart(null);
       setIsDraggingLabel(false);
       setDraggingLabelId(null);
       setIsDraggingRoomLabel(false);
