@@ -2,7 +2,16 @@
   "buildCommand": "npx vite build",
   "outputDirectory": "dist/public",
   "framework": null,
+  "headers": [
+    {
+      "source": "/embed",
+      "headers": [
+        { "key": "Content-Security-Policy", "value": "frame-ancestors *" }
+      ]
+    }
+  ],
   "routes": [
+    { "src": "/embed", "dest": "/index.html", "headers": { "Content-Security-Policy": "frame-ancestors *" } },
     { "src": "/assets/(.*)", "dest": "/assets/$1" },
     { "src": "/sitemap.xml", "dest": "/sitemap.xml" },
     { "src": "/robots.txt", "dest": "/robots.txt" },

@@ -124,9 +124,7 @@ function buildHomepageEmbedSnippet(partnerId: string, form: FormState): string {
   var SRC     = '${src}';
 
   var root    = document.getElementById('frp-embed-root');
-  var expanded     = false;
-  var iframeEl     = null;
-  var wrapEl       = null;
+  var wrapEl  = null;
 
   // ── Styles ──────────────────────────────────────────────────
   var style = document.createElement('style');
@@ -136,7 +134,7 @@ function buildHomepageEmbedSnippet(partnerId: string, form: FormState): string {
       'box-shadow:0 2px 8px rgba(0,0,0,.05);transition:box-shadow .3s;}',
     '#frp-card.open{box-shadow:0 8px 32px rgba(0,0,0,.10);}',
     '#frp-header{display:flex;flex-direction:column;align-items:center;gap:16px;padding:32px 24px;',
-      'transition:padding .3s,flex-direction .3s;}',
+      'transition:padding .3s;}',
     '#frp-card.open #frp-header{flex-direction:row;padding:14px 20px;border-bottom:1px solid #ede9e3;}',
     '#frp-logo{width:56px;height:56px;flex-shrink:0;}',
     '#frp-card.open #frp-logo{display:none;}',
@@ -166,15 +164,17 @@ function buildHomepageEmbedSnippet(partnerId: string, form: FormState): string {
   ].join('');
   document.head.appendChild(style);
 
-  // ── Logo SVG (matches freeroomplanner brand mark) ────────────
-  var logoHTML = '<img id="frp-logo" src="https://freeroomplanner.com/logo.png" alt="Free Room Planner">';
-
   // ── Build collapsed card ─────────────────────────────────────
   var card = document.createElement('div');
   card.id = 'frp-card';
   card.innerHTML =
     '<div id="frp-header">' +
-      logoHTML +
+      '<svg id="frp-logo" width="56" height="56" viewBox="0 0 48 48" fill="none">' +
+        '<rect x="4" y="8" width="40" height="32" rx="4" stroke="' + BRAND + '" stroke-width="2.5" fill="none"/>' +
+        '<line x1="4" y1="16" x2="44" y2="16" stroke="' + BRAND + '" stroke-width="1.5" opacity="0.4"/>' +
+        '<rect x="10" y="22" width="12" height="10" rx="2" fill="' + BRAND + '" opacity="0.15"/>' +
+        '<rect x="26" y="22" width="12" height="10" rx="2" fill="' + BRAND + '" opacity="0.15"/>' +
+      '</svg>' +
       '<div id="frp-text" style="flex:1">' +
         '<p id="frp-title">Plan your room layout</p>' +
         '<p id="frp-desc">Design your space with our free drag-and-drop room planner.</p>' +
@@ -185,43 +185,50 @@ function buildHomepageEmbedSnippet(partnerId: string, form: FormState): string {
   root.appendChild(card);
 
   // ── Expand ───────────────────────────────────────────────────
-  card.querySelector('#frp-cta').addEventListener('click', function() {
-    expanded = true;
+  function expand() {
     card.classList.add('open');
 
     // Swap CTA for collapse button
     var header = card.querySelector('#frp-header');
-    header.querySelector('#frp-cta').remove();
-    header.querySelector('#frp-attr').remove();
+    var cta = header.querySelector('#frp-cta');
+    var attr = header.querySelector('#frp-attr');
+    if (cta) cta.remove();
+    if (attr) attr.remove();
     var collapseBtn = document.createElement('button');
     collapseBtn.id = 'frp-collapse';
     collapseBtn.innerHTML = '&#8593; Collapse planner';
     collapseBtn.addEventListener('click', collapse);
     header.appendChild(collapseBtn);
 
-    // Spinner + iframe
+    // Spinner + iframe (create via DOM to avoid HTML-entity issues with & in URL)
     wrapEl = document.createElement('div');
     wrapEl.id = 'frp-iframe-wrap';
-    wrapEl.innerHTML =
-      '<div id="frp-spinner-wrap"><div id="frp-spinner"></div>Loading planner\u2026</div>' +
-      '<iframe id="frp-iframe" src="' + SRC + '" title="Free Room Planner" allow="fullscreen"></iframe>';
-    card.appendChild(wrapEl);
 
-    var iframe = wrapEl.querySelector('#frp-iframe');
+    var spinnerWrap = document.createElement('div');
+    spinnerWrap.id = 'frp-spinner-wrap';
+    spinnerWrap.innerHTML = '<div id="frp-spinner"></div>Loading planner\\u2026';
+    wrapEl.appendChild(spinnerWrap);
+
+    var iframe = document.createElement('iframe');
+    iframe.id = 'frp-iframe';
+    iframe.src = SRC;
+    iframe.title = 'Free Room Planner';
+    iframe.allow = 'fullscreen';
     iframe.addEventListener('load', function() {
       iframe.classList.add('loaded');
-      var spinnerWrap = wrapEl.querySelector('#frp-spinner-wrap');
-      if (spinnerWrap) spinnerWrap.remove();
+      if (spinnerWrap.parentNode) spinnerWrap.remove();
     });
+    wrapEl.appendChild(iframe);
+
+    card.appendChild(wrapEl);
 
     setTimeout(function() {
       card.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 100);
-  });
+  }
 
   // ── Collapse ─────────────────────────────────────────────────
   function collapse() {
-    expanded = false;
     card.classList.remove('open');
 
     // Remove iframe
@@ -235,7 +242,7 @@ function buildHomepageEmbedSnippet(partnerId: string, form: FormState): string {
     var ctaBtn = document.createElement('button');
     ctaBtn.id = 'frp-cta';
     ctaBtn.innerHTML = 'Start planning &#8594;';
-    ctaBtn.addEventListener('click', arguments.callee); // re-bind via the outer click handler
+    ctaBtn.addEventListener('click', expand);
     header.appendChild(ctaBtn);
 
     var attr = document.createElement('p');
@@ -243,13 +250,13 @@ function buildHomepageEmbedSnippet(partnerId: string, form: FormState): string {
     attr.innerHTML = 'Powered by <a href="https://freeroomplanner.com" target="_blank" rel="noopener">freeroomplanner.com</a>';
     header.appendChild(attr);
 
-    // Re-bind expand — simplest to just reload the listener via delegation
-    ctaBtn.addEventListener('click', function() { card.querySelector('#frp-cta').click(); });
-
     setTimeout(function() {
       card.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }, 100);
   }
+
+  // ── Initial bind ─────────────────────────────────────────────
+  card.querySelector('#frp-cta').addEventListener('click', expand);
 })();
 <\/script>`;
 }
