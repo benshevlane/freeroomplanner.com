@@ -22,6 +22,7 @@ export default function Embed() {
   const [started, setStarted] = useState(() => {
     if (!params.partner) return true; // skip if no partner
     if (!params.embed) return true; // skip welcome on direct navigation
+    if (params.type === "homepage") return true; // homepage embed card already has its own CTA
     return sessionStorage.getItem(`frp-embed-started-${params.partner}`) === "1";
   });
   const [welcomeFading, setWelcomeFading] = useState(false);

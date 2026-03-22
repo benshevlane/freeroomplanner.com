@@ -75,13 +75,12 @@ function buildHomepageLinkSnippet(form: FormState): string {
 <!-- Free to use. Powered by freeroomplanner.com -->
 <div style="max-width: 560px; margin: 0 auto; font-family: 'DM Sans', system-ui, -apple-system, sans-serif; box-sizing: border-box;">
   <div style="border: 1px solid #e8e3d8; border-radius: 12px; padding: 20px 24px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; background: #fff;">
-    <img
-      src="https://freeroomplanner.com/logo.png"
-      alt="Free Room Planner"
-      width="40"
-      height="40"
-      style="flex-shrink: 0; object-fit: contain;"
-    />
+    <svg width="40" height="40" viewBox="0 0 48 48" fill="none" style="flex-shrink:0;">
+      <rect x="4" y="8" width="40" height="32" rx="4" stroke="${brandColor}" stroke-width="2.5" fill="none"/>
+      <line x1="4" y1="16" x2="44" y2="16" stroke="${brandColor}" stroke-width="1.5" opacity="0.4"/>
+      <rect x="10" y="22" width="12" height="10" rx="2" fill="${brandColor}" opacity="0.15"/>
+      <rect x="26" y="22" width="12" height="10" rx="2" fill="${brandColor}" opacity="0.15"/>
+    </svg>
     <div style="flex: 1; min-width: 160px;">
       <div style="font-size: 16px; font-weight: 700; color: #1a1a18; margin: 0 0 2px; line-height: 1.3;">Plan your room layout</div>
       <div style="font-size: 13px; color: #6b6457; line-height: 1.4; margin: 0;">Design your space with our free drag-and-drop room planner.</div>
