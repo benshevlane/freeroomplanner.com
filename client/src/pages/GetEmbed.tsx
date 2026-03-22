@@ -114,25 +114,145 @@ function buildFullPageSnippet(partnerId: string, form: FormState): string {
 }
 
 function buildHomepageEmbedSnippet(partnerId: string, form: FormState): string {
-  const src = buildEmbedSrc(partnerId, form, "homepage");
   const brandColor = form.brandColor || DEFAULT_BRAND_COLOR;
-  return `<!-- Free Room Planner Embed — Homepage -->
-<!-- Free to use. Powered by freeroomplanner.com -->
-<div id="frp-embed-root">
-  <div id="frp-preview" style="max-width: 560px; margin: 0 auto; border: 1px solid #e8e3d8; border-radius: 12px; padding: 24px; text-align: center; font-family: 'DM Sans', system-ui, -apple-system, sans-serif; background: #fff; cursor: pointer;" onclick="document.getElementById('frp-overlay').style.display='flex'">
-    <div style="margin-bottom: 12px;">
-      <svg width="48" height="48" viewBox="0 0 48 48" fill="none"><rect x="4" y="8" width="40" height="32" rx="4" stroke="${brandColor}" stroke-width="2.5" fill="none"/><line x1="4" y1="16" x2="44" y2="16" stroke="${brandColor}" stroke-width="1.5" opacity="0.4"/><rect x="10" y="22" width="12" height="10" rx="2" fill="${brandColor}" opacity="0.15"/><rect x="26" y="22" width="12" height="10" rx="2" fill="${brandColor}" opacity="0.15"/></svg>
-    </div>
-    <div style="font-size: 18px; font-weight: 700; color: #1a1a18; margin-bottom: 4px;">Plan your room layout</div>
-    <div style="font-size: 14px; color: #6b6457; margin-bottom: 16px;">Design your space with our free drag-and-drop room planner.</div>
-    <span style="display: inline-flex; align-items: center; gap: 6px; padding: 12px 28px; font-size: 15px; font-weight: 600; color: #fff; background: ${brandColor}; border-radius: 10px; text-decoration: none; font-family: inherit;">Start planning &#x2192;</span>
-    <div style="margin-top: 8px; font-size: 11px; color: #a09a8c;">Powered by <a href="https://freeroomplanner.com" style="color: #a09a8c; text-decoration: underline;" target="_blank" rel="noopener">freeroomplanner.com</a></div>
-  </div>
-  <div id="frp-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 9999; background: #fff; flex-direction: column; align-items: stretch;">
-    <button onclick="document.getElementById('frp-overlay').style.display='none'" style="position: absolute; top: 12px; right: 16px; z-index: 10000; width: 36px; height: 36px; border-radius: 50%; border: 1px solid #e8e3d8; background: #fff; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #6b6457; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">&times;</button>
-    <iframe src="${src}" width="100%" height="100%" style="border: none; display: block; flex: 1;" title="Free Room Planner" loading="lazy"></iframe>
-  </div>
-</div>`;
+  const units = form.units;
+  return `<!-- Free Room Planner – Homepage Embed -->
+<div id="frp-embed-root" style="width:100%;font-family:inherit;"></div>
+<script>
+(function() {
+  var BRAND   = '${brandColor}';
+  var UNITS   = '${units}';
+  var SRC     = 'https://freeroomplanner.com?embed=1&color=' + encodeURIComponent(BRAND) + '&units=' + UNITS;
+
+  var root    = document.getElementById('frp-embed-root');
+  var expanded     = false;
+  var iframeEl     = null;
+  var wrapEl       = null;
+
+  // ── Styles ──────────────────────────────────────────────────
+  var style = document.createElement('style');
+  style.textContent = [
+    '#frp-embed-root *{box-sizing:border-box;margin:0;padding:0;}',
+    '#frp-card{width:100%;border:1px solid #e2ddd5;border-radius:12px;background:#fff;overflow:hidden;',
+      'box-shadow:0 2px 8px rgba(0,0,0,.05);transition:box-shadow .3s;}',
+    '#frp-card.open{box-shadow:0 8px 32px rgba(0,0,0,.10);}',
+    '#frp-header{display:flex;flex-direction:column;align-items:center;gap:16px;padding:32px 24px;',
+      'transition:padding .3s,flex-direction .3s;}',
+    '#frp-card.open #frp-header{flex-direction:row;padding:14px 20px;border-bottom:1px solid #ede9e3;}',
+    '#frp-logo{width:56px;height:56px;flex-shrink:0;}',
+    '#frp-card.open #frp-logo{display:none;}',
+    '#frp-title{font-size:18px;font-weight:600;color:#1a1a1a;letter-spacing:-.01em;text-align:center;}',
+    '#frp-card.open #frp-title{font-size:15px;text-align:left;}',
+    '#frp-desc{margin-top:6px;font-size:14px;color:#6b6b6b;line-height:1.5;text-align:center;}',
+    '#frp-card.open #frp-desc{display:none;}',
+    '#frp-cta{display:inline-flex;align-items:center;gap:8px;padding:12px 24px;',
+      'background:' + BRAND + ';color:#fff;border:none;border-radius:8px;font-size:15px;',
+      'font-weight:600;cursor:pointer;letter-spacing:-.01em;transition:opacity .2s;}',
+    '#frp-cta:hover{opacity:.88;}',
+    '#frp-collapse{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;',
+      'background:transparent;color:#6b6b6b;border:1px solid #ddd;border-radius:6px;',
+      'font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap;transition:background .2s,color .2s;}',
+    '#frp-collapse:hover{background:#f5f5f5;color:#333;}',
+    '#frp-attr{font-size:12px;color:#aaa;}',
+    '#frp-attr a{color:' + BRAND + ';text-decoration:none;}',
+    '#frp-iframe-wrap{position:relative;width:100%;height:min(720px,80vh);}',
+    '#frp-spinner-wrap{position:absolute;inset:0;display:flex;flex-direction:column;',
+      'align-items:center;justify-content:center;gap:12px;background:#f9f7f4;',
+      'color:#999;font-size:14px;}',
+    '@keyframes frp-spin{to{transform:rotate(360deg)}}',
+    '#frp-spinner{width:36px;height:36px;border:3px solid #e0e0e0;',
+      'border-top-color:' + BRAND + ';border-radius:50%;animation:frp-spin .8s linear infinite;}',
+    '#frp-iframe{width:100%;height:100%;border:none;display:block;opacity:0;transition:opacity .3s;}',
+    '#frp-iframe.loaded{opacity:1;}',
+  ].join('');
+  document.head.appendChild(style);
+
+  // ── Logo SVG (matches freeroomplanner brand mark) ────────────
+  var logoHTML = '<img id="frp-logo" src="https://freeroomplanner.com/logo.svg" alt="Free Room Planner">';
+
+  // ── Build collapsed card ─────────────────────────────────────
+  var card = document.createElement('div');
+  card.id = 'frp-card';
+  card.innerHTML =
+    '<div id="frp-header">' +
+      logoHTML +
+      '<div id="frp-text" style="flex:1">' +
+        '<p id="frp-title">Plan your room layout</p>' +
+        '<p id="frp-desc">Design your space with our free drag-and-drop room planner.</p>' +
+      '</div>' +
+      '<button id="frp-cta">Start planning &#8594;</button>' +
+      '<p id="frp-attr">Powered by <a href="https://freeroomplanner.com" target="_blank" rel="noopener">freeroomplanner.com</a></p>' +
+    '</div>';
+  root.appendChild(card);
+
+  // ── Expand ───────────────────────────────────────────────────
+  card.querySelector('#frp-cta').addEventListener('click', function() {
+    expanded = true;
+    card.classList.add('open');
+
+    // Swap CTA for collapse button
+    var header = card.querySelector('#frp-header');
+    header.querySelector('#frp-cta').remove();
+    header.querySelector('#frp-attr').remove();
+    var collapseBtn = document.createElement('button');
+    collapseBtn.id = 'frp-collapse';
+    collapseBtn.innerHTML = '&#8593; Collapse planner';
+    collapseBtn.addEventListener('click', collapse);
+    header.appendChild(collapseBtn);
+
+    // Spinner + iframe
+    wrapEl = document.createElement('div');
+    wrapEl.id = 'frp-iframe-wrap';
+    wrapEl.innerHTML =
+      '<div id="frp-spinner-wrap"><div id="frp-spinner"></div>Loading planner\u2026</div>' +
+      '<iframe id="frp-iframe" src="' + SRC + '" title="Free Room Planner" allow="fullscreen"></iframe>';
+    card.appendChild(wrapEl);
+
+    var iframe = wrapEl.querySelector('#frp-iframe');
+    iframe.addEventListener('load', function() {
+      iframe.classList.add('loaded');
+      var spinnerWrap = wrapEl.querySelector('#frp-spinner-wrap');
+      if (spinnerWrap) spinnerWrap.remove();
+    });
+
+    setTimeout(function() {
+      card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
+  });
+
+  // ── Collapse ─────────────────────────────────────────────────
+  function collapse() {
+    expanded = false;
+    card.classList.remove('open');
+
+    // Remove iframe
+    if (wrapEl) { wrapEl.remove(); wrapEl = null; }
+
+    // Restore CTA + attribution
+    var header = card.querySelector('#frp-header');
+    var collapseBtn = header.querySelector('#frp-collapse');
+    if (collapseBtn) collapseBtn.remove();
+
+    var ctaBtn = document.createElement('button');
+    ctaBtn.id = 'frp-cta';
+    ctaBtn.innerHTML = 'Start planning &#8594;';
+    ctaBtn.addEventListener('click', arguments.callee); // re-bind via the outer click handler
+    header.appendChild(ctaBtn);
+
+    var attr = document.createElement('p');
+    attr.id = 'frp-attr';
+    attr.innerHTML = 'Powered by <a href="https://freeroomplanner.com" target="_blank" rel="noopener">freeroomplanner.com</a>';
+    header.appendChild(attr);
+
+    // Re-bind expand — simplest to just reload the listener via delegation
+    ctaBtn.addEventListener('click', function() { card.querySelector('#frp-cta').click(); });
+
+    setTimeout(function() {
+      card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 100);
+  }
+})();
+<\/script>`;
 }
 
 function buildFullPageSnippetForLink(partnerId: string, form: FormState): string {
