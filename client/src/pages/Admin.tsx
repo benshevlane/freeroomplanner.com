@@ -62,6 +62,58 @@ function LoginForm({ onSuccess }: { onSuccess: () => void }) {
   );
 }
 
+interface DownloadPartner {
+  partner_id: string;
+  business_name: string;
+  plan_exported_count: number;
+}
+
+function DownloadsReport() {
+  const { data, isLoading, error } = useQuery<{
+    total_downloads: number;
+    embed_partner_downloads: DownloadPartner[];
+  }>({
+    queryKey: ["/api/admin/downloads-report"],
+  });
+
+  if (isLoading) return <p className="text-sm text-[#9a9488]">Loading downloads report...</p>;
+  if (error) return <p className="text-sm text-red-600">Failed to load downloads report.</p>;
+
+  const total = data?.total_downloads ?? 0;
+  const partners = data?.embed_partner_downloads ?? [];
+
+  return (
+    <div className="mt-12">
+      <h2 className="text-lg font-semibold mb-1">Plan Downloads</h2>
+      <p className="text-sm text-[#6b6457] mb-4">
+        {total} total plan{total !== 1 ? "s" : ""} downloaded via embed partners
+      </p>
+      {partners.length === 0 ? (
+        <p className="text-sm text-[#9a9488]">No plan downloads recorded yet.</p>
+      ) : (
+        <div className="overflow-x-auto rounded-xl border border-[#e8e3d8] bg-white shadow-sm">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-[#e8e3d8] bg-[#f5f2ec]">
+                <th className="text-left px-4 py-3 font-medium text-[#6b6457]">Partner</th>
+                <th className="text-right px-4 py-3 font-medium text-[#6b6457]">Plans Downloaded</th>
+              </tr>
+            </thead>
+            <tbody>
+              {partners.map((p) => (
+                <tr key={p.partner_id} className="border-b border-[#e8e3d8] last:border-0">
+                  <td className="px-4 py-3 font-medium">{p.business_name}</td>
+                  <td className="px-4 py-3 text-right tabular-nums">{p.plan_exported_count}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function EmbedReport() {
   const { data, isLoading, error } = useQuery<{ partners: EmbedPartner[] }>({
     queryKey: ["/api/admin/embed-report"],
@@ -325,6 +377,9 @@ export default function Admin() {
             <p className="text-xs text-[#9a9488] mt-2">Stored in Supabase Storage</p>
           </div>
         )}
+
+        {/* Plan Downloads Report */}
+        <DownloadsReport />
 
         {/* Embed Users Report */}
         <EmbedReport />
