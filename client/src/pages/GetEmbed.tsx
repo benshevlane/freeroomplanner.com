@@ -169,12 +169,7 @@ function buildHomepageEmbedSnippet(partnerId: string, form: FormState): string {
   card.id = 'frp-card';
   card.innerHTML =
     '<div id="frp-header">' +
-      '<svg id="frp-logo" width="56" height="56" viewBox="0 0 48 48" fill="none">' +
-        '<rect x="4" y="8" width="40" height="32" rx="4" stroke="' + BRAND + '" stroke-width="2.5" fill="none"/>' +
-        '<line x1="4" y1="16" x2="44" y2="16" stroke="' + BRAND + '" stroke-width="1.5" opacity="0.4"/>' +
-        '<rect x="10" y="22" width="12" height="10" rx="2" fill="' + BRAND + '" opacity="0.15"/>' +
-        '<rect x="26" y="22" width="12" height="10" rx="2" fill="' + BRAND + '" opacity="0.15"/>' +
-      '</svg>' +
+      '<img id="frp-logo" src="https://freeroomplanner.com/logo.png" alt="Free Room Planner" width="56" height="56" style="object-fit:contain;">' +
       '<div id="frp-text" style="flex:1">' +
         '<p id="frp-title">Plan your room layout</p>' +
         '<p id="frp-desc">Design your space with our free drag-and-drop room planner.</p>' +
