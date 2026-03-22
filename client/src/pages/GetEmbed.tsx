@@ -251,12 +251,6 @@ export default function GetEmbed() {
       }
       if (!form.websiteUrl.trim()) {
         newErrors.websiteUrl = "Website URL is required.";
-      } else {
-        try {
-          new URL(form.websiteUrl.trim());
-        } catch {
-          newErrors.websiteUrl = "Please enter a valid URL.";
-        }
       }
       if (form.embedType === "homepage-link") {
         if (!form.plannerPageUrl.trim()) {
@@ -531,7 +525,7 @@ export default function GetEmbed() {
                 </label>
                 <input
                   type="text"
-                  placeholder="https://yoursite.com"
+                  placeholder="yoursite.com"
                   value={form.websiteUrl}
                   onChange={(e) => setField("websiteUrl", e.target.value)}
                   className={`w-full px-3 py-2 rounded-lg border text-sm outline-none focus:ring-2 focus:ring-[#3d8a7c]/40 transition ${inputBg}`}
