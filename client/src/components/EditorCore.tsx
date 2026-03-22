@@ -467,7 +467,7 @@ export default function EditorCore({
               <SheetContent side="left" className="p-0 w-72">
                 <SheetTitle className="sr-only">Items Library</SheetTitle>
                 <FurniturePanel
-                  className="w-full border-r-0"
+                  className="w-full h-full border-r-0"
                   onSelectFurniture={(t) => { handleSelectFurniture(t); setFurniturePanelOpen(false); }}
                   onSwitchToSelect={() => editor.setTool("select")}
                 />
