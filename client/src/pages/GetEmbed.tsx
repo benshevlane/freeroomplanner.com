@@ -114,15 +114,14 @@ function buildFullPageSnippet(partnerId: string, form: FormState): string {
 }
 
 function buildHomepageEmbedSnippet(partnerId: string, form: FormState): string {
+  const src = buildEmbedSrc(partnerId, form, "homepage");
   const brandColor = form.brandColor || DEFAULT_BRAND_COLOR;
-  const units = form.units;
   return `<!-- Free Room Planner – Homepage Embed -->
 <div id="frp-embed-root" style="width:100%;font-family:inherit;"></div>
 <script>
 (function() {
   var BRAND   = '${brandColor}';
-  var UNITS   = '${units}';
-  var SRC     = 'https://freeroomplanner.com?embed=1&color=' + encodeURIComponent(BRAND) + '&units=' + UNITS;
+  var SRC     = '${src}';
 
   var root    = document.getElementById('frp-embed-root');
   var expanded     = false;
@@ -168,7 +167,7 @@ function buildHomepageEmbedSnippet(partnerId: string, form: FormState): string {
   document.head.appendChild(style);
 
   // ── Logo SVG (matches freeroomplanner brand mark) ────────────
-  var logoHTML = '<img id="frp-logo" src="https://freeroomplanner.com/logo.svg" alt="Free Room Planner">';
+  var logoHTML = '<img id="frp-logo" src="https://freeroomplanner.com/logo.png" alt="Free Room Planner">';
 
   // ── Build collapsed card ─────────────────────────────────────
   var card = document.createElement('div');
