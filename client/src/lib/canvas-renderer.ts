@@ -488,19 +488,8 @@ export function drawWalls(
   panOffset: Point,
   isDark: boolean,
   selectedId: string | null,
-  units: UnitSystem = "m",
-  measureMode: MeasureMode = "inside",
-  furniture: FurnitureItem[] = [],
-  rooms: DetectedRoom[] = []
 ) {
   const pxPerCm = (gridSize * zoom) / 100;
-
-  // Find collinear wall groups for merged labels
-  const collinearGroups = findCollinearGroups(walls);
-  const mergedWallIds = new Set<string>();
-  for (const group of collinearGroups.values()) {
-    for (const id of group.wallIds) mergedWallIds.add(id);
-  }
 
   // Draw all walls as solid-filled polygons (architectural style)
   // First pass: draw filled wall rectangles
@@ -562,6 +551,29 @@ export function drawWalls(
     ctx.arc(px, py, halfThick, 0, Math.PI * 2);
     ctx.fill();
   });
+
+}
+
+/** Draw wall dimension labels separately from wall polygons so they render on top of furniture */
+export function drawWallDimensionLabels(
+  ctx: CanvasRenderingContext2D,
+  walls: Wall[],
+  gridSize: number,
+  zoom: number,
+  panOffset: Point,
+  isDark: boolean,
+  units: UnitSystem = "m",
+  measureMode: MeasureMode = "inside",
+  furniture: FurnitureItem[] = [],
+  rooms: DetectedRoom[] = []
+) {
+  const pxPerCm = (gridSize * zoom) / 100;
+
+  const collinearGroups = findCollinearGroups(walls);
+  const mergedWallIds = new Set<string>();
+  for (const group of collinearGroups.values()) {
+    for (const id of group.wallIds) mergedWallIds.add(id);
+  }
 
   // Identify doors/windows for occupant checks
   const doorsWindows = furniture.filter((f) => f.type === "door" || f.type === "door_double" || f.type === "window");

@@ -4,6 +4,7 @@ import RichTextBoxComponent from "./RichTextBox";
 import {
   drawGrid,
   drawWalls,
+  drawWallDimensionLabels,
   drawWallSegmentMeasurements,
   drawMeasurementIndicatorLines,
   drawFurniture,
@@ -258,8 +259,8 @@ export default function FloorPlanCanvas({
       drawRoomAreas(ctx, rooms, state.gridSize, state.zoom, state.panOffset, isDark, state.units, state.roomNames, selectedRoomKey, roomLabelPositions, state.roomLabelOffsets);
     }
 
-    // Walls
-    drawWalls(ctx, state.walls, state.gridSize, state.zoom, state.panOffset, isDark, state.selectedItemId, state.units, measureMode, state.furniture, rooms);
+    // Walls (polygons only — dimension labels drawn after furniture)
+    drawWalls(ctx, state.walls, state.gridSize, state.zoom, state.panOffset, isDark, state.selectedItemId);
 
     // Measurement indicator lines (on top of walls, below labels/furniture)
     drawMeasurementIndicatorLines(ctx, state.walls, rooms, state.gridSize, state.zoom, state.panOffset, measureMode);
@@ -346,6 +347,9 @@ export default function FloorPlanCanvas({
     // Doors & windows render on top of walls so they overlay correctly
     const doorWindowItems = state.furniture.filter((f) => f.type === "door" || f.type === "door_double" || f.type === "window" || f.type === "bay_window");
     drawFurniture(ctx, doorWindowItems, state.gridSize, state.zoom, state.panOffset, isDark, state.selectedItemId);
+
+    // Wall dimension labels (drawn after furniture so items don't obscure them)
+    drawWallDimensionLabels(ctx, state.walls, state.gridSize, state.zoom, state.panOffset, isDark, state.units, measureMode, state.furniture, rooms);
 
     // Segment measurements for walls with doors/windows (drawn after furniture so worktops don't obscure them)
     drawWallSegmentMeasurements(ctx, state.walls, state.furniture, state.gridSize, state.zoom, state.panOffset, isDark, state.units, measureMode);

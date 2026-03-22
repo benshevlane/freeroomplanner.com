@@ -3,6 +3,7 @@ import { EditorState } from "./types";
 import {
   drawGrid,
   drawWalls,
+  drawWallDimensionLabels,
   drawFurniture,
   drawLabels,
 } from "./canvas-renderer";
@@ -76,6 +77,9 @@ export async function exportToPdf(state: EditorState, roomName: string) {
 
   // Draw furniture
   drawFurniture(ctx, state.furniture, gridSize, zoom, panOffset, false, null);
+
+  // Draw wall dimension labels (after furniture so items don't obscure them)
+  drawWallDimensionLabels(ctx, state.walls, gridSize, zoom, panOffset, false, state.units, "inside", state.furniture, []);
 
   // Draw labels
   drawLabels(ctx, state.labels, gridSize, zoom, panOffset, false, null);
