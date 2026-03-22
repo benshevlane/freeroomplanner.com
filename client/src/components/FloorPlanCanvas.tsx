@@ -348,7 +348,7 @@ export default function FloorPlanCanvas({
     drawFurniture(ctx, doorWindowItems, state.gridSize, state.zoom, state.panOffset, isDark, state.selectedItemId);
 
     // Segment measurements for walls with doors/windows (drawn after furniture so worktops don't obscure them)
-    drawWallSegmentMeasurements(ctx, state.walls, state.furniture, state.gridSize, state.zoom, state.panOffset, isDark, state.units, measureMode);
+    drawWallSegmentMeasurements(ctx, state.walls, state.furniture, state.gridSize, state.zoom, state.panOffset, isDark, state.units, measureMode, rooms);
 
     // Wall snap indicator lines (during drag)
     if (isDragging && wallSnapEdges.length > 0) {

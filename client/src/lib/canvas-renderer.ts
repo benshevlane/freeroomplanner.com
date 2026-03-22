@@ -643,7 +643,8 @@ function drawTotalWallDimensionLine(
   measureMode: MeasureMode = "inside",
   occupants: { along: number; halfExtent: number }[] = [],
   startExtension: number = 0,
-  endExtension: number = 0
+  endExtension: number = 0,
+  normalSign: number = 1
 ) {
   const sx = wallStart.x * pxPerCm + panOffset.x;
   const sy = wallStart.y * pxPerCm + panOffset.y;
@@ -666,8 +667,8 @@ function drawTotalWallDimensionLine(
 
   const segLenPx = Math.sqrt((iex - isx) ** 2 + (iey - isy) ** 2);
 
-  // Offset to opposite side (negative normal) from segment measurements
-  const offsetDist = -(wallThickPx / 2 + 8 * zoom);
+  // Offset to opposite side from segment measurements
+  const offsetDist = -normalSign * (wallThickPx / 2 + 8 * zoom);
   const normX = -Math.sin(angle);
   const normY = Math.cos(angle);
 
@@ -756,7 +757,8 @@ export function drawWallSegmentMeasurements(
   panOffset: Point,
   isDark: boolean,
   units: UnitSystem = "m",
-  measureMode: MeasureMode = "inside"
+  measureMode: MeasureMode = "inside",
+  rooms: DetectedRoom[] = []
 ) {
   const pxPerCm = (gridSize * zoom) / 100;
   const color = isDark ? DIMENSION_COLOR_DARK : DIMENSION_COLOR_LIGHT;
@@ -765,6 +767,19 @@ export function drawWallSegmentMeasurements(
 
   // Non-door/window furniture (worktops, etc.) used as label-positioning obstacles for total dimension line
   const otherFurniture = furniture.filter((f) => f.type !== "door" && f.type !== "door_double" && f.type !== "window" && f.type !== "bay_window");
+
+  // Compute a fallback "center" from all wall endpoints for walls not in any room
+  let fallbackCenter = { x: 0, y: 0 };
+  let pointCount = 0;
+  for (const w of walls) {
+    fallbackCenter.x += w.start.x + w.end.x;
+    fallbackCenter.y += w.start.y + w.end.y;
+    pointCount += 2;
+  }
+  if (pointCount > 0) {
+    fallbackCenter.x /= pointCount;
+    fallbackCenter.y /= pointCount;
+  }
 
   // Find collinear wall groups so we measure segments against the full merged wall
   const collinearGroups = findCollinearGroups(walls);
@@ -775,7 +790,7 @@ export function drawWallSegmentMeasurements(
 
   // Helper: draw a segment measurement along a wall between two points
   function drawSegment(
-    startPt: Point, endPt: Point, wallThicknessCm: number
+    startPt: Point, endPt: Point, wallThicknessCm: number, normalSign: number = 1
   ) {
     const dx = endPt.x - startPt.x;
     const dy = endPt.y - startPt.y;
@@ -791,7 +806,7 @@ export function drawWallSegmentMeasurements(
     // Draw dashed line along the wall (offset perpendicular so it doesn't overlap the wall label)
     const angle = Math.atan2(ey - sy, ex - sx);
     const wallThickPx = wallThicknessCm * pxPerCm;
-    const offsetDist = wallThickPx / 2 + 8 * zoom;
+    const offsetDist = normalSign * (wallThickPx / 2 + 8 * zoom);
     const normX = -Math.sin(angle);
     const normY = Math.cos(angle);
 
@@ -889,6 +904,53 @@ export function drawWallSegmentMeasurements(
     const wallNormX = -wallDirY;
     const wallNormY = wallDirX;
 
+    // Determine inside normal direction for this wall (same logic as drawMeasurementIndicatorLines)
+    let insideNormX = wallNormX;
+    let insideNormY = wallNormY;
+    {
+      const wallMid = { x: (wallStart.x + wallEnd.x) / 2, y: (wallStart.y + wallEnd.y) / 2 };
+      let foundRoom = false;
+      let bestRoom: DetectedRoom | null = null;
+      for (const room of rooms) {
+        const hasStart = room.vertices.some(v =>
+          Math.sqrt((v.x - wallStart.x) ** 2 + (v.y - wallStart.y) ** 2) < 15
+        );
+        const hasEnd = room.vertices.some(v =>
+          Math.sqrt((v.x - wallEnd.x) ** 2 + (v.y - wallEnd.y) ** 2) < 15
+        );
+        if (hasStart && hasEnd) {
+          if (!bestRoom || room.area > bestRoom.area) {
+            bestRoom = room;
+          }
+        }
+      }
+      if (bestRoom) {
+        // Use wall object if available, otherwise create a temporary one for computeInsideNormal
+        const wallObj: Wall = { id: wall.id, start: wallStart, end: wallEnd, thickness: wallThick };
+        const insideNormal = computeInsideNormal(wallObj, bestRoom.vertices);
+        if (insideNormal) {
+          insideNormX = insideNormal.nx;
+          insideNormY = insideNormal.ny;
+          foundRoom = true;
+        }
+      }
+      if (!foundRoom) {
+        const toCentroid = { x: fallbackCenter.x - wallMid.x, y: fallbackCenter.y - wallMid.y };
+        const dot = toCentroid.x * wallNormX + toCentroid.y * wallNormY;
+        if (dot < 0) {
+          insideNormX = -wallNormX;
+          insideNormY = -wallNormY;
+        }
+      }
+    }
+
+    // Compute normalSign: +1 if insideNorm aligns with geometric normal, -1 otherwise.
+    // In inside mode, segments go on the inside (positive normalSign side).
+    // In full mode, segments go on the outside (flip the sign).
+    const insideDot = insideNormX * wallNormX + insideNormY * wallNormY;
+    let normalSign = insideDot >= 0 ? 1 : -1;
+    if (measureMode === "full") normalSign = -normalSign;
+
     // Find doors/windows on this effective wall
     const occupants = getWallOccupants(wallStart, wallEnd, wallThick, doorsWindows);
 
@@ -929,7 +991,7 @@ export function drawWallSegmentMeasurements(
         x: wallStart.x + wallDirX * seg.endAlong,
         y: wallStart.y + wallDirY * seg.endAlong,
       };
-      drawSegment(startPt, endPt, wallThick);
+      drawSegment(startPt, endPt, wallThick, normalSign);
     }
 
     // Draw total wall length as a dimension line on the opposite side from segments
@@ -943,7 +1005,7 @@ export function drawWallSegmentMeasurements(
     drawTotalWallDimensionLine(
       ctx, wallStart, wallEnd, displayLengthCm, wallThick,
       pxPerCm, panOffset, zoom, isDark, units, color, measureMode,
-      allOccupants, segStartExt, segEndExt
+      allOccupants, segStartExt, segEndExt, normalSign
     );
   }
 }
