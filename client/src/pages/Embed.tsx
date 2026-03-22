@@ -191,7 +191,17 @@ export default function Embed() {
         units={params.units}
         hideToolbar={params.hideToolbar}
         isDark={isDark}
-        onExport={() => trackEmbedEvent(params.partner!, "plan_exported")}
+        onExport={() => {
+          trackEmbedEvent(params.partner!, "plan_exported");
+          fetch("/api/embed/notify-download", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              partnerId: params.partner,
+              referrer: document.referrer || undefined,
+            }),
+          }).catch(() => {});
+        }}
       />
 
       <PoweredByBadge partnerId={params.partner} />

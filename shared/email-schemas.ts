@@ -15,5 +15,11 @@ export const feedbackFormSchema = z.object({
   email: z.string().email("Please enter a valid email").optional().or(z.literal("")),
 });
 
+export const embedDownloadNotificationSchema = z.object({
+  partnerId: z.string().min(1).max(64),
+  referrer: z.string().max(500).optional(),
+});
+
 export type ContactFormData = z.infer<typeof contactFormSchema>;
 export type FeedbackFormData = z.infer<typeof feedbackFormSchema>;
+export type EmbedDownloadNotification = z.infer<typeof embedDownloadNotificationSchema>;

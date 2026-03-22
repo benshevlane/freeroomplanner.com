@@ -4,7 +4,7 @@ import { createServer, type Server } from "http";
 import { Resend } from "resend";
 import { storage } from "./storage";
 import { supabaseAdmin } from "./supabase";
-import { contactFormSchema, feedbackFormSchema } from "../shared/email-schemas";
+import { contactFormSchema, feedbackFormSchema, embedDownloadNotificationSchema } from "../shared/email-schemas";
 
 function requireAdmin(req: Request, res: Response, next: NextFunction) {
   if (req.session?.isAdmin) return next();
@@ -161,6 +161,35 @@ export async function registerRoutes(
   app.delete("/api/admin/hero-image", requireAdmin, async (_req, res) => {
     await deleteHeroImage();
     res.json({ ok: true });
+  });
+
+  // Embed download notification
+  app.post("/api/embed/notify-download", async (req, res) => {
+    if (!process.env.RESEND_API_KEY) {
+      return res.status(503).json({ error: "Email service not configured" });
+    }
+    const parsed = embedDownloadNotificationSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: parsed.error.flatten().fieldErrors });
+    }
+    const { partnerId, referrer } = parsed.data;
+    try {
+      const resend = new Resend(process.env.RESEND_API_KEY);
+      await resend.emails.send({
+        from: process.env.EMAIL_FROM || "Free Room Planner <noreply@send.freeroomplanner.com>",
+        to: process.env.CONTACT_EMAIL || "ben@freeroomplanner.com",
+        subject: `[Embed Download] ${partnerId}`,
+        html: `<h2>Embed Plan Downloaded</h2>
+<p>A user downloaded a floor plan from an embedded planner.</p>
+<p><strong>Partner:</strong> ${partnerId}</p>
+${referrer ? `<p><strong>Referrer:</strong> ${referrer}</p>` : ""}
+<p><strong>Time:</strong> ${new Date().toUTCString()}</p>`,
+      });
+      return res.json({ ok: true });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to send notification";
+      return res.status(500).json({ error: msg });
+    }
   });
 
   // Contact form
