@@ -101,16 +101,16 @@ function buildFullPageSnippet(partnerId: string, form: FormState): string {
   const src = buildEmbedSrc(partnerId, form, "fullpage");
   return `<!-- Free Room Planner Embed — Full Page -->
 <!-- Free to use. Powered by freeroomplanner.com -->
-<div style="width: 100%; height: 100vh; overflow: hidden;">
+<div style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 9999; margin: 0; padding: 0; overflow: hidden;">
   <iframe
     src="${src}"
-    width="100%"
-    height="100vh"
-    style="border: none; display: block;"
+    style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none; display: block;"
     title="Free Room Planner"
     loading="lazy"
+    allow="clipboard-write"
   ></iframe>
-</div>`;
+</div>
+<script>document.body.style.overflow='hidden';</script>`;
 }
 
 function buildHomepageEmbedSnippet(partnerId: string, form: FormState): string {
