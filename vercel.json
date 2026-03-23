@@ -17,6 +17,6 @@
     { "source": "/admin", "destination": "/index.html" },
     { "source": "/get-embed", "destination": "/index.html" },
     { "source": "/embed", "destination": "/index.html" },
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/:path((?!api/).*)", "destination": "/index.html" }
   ]
 }

@@ -28,8 +28,13 @@ function LoginForm({ onSuccess }: { onSuccess: () => void }) {
     try {
       await apiRequest("POST", "/api/admin/login", { password });
       onSuccess();
-    } catch {
-      setError("Invalid password");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "";
+      if (msg.includes("401")) {
+        setError("Invalid password");
+      } else {
+        setError("Login failed — please try again");
+      }
     }
     setLoading(false);
   };
