@@ -75,6 +75,7 @@ export default function EditorCore({
   }, []);
 
   const [droppingFurniture, setDroppingFurniture] = useState<FurnitureTemplate | null>(null);
+  const [autoEditTextBoxId, setAutoEditTextBoxId] = useState<string | null>(null);
   const [showClearDialog, setShowClearDialog] = useState(false);
   const [furniturePanelOpen, setFurniturePanelOpen] = useState(false);
   const [propertiesPanelOpen, setPropertiesPanelOpen] = useState(false);
@@ -201,7 +202,8 @@ export default function EditorCore({
       x: (cx - state.panOffset.x) / ((state.gridSize * state.zoom) / 100),
       y: (cy - state.panOffset.y) / ((state.gridSize * state.zoom) / 100),
     };
-    editor.addTextBox(centerWorld);
+    const newId = editor.addTextBox(centerWorld);
+    setAutoEditTextBoxId(newId);
   }, [editor, state]);
 
   const handleDeleteSelected = useCallback(() => {
@@ -540,6 +542,8 @@ export default function EditorCore({
           onSetLabelOffset={editor.setLabelOffset}
           onSetTool={editor.setTool}
           onSetRoomLabelOffset={editor.setRoomLabelOffset}
+          autoEditTextBoxId={autoEditTextBoxId}
+          onClearAutoEditTextBox={() => setAutoEditTextBoxId(null)}
         />
 
         {/* Desktop: Properties sidebar */}

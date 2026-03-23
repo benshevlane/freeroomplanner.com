@@ -88,6 +88,8 @@ interface FloorPlanCanvasProps {
   onSetLabelOffset: (id: string, offset: { x: number; y: number }) => void;
   onSetTool: (tool: EditorTool) => void;
   onSetRoomLabelOffset: (roomKey: string, offset: Point) => void;
+  autoEditTextBoxId?: string | null;
+  onClearAutoEditTextBox?: () => void;
 }
 
 export default function FloorPlanCanvas({
@@ -122,6 +124,8 @@ export default function FloorPlanCanvas({
   onSetLabelOffset,
   onSetTool,
   onSetRoomLabelOffset,
+  autoEditTextBoxId,
+  onClearAutoEditTextBox,
 }: FloorPlanCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -194,6 +198,14 @@ export default function FloorPlanCanvas({
   const [textBoxDragging, setTextBoxDragging] = useState<{ id: string; offsetX: number; offsetY: number } | null>(null);
   const [textBoxResizing, setTextBoxResizing] = useState<{ id: string; corner: string; startX: number; startY: number; origX: number; origY: number; origW: number; origH: number } | null>(null);
   const [textBoxRotating, setTextBoxRotating] = useState<{ id: string; startAngle: number; origRotation: number; centerX: number; centerY: number } | null>(null);
+
+  // Auto-enter edit mode for newly created text boxes
+  useEffect(() => {
+    if (autoEditTextBoxId) {
+      setEditingTextBoxId(autoEditTextBoxId);
+      onClearAutoEditTextBox?.();
+    }
+  }, [autoEditTextBoxId, onClearAutoEditTextBox]);
 
   // Arrow drawing state
   const [arrowDrawingStart, setArrowDrawingStart] = useState<Point | null>(null);
@@ -1546,11 +1558,24 @@ export default function FloorPlanCanvas({
   }, [onSelectItem]);
 
   const handleTextBoxExitEdit = useCallback(() => {
+    if (editingTextBoxId) {
+      const tb = state.textBoxes.find((t) => t.id === editingTextBoxId);
+      if (tb) {
+        const textContent = tb.content.replace(/<[^>]*>/g, "").trim();
+        if (!textContent) {
+          onRemoveTextBox(editingTextBoxId);
+        }
+      }
+    }
     setEditingTextBoxId(null);
-  }, []);
+  }, [editingTextBoxId, state.textBoxes, onRemoveTextBox]);
 
   const handleTextBoxContentChange = useCallback((id: string, html: string) => {
     onUpdateTextBox(id, { content: html });
+  }, [onUpdateTextBox]);
+
+  const handleTextBoxResizeHeight = useCallback((id: string, newHeightCm: number) => {
+    onUpdateTextBox(id, { height: newHeightCm });
   }, [onUpdateTextBox]);
 
   const handleTextBoxStartResize = useCallback((id: string, corner: string, e: React.PointerEvent) => {
@@ -1801,6 +1826,7 @@ export default function FloorPlanCanvas({
           onContentChange={handleTextBoxContentChange}
           onStartResize={handleTextBoxStartResize}
           onStartRotate={handleTextBoxStartRotate}
+          onResizeHeight={handleTextBoxResizeHeight}
         />
       ))}
       {/* Inline label editing overlay */}

@@ -66,7 +66,6 @@ const tools: { tool: EditorTool; icon: typeof MousePointer2; label: string; shor
   { tool: "pan", icon: Hand, label: "Pan / Drag", shortcut: "H" },
   { tool: "wall", icon: Pencil, label: "Draw Walls", shortcut: "W" },
   { tool: "arrow", icon: MoveRight, label: "Draw Arrow", shortcut: "A" },
-  { tool: "label", icon: Type, label: "Add Label", shortcut: "L" },
   { tool: "eraser", icon: Eraser, label: "Eraser", shortcut: "E" },
 ];
 
@@ -125,6 +124,9 @@ export default function EditorToolbar({
 
           <Separator orientation="vertical" className="h-6 mx-0.5 flex-shrink-0" />
 
+          <Button size="icon" variant={selectedTool === "label" ? "default" : "ghost"} className={btnClass} onClick={() => onSetTool("label")} data-testid="tool-label">
+            <Type className="h-5 w-5" />
+          </Button>
           <Button size="icon" variant="ghost" className={btnClass} onClick={onAddTextBox} data-testid="btn-add-text-box">
             <TextCursorInput className="h-5 w-5" />
           </Button>
@@ -239,15 +241,30 @@ export default function EditorToolbar({
 
       <Separator orientation="vertical" className="h-6 mx-1" />
 
-      {/* Add Text Box */}
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button size="icon" variant="ghost" onClick={onAddTextBox} data-testid="btn-add-text-box">
-            <TextCursorInput className="h-4 w-4" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent><p>Add Text Box (T)</p></TooltipContent>
-      </Tooltip>
+      {/* Text / Annotation Tools */}
+      <div className="flex items-center gap-0.5">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              size="icon"
+              variant={selectedTool === "label" ? "default" : "ghost"}
+              onClick={() => onSetTool("label")}
+              data-testid="tool-label"
+            >
+              <Type className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent><p>Add Label (L)</p></TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button size="icon" variant="ghost" onClick={onAddTextBox} data-testid="btn-add-text-box">
+              <TextCursorInput className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent><p>Add Text Box (T)</p></TooltipContent>
+        </Tooltip>
+      </div>
 
       <Separator orientation="vertical" className="h-6 mx-1" />
 

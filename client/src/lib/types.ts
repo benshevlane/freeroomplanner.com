@@ -115,7 +115,7 @@ export const DEFAULT_TEXT_BOX: Omit<TextBox, "id" | "x" | "y"> = {
   cornerRadius: 0,
   backgroundColor: "#ffffff",
   backgroundOpacity: 1,
-  padding: 12,
+  padding: 4,
   shadowEnabled: false,
   shadowBlur: 8,
   shadowOffsetX: 2,

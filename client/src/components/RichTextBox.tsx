@@ -17,6 +17,7 @@ interface RichTextBoxProps {
   onContentChange: (id: string, html: string) => void;
   onStartResize: (id: string, corner: string, e: React.PointerEvent) => void;
   onStartRotate: (id: string, e: React.PointerEvent) => void;
+  onResizeHeight: (id: string, newHeightCm: number) => void;
 }
 
 const RESIZE_HANDLE_SIZE = 8;
@@ -36,6 +37,7 @@ export default function RichTextBox({
   onContentChange,
   onStartResize,
   onStartRotate,
+  onResizeHeight,
 }: RichTextBoxProps) {
   const contentRef = useRef<HTMLDivElement>(null);
   const [containerRect, setContainerRect] = useState<DOMRect | null>(null);
@@ -73,8 +75,16 @@ export default function RichTextBox({
   const handleInput = useCallback(() => {
     if (contentRef.current) {
       onContentChange(textBox.id, contentRef.current.innerHTML);
+      // Auto-resize height to fit content
+      const el = contentRef.current.parentElement;
+      if (el) {
+        const newHeightCm = el.scrollHeight / pxPerCm;
+        if (newHeightCm > textBox.height) {
+          onResizeHeight(textBox.id, newHeightCm);
+        }
+      }
     }
-  }, [textBox.id, onContentChange]);
+  }, [textBox.id, textBox.height, pxPerCm, onContentChange, onResizeHeight]);
 
   const handlePointerDown = useCallback(
     (e: React.PointerEvent) => {
@@ -127,7 +137,7 @@ export default function RichTextBox({
     left: screenX,
     top: screenY,
     width: screenW,
-    height: screenH,
+    minHeight: screenH,
     transform: `rotate(${textBox.rotation}deg)`,
     transformOrigin: "center center",
     backgroundColor: bgRgba,
@@ -135,7 +145,7 @@ export default function RichTextBox({
     padding: textBox.padding * zoom,
     fontSize: textBox.fontSize * zoom,
     fontFamily: textBox.fontFamily,
-    overflow: isEditMode ? "auto" : "hidden",
+    overflow: isEditMode ? "auto" : "visible",
     cursor: isEditMode ? "text" : isSelected ? "move" : "default",
     outline: isEditMode ? "2px solid #3b82f6" : isSelected ? "2px solid #01696f" : "none",
     outlineOffset: -1,
