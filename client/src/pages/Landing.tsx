@@ -189,7 +189,7 @@ export default function Landing() {
       </header>
 
       {/* Hero */}
-      <section className="max-w-5xl mx-auto px-5 pt-20 pb-16 text-center">
+      <section className="max-w-5xl mx-auto px-5 pt-12 sm:pt-20 pb-16 text-center">
         <div className="rs-fade opacity-0 translate-y-4 transition-all duration-700">
           <div className={`inline-flex items-center gap-2 text-xs font-medium px-3 py-1.5 rounded-full mb-6 ${isDark ? "bg-[#2e2e2a] text-[#5ba89a]" : "bg-[#e8f4f1] text-[#3d8a7c]"}`}>
             No sign-up needed · completely free
@@ -200,7 +200,7 @@ export default function Landing() {
           <p className={`text-lg max-w-xl mx-auto mb-8 ${isDark ? "text-[#a09a8c]" : "text-[#6b6457]"}`}>
             A browser-based floor planner built for homeowners. Brief kitchen makers, bathroom fitters, architects, and contractors — fast.
           </p>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 justify-center">
             <button
               onClick={goToApp}
               className="px-7 py-3 rounded-xl text-base font-semibold bg-[#3d8a7c] hover:bg-[#327368] text-white transition-colors shadow-sm"
