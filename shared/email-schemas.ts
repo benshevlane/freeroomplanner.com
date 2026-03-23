@@ -17,9 +17,11 @@ export const feedbackFormSchema = z.object({
 
 export const embedSignupNotificationSchema = z.object({
   partnerId: z.string().min(1).max(64),
+  contactName: z.string().min(1).max(200),
   businessName: z.string().min(1).max(200),
   email: z.string().email(),
   websiteUrl: z.string().max(500).optional(),
+  embedCode: z.string().min(1).max(50000),
 });
 
 export type ContactFormData = z.infer<typeof contactFormSchema>;

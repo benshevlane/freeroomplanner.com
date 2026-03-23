@@ -210,8 +210,8 @@ export async function registerRoutes(
     res.json({ ok: true });
   });
 
-  // Embed partner signup notification
-  app.post("/api/embed/notify-signup", async (req, res) => {
+  // Embed partner signup notification + user confirmation
+  app.post("/api/embed-notify-signup", async (req, res) => {
     if (!process.env.RESEND_API_KEY) {
       return res.status(503).json({ error: "Email service not configured" });
     }
@@ -219,27 +219,59 @@ export async function registerRoutes(
     if (!parsed.success) {
       return res.status(400).json({ error: parsed.error.flatten().fieldErrors });
     }
-    const { partnerId, businessName, email, websiteUrl } = parsed.data;
+    const { partnerId, contactName, businessName, email, websiteUrl, embedCode } = parsed.data;
+    const fromAddr = process.env.EMAIL_FROM || "Free Room Planner <noreply@send.freeroomplanner.com>";
+    const resend = new Resend(process.env.RESEND_API_KEY);
+
+    // 1. Owner notification
     try {
-      const resend = new Resend(process.env.RESEND_API_KEY);
       await resend.emails.send({
-        from: process.env.EMAIL_FROM || "Free Room Planner <noreply@send.freeroomplanner.com>",
+        from: fromAddr,
         to: process.env.CONTACT_EMAIL || "ben@freeroomplanner.com",
         replyTo: email,
         subject: `[New Embed Partner] ${businessName}`,
         html: `<h2>New Embed Partner Signup</h2>
 <p>A new partner signed up and got their embed code.</p>
+<p><strong>Name:</strong> ${contactName}</p>
 <p><strong>Business:</strong> ${businessName}</p>
 <p><strong>Partner ID:</strong> ${partnerId}</p>
 <p><strong>Email:</strong> ${email}</p>
 ${websiteUrl ? `<p><strong>Website:</strong> <a href="${websiteUrl}">${websiteUrl}</a></p>` : ""}
 <p><strong>Time:</strong> ${new Date().toUTCString()}</p>`,
       });
-      return res.json({ ok: true });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Failed to send notification";
-      return res.status(500).json({ error: msg });
+      console.error("Failed to send owner notification:", err instanceof Error ? err.message : err);
     }
+
+    // 2. User confirmation with embed code
+    try {
+      const escapedCode = embedCode.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      await resend.emails.send({
+        from: fromAddr,
+        to: email,
+        subject: "Your Free Room Planner Embed Code",
+        html: `<h2>Your Embed Code is Ready!</h2>
+<p>Hi ${contactName},</p>
+<p>Thanks for choosing Free Room Planner! Below is your embed code for <strong>${businessName}</strong>.</p>
+<h3>Your Embed Code</h3>
+<p>Copy and paste this into your website's HTML where you'd like the room planner to appear:</p>
+<pre style="background:#f4f4f4;padding:16px;border-radius:8px;overflow-x:auto;font-size:13px;line-height:1.4;"><code>${escapedCode}</code></pre>
+<h3>How to Add It</h3>
+<ul>
+  <li><strong>WordPress:</strong> Add a "Custom HTML" block and paste the code</li>
+  <li><strong>Squarespace:</strong> Add a "Code" block and paste the code</li>
+  <li><strong>Wix:</strong> Add an "Embed HTML" element and paste the code</li>
+  <li><strong>Other:</strong> Paste into your page's HTML source where you want the planner</li>
+</ul>
+<p>If you have any questions, just reply to this email.</p>
+<p>— The Free Room Planner Team<br/>
+<a href="https://freeroomplanner.com">freeroomplanner.com</a></p>`,
+      });
+    } catch (err) {
+      console.error("Failed to send user confirmation:", err instanceof Error ? err.message : err);
+    }
+
+    return res.json({ ok: true });
   });
 
   // Contact form

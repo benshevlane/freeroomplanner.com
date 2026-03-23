@@ -15,6 +15,7 @@ import {
 /* ------------------------------------------------------------------ */
 
 interface FormState {
+  contactName: string;
   businessName: string;
   email: string;
   websiteUrl: string;
@@ -30,6 +31,7 @@ const DEFAULT_BRAND_COLOR = "#6bbfa0";
 const LOGO_URL = "https://freeroomplanner.com/logo.png";
 
 const INITIAL_FORM: FormState = {
+  contactName: "",
   businessName: "",
   email: "",
   websiteUrl: "",
@@ -367,6 +369,7 @@ export default function GetEmbed() {
 
       // Validate
       const newErrors: Partial<Record<keyof FormState, string>> = {};
+      if (!form.contactName.trim()) newErrors.contactName = "Your name is required.";
       if (!form.businessName.trim()) newErrors.businessName = "Business name is required.";
       if (!form.email.trim()) {
         newErrors.email = "Email is required.";
@@ -433,15 +436,18 @@ export default function GetEmbed() {
         }
       }
 
-      // Notify admin of new partner signup (fire-and-forget)
+      // Notify admin + send user their embed code (fire-and-forget)
+      const embedCode = buildSnippet(finalId, form);
       fetch("/api/embed-notify-signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           partnerId: finalId,
+          contactName: form.contactName.trim(),
           businessName: form.businessName.trim(),
           email: form.email.trim(),
           websiteUrl: form.websiteUrl.trim() || undefined,
+          embedCode,
         }),
       }).catch(() => {});
 
@@ -594,6 +600,23 @@ export default function GetEmbed() {
               className={`rounded-xl border p-6 sm:p-8 ${cardBg} ${border}`}
               noValidate
             >
+              {/* Your name */}
+              <div className="mb-5">
+                <label className="block text-sm font-medium mb-1.5">
+                  Your name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ben Johnson"
+                  value={form.contactName}
+                  onChange={(e) => setField("contactName", e.target.value)}
+                  className={`w-full px-3 py-2 rounded-lg border text-sm outline-none focus:ring-2 focus:ring-[#3d8a7c]/40 transition ${inputBg}`}
+                />
+                {errors.contactName && (
+                  <p className="text-red-500 text-xs mt-1">{errors.contactName}</p>
+                )}
+              </div>
+
               {/* Business name */}
               <div className="mb-5">
                 <label className="block text-sm font-medium mb-1.5">
