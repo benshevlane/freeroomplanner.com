@@ -47,6 +47,17 @@ export default function Embed() {
     document.documentElement.classList.toggle("dark", isDark);
   }, [isDark]);
 
+  // Remove favicon links so the embed iframe doesn't override the host page's favicon
+  useEffect(() => {
+    const selectors =
+      'link[rel="icon"], link[rel="shortcut icon"], link[rel="apple-touch-icon"], link[rel="manifest"]';
+    const links = Array.from(document.head.querySelectorAll(selectors));
+    links.forEach((link) => link.remove());
+    return () => {
+      links.forEach((link) => document.head.appendChild(link));
+    };
+  }, []);
+
   // Track embed load (only when user has already started / returning visit)
   useEffect(() => {
     if (params.partner && started && !welcomeFading) {
