@@ -581,7 +581,7 @@ export default function GetEmbed() {
             {/* Value proposition */}
             <div className="text-center mb-10">
               <h1 className="text-3xl sm:text-4xl font-bold tracking-tight leading-tight mb-4">
-                Turn visitors into ready-to-quote leads
+                Turn visitors into ready-to-quote leads by embedding Free Room Planner into your website
               </h1>
               <p className={`text-base max-w-md mx-auto mb-6 ${muted}`}>
                 Customers who plan their room arrive at enquiry knowing their space. You spend less time measuring — and more time closing.
