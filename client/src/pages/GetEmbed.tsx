@@ -829,11 +829,11 @@ export default function GetEmbed() {
               {form.embedType === "homepage-link" && (
                 <div className="mb-6">
                   <label className="block text-sm font-medium mb-1.5">
-                    Room planner page URL
+                    Room planner page path
                   </label>
                   <input
                     type="text"
-                    placeholder="yoursite.com/room-planner"
+                    placeholder="/room-planner"
                     value={form.plannerPageUrl}
                     onChange={(e) => setField("plannerPageUrl", e.target.value)}
                     className={`w-full px-3 py-2 rounded-lg border text-sm outline-none focus:ring-2 focus:ring-[#3d8a7c]/40 transition ${inputBg}`}
@@ -842,7 +842,7 @@ export default function GetEmbed() {
                     <p className="text-red-500 text-xs mt-1">{errors.plannerPageUrl}</p>
                   )}
                   <p className={`text-xs mt-1 ${muted}`}>
-                    The page on your site where you host the full page embed.
+                    The path on your site where you'll host the full page embed (e.g. /room-planner).
                   </p>
                 </div>
               )}
