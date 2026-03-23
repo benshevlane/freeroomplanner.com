@@ -434,7 +434,7 @@ export default function GetEmbed() {
       }
 
       // Notify admin of new partner signup (fire-and-forget)
-      fetch("/api/embed/notify-signup", {
+      fetch("/api/embed-notify-signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
