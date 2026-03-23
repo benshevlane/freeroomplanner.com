@@ -377,17 +377,6 @@ export default function GetEmbed() {
       if (!form.websiteUrl.trim()) {
         newErrors.websiteUrl = "Website URL is required.";
       }
-      if (form.embedType === "homepage-link") {
-        if (!form.plannerPageUrl.trim()) {
-          newErrors.plannerPageUrl = "A planner page URL is required for the homepage link.";
-        } else {
-          try {
-            new URL(form.plannerPageUrl.trim());
-          } catch {
-            newErrors.plannerPageUrl = "Please enter a valid URL.";
-          }
-        }
-      }
       if (Object.keys(newErrors).length > 0) {
         setErrors(newErrors);
         return;
@@ -819,11 +808,11 @@ export default function GetEmbed() {
               {form.embedType === "homepage-link" && (
                 <div className="mb-6">
                   <label className="block text-sm font-medium mb-1.5">
-                    Room planner page URL <span className="text-red-500">*</span>
+                    Room planner page URL
                   </label>
                   <input
                     type="text"
-                    placeholder="https://yoursite.com/room-planner"
+                    placeholder="yoursite.com/room-planner"
                     value={form.plannerPageUrl}
                     onChange={(e) => setField("plannerPageUrl", e.target.value)}
                     className={`w-full px-3 py-2 rounded-lg border text-sm outline-none focus:ring-2 focus:ring-[#3d8a7c]/40 transition ${inputBg}`}
