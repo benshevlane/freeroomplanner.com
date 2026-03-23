@@ -1000,19 +1000,6 @@ export default function GetEmbed() {
                   </button>
                 </div>
 
-                <p className={`text-xs mt-4 ${muted}`}>
-                  This is your unique embed code. It will always show the &lsquo;Powered by
-                  freeroomplanner.com&rsquo; badge.
-                </p>
-                <p className={`text-xs mt-2 ${muted}`}>
-                  Want to remove the badge or use your own branding?{" "}
-                  <a
-                    href="mailto:hello@freeroomplanner.com"
-                    className={`${teal} hover:underline`}
-                  >
-                    Contact us about our partner plan &rarr;
-                  </a>
-                </p>
               </div>
             )}
 
