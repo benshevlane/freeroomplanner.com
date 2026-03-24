@@ -466,7 +466,7 @@ export default function EditorCore({
           <>
             {/* Mobile: Furniture panel in a left sheet */}
             <Sheet open={furniturePanelOpen} onOpenChange={setFurniturePanelOpen}>
-              <SheetContent side="left" className="p-0 w-72">
+              <SheetContent side="left" className="p-0 w-72" onOpenAutoFocus={(e) => e.preventDefault()}>
                 <SheetTitle className="sr-only">Items Library</SheetTitle>
                 <FurniturePanel
                   className="w-full h-full border-r-0"
