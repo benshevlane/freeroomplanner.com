@@ -527,14 +527,23 @@ export default function Landing() {
 
       {/* Footer */}
       <footer className={`border-t py-8 ${isDark ? "border-[#2e2e2a] bg-[#1a1a18] text-[#5a5a52]" : "border-[#e8e3d8] bg-[#faf8f4] text-[#9a9488]"}`}>
-        <div className="max-w-5xl mx-auto px-5 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
-          <div className="flex items-center gap-2">
-            <FreeRoomPlannerLogo size={16} className={isDark ? "text-[#5a5a52]" : "text-[#9a9488]"} />
-            <span>Free Room Planner</span>
+        <div className="max-w-5xl mx-auto px-5 flex flex-col items-center gap-4 text-xs">
+          <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
+            <div className="flex items-center gap-2">
+              <FreeRoomPlannerLogo size={16} className={isDark ? "text-[#5a5a52]" : "text-[#9a9488]"} />
+              <span>Free Room Planner</span>
+            </div>
+            <a href="/get-embed" onClick={(e) => { e.preventDefault(); navigate("/get-embed"); }} className={`${isDark ? "text-[#5a5a52] hover:text-[#a09a8c]" : "text-[#9a9488] hover:text-[#6b6457]"} transition-colors`}>For businesses</a>
+            <button onClick={() => setContactOpen(true)} className={`${isDark ? "text-[#5a5a52] hover:text-[#a09a8c]" : "text-[#9a9488] hover:text-[#6b6457]"} transition-colors`}>Contact us</button>
+            <button onClick={() => setFeedbackOpen(true)} className={`${isDark ? "text-[#5a5a52] hover:text-[#a09a8c]" : "text-[#9a9488] hover:text-[#6b6457]"} transition-colors`}>Feedback</button>
           </div>
-          <a href="/get-embed" onClick={(e) => { e.preventDefault(); navigate("/get-embed"); }} className={`${isDark ? "text-[#5a5a52] hover:text-[#a09a8c]" : "text-[#9a9488] hover:text-[#6b6457]"} transition-colors`}>For businesses</a>
-          <button onClick={() => setContactOpen(true)} className={`${isDark ? "text-[#5a5a52] hover:text-[#a09a8c]" : "text-[#9a9488] hover:text-[#6b6457]"} transition-colors`}>Contact us</button>
-          <button onClick={() => setFeedbackOpen(true)} className={`${isDark ? "text-[#5a5a52] hover:text-[#a09a8c]" : "text-[#9a9488] hover:text-[#6b6457]"} transition-colors`}>Feedback</button>
+          <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
+            <a href="/kitchen-planner" className={`${isDark ? "text-[#5a5a52] hover:text-[#a09a8c]" : "text-[#9a9488] hover:text-[#6b6457]"} transition-colors`}>Kitchen Planner</a>
+            <a href="/bathroom-planner" className={`${isDark ? "text-[#5a5a52] hover:text-[#a09a8c]" : "text-[#9a9488] hover:text-[#6b6457]"} transition-colors`}>Bathroom Planner</a>
+            <a href="/bedroom-planner" className={`${isDark ? "text-[#5a5a52] hover:text-[#a09a8c]" : "text-[#9a9488] hover:text-[#6b6457]"} transition-colors`}>Bedroom Planner</a>
+            <a href="/living-room-planner" className={`${isDark ? "text-[#5a5a52] hover:text-[#a09a8c]" : "text-[#9a9488] hover:text-[#6b6457]"} transition-colors`}>Living Room Planner</a>
+            <a href="/floor-plan-maker" className={`${isDark ? "text-[#5a5a52] hover:text-[#a09a8c]" : "text-[#9a9488] hover:text-[#6b6457]"} transition-colors`}>Floor Plan Maker</a>
+          </div>
           <span>© {new Date().getFullYear()} Free Room Planner. Free to use.</span>
         </div>
       </footer>
