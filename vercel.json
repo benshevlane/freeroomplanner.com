@@ -1,6 +1,6 @@
 {
   "cleanUrls": true,
-  "buildCommand": "npx vite build",
+  "buildCommand": "npx vite build && cp dist/public/index.html dist/public/app.html && cp dist/public/index.html dist/public/embed.html && cp dist/public/index.html dist/public/admin.html && cp dist/public/index.html dist/public/get-embed.html",
   "outputDirectory": "dist/public",
   "framework": null,
   "headers": [
