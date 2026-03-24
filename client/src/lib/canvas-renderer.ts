@@ -2169,6 +2169,655 @@ function drawFurnitureDetail(
       ctx.textBaseline = "middle";
       ctx.fillText("B", 0, 0);
       break;
+    case "corner_bath": {
+      // Inner rim rectangle
+      ctx.globalAlpha = 0.3;
+      ctx.strokeRect(-w * 0.42, -h * 0.42, w * 0.84, h * 0.84);
+      ctx.globalAlpha = 1;
+      // Basin circle (square item, so use min)
+      const cbR = Math.min(w, h) * 0.33;
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.08;
+      ctx.beginPath();
+      ctx.arc(0, 0, cbR, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.beginPath();
+      ctx.arc(0, 0, cbR, 0, Math.PI * 2);
+      ctx.stroke();
+      // Taps rectangle top-left
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.25;
+      ctx.fillRect(-w * 0.42, -h * 0.42, w * 0.15, h * 0.08);
+      ctx.globalAlpha = 1;
+      ctx.strokeRect(-w * 0.42, -h * 0.42, w * 0.15, h * 0.08);
+      // Drain cross at center
+      ctx.globalAlpha = 0.5;
+      ctx.beginPath();
+      ctx.arc(0, 0, w * 0.035, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.04, 0);
+      ctx.lineTo(w * 0.04, 0);
+      ctx.moveTo(0, -h * 0.04);
+      ctx.lineTo(0, h * 0.04);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      break;
+    }
+    case "freestanding_bath": {
+      // Outer ellipse (the tub rim)
+      ctx.beginPath();
+      ctx.ellipse(0, 0, w * 0.48, h * 0.46, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      // Inner ellipse rim
+      ctx.globalAlpha = 0.5;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, w * 0.43, h * 0.38, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      // Basin ellipse
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.08;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, w * 0.37, h * 0.29, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, w * 0.37, h * 0.29, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      // Clawfoot dots (4 corners)
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.4;
+      for (const [fx, fy] of [[-0.43, -0.3], [-0.43, 0.3], [0.43, -0.3], [0.43, 0.3]]) {
+        ctx.beginPath();
+        ctx.arc(w * fx, h * fy, 3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+      // Taps bar at top center
+      ctx.strokeRect(-w * 0.06, -h * 0.44, w * 0.12, h * 0.06);
+      // Drain cross
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.5;
+      ctx.beginPath();
+      ctx.arc(0, 0, w * 0.025, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.03, 0);
+      ctx.lineTo(w * 0.03, 0);
+      ctx.moveTo(0, -h * 0.05);
+      ctx.lineTo(0, h * 0.05);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      break;
+    }
+    case "p_shape_bath": {
+      // P-shape: rectangular left portion + rounded right end
+      // Dashed divider at ~58% width
+      ctx.globalAlpha = 0.4;
+      ctx.setLineDash([4, 3]);
+      const divX = -w / 2 + w * 0.58;
+      ctx.beginPath();
+      ctx.moveTo(divX, -h / 2);
+      ctx.lineTo(divX, h / 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.globalAlpha = 1;
+      // Basin ellipse in left section
+      const bCx = -w / 2 + w * 0.3;
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.08;
+      ctx.beginPath();
+      ctx.ellipse(bCx, 0, w * 0.21, h * 0.32, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.beginPath();
+      ctx.ellipse(bCx, 0, w * 0.21, h * 0.32, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      // Taps on left edge
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.3;
+      ctx.fillRect(-w * 0.46, -h * 0.08, w * 0.065, h * 0.16);
+      ctx.globalAlpha = 1;
+      ctx.strokeRect(-w * 0.46, -h * 0.08, w * 0.065, h * 0.16);
+      // Shower head circle in right section
+      const shCx = -w / 2 + w * 0.77;
+      const shCy = -h * 0.24;
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.08;
+      ctx.beginPath();
+      ctx.arc(shCx, shCy, w * 0.084, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.beginPath();
+      ctx.arc(shCx, shCy, w * 0.084, 0, Math.PI * 2);
+      ctx.stroke();
+      // Spray dots around shower head
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.5;
+      for (const [dx, dy] of [[-0.04, -0.04], [0, -0.05], [0.04, -0.04], [-0.045, 0], [0.045, 0]]) {
+        ctx.beginPath();
+        ctx.arc(shCx + w * dx, shCy + h * dy, 1.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+      // Drain cross in basin
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.5;
+      ctx.beginPath();
+      ctx.arc(bCx, 0, w * 0.025, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(bCx - w * 0.03, 0);
+      ctx.lineTo(bCx + w * 0.03, 0);
+      ctx.moveTo(bCx, -h * 0.05);
+      ctx.lineTo(bCx, h * 0.05);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      break;
+    }
+    case "corner_shower": {
+      // Curved door arc from top-right to bottom-left
+      ctx.beginPath();
+      ctx.arc(-w / 2, -h / 2, Math.min(w, h) * 0.96, 0, Math.PI / 2);
+      ctx.stroke();
+      // Triangular tray fill
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.06;
+      ctx.beginPath();
+      ctx.moveTo(-w / 2, -h / 2);
+      ctx.lineTo(w * 0.44, -h / 2);
+      ctx.quadraticCurveTo(w * 0.44, h * 0.44, -w / 2, h * 0.44);
+      ctx.closePath();
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      // Shower head circle top-left
+      const csShR = Math.min(w, h) * 0.14;
+      const csShX = -w * 0.24;
+      const csShY = -h * 0.24;
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.08;
+      ctx.beginPath();
+      ctx.arc(csShX, csShY, csShR, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.beginPath();
+      ctx.arc(csShX, csShY, csShR, 0, Math.PI * 2);
+      ctx.stroke();
+      // Inner shower head
+      ctx.beginPath();
+      ctx.arc(csShX, csShY, csShR * 0.42, 0, Math.PI * 2);
+      ctx.stroke();
+      // Spray dots
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.5;
+      for (const [dx, dy] of [[-0.06, -0.06], [0, -0.08], [0.06, -0.06], [-0.08, 0], [0.08, 0], [-0.06, 0.06], [0.06, 0.06]]) {
+        ctx.beginPath();
+        ctx.arc(csShX + w * dx, csShY + h * dy, 1.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+      // Drain cross bottom-right
+      const csDx = w * 0.22;
+      const csDy = h * 0.22;
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.5;
+      ctx.beginPath();
+      ctx.arc(csDx, csDy, w * 0.04, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(csDx - w * 0.04, csDy);
+      ctx.lineTo(csDx + w * 0.04, csDy);
+      ctx.moveTo(csDx, csDy - h * 0.04);
+      ctx.lineTo(csDx, csDy + h * 0.04);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      break;
+    }
+    case "walkin_shower": {
+      // Dashed entry line at bottom
+      ctx.globalAlpha = 0.5;
+      ctx.setLineDash([5, 3]);
+      ctx.beginPath();
+      ctx.moveTo(-w / 2, h / 2);
+      ctx.lineTo(w / 2, h / 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.globalAlpha = 1;
+      // Tray fill
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.05;
+      ctx.fillRect(-w / 2, -h / 2, w, h);
+      ctx.globalAlpha = 1;
+      // Shower head circle top-right
+      const wiShX = w * 0.3;
+      const wiShY = -h * 0.26;
+      const wiShR = Math.min(w, h) * 0.16;
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.08;
+      ctx.beginPath();
+      ctx.arc(wiShX, wiShY, wiShR, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.beginPath();
+      ctx.arc(wiShX, wiShY, wiShR, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(wiShX, wiShY, wiShR * 0.44, 0, Math.PI * 2);
+      ctx.stroke();
+      // Spray dots
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.5;
+      for (const [dx, dy] of [[-0.05, -0.06], [0, -0.08], [0.05, -0.06], [-0.07, 0], [0.07, 0], [-0.05, 0.06], [0.05, 0.06]]) {
+        ctx.beginPath();
+        ctx.arc(wiShX + w * dx, wiShY + h * dy, 1.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+      // Drain cross bottom-left
+      const wiDx = -w * 0.3;
+      const wiDy = h * 0.26;
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.5;
+      ctx.beginPath();
+      ctx.arc(wiDx, wiDy, w * 0.04, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(wiDx - w * 0.03, wiDy);
+      ctx.lineTo(wiDx + w * 0.03, wiDy);
+      ctx.moveTo(wiDx, wiDy - h * 0.04);
+      ctx.lineTo(wiDx, wiDy + h * 0.04);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      break;
+    }
+    case "shower_screen": {
+      // Tray fill
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.05;
+      ctx.fillRect(-w / 2, -h / 2, w, h);
+      ctx.globalAlpha = 1;
+      // Screen panel bar at bottom
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.15;
+      ctx.fillRect(-w / 2, h * 0.35, w * 0.49, h * 0.07);
+      ctx.globalAlpha = 0.08;
+      ctx.fillRect(0, h * 0.35, w * 0.49, h * 0.07);
+      ctx.globalAlpha = 1;
+      ctx.strokeRect(-w / 2, h * 0.35, w * 0.49, h * 0.07);
+      ctx.strokeRect(0, h * 0.35, w * 0.49, h * 0.07);
+      // Hinge/handle dots
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.5;
+      ctx.beginPath();
+      ctx.arc(-w * 0.03, h * 0.39, 2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(w * 0.05, h * 0.39, 2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      // Shower head circle top-right
+      const ssShX = w * 0.3;
+      const ssShY = -h * 0.25;
+      const ssShR = Math.min(w, h) * 0.16;
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.08;
+      ctx.beginPath();
+      ctx.arc(ssShX, ssShY, ssShR, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.beginPath();
+      ctx.arc(ssShX, ssShY, ssShR, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(ssShX, ssShY, ssShR * 0.4, 0, Math.PI * 2);
+      ctx.stroke();
+      // Spray dots
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.5;
+      for (const [dx, dy] of [[-0.05, -0.06], [0, -0.08], [0.05, -0.06], [-0.07, 0], [0.07, 0], [-0.05, 0.06], [0.05, 0.06]]) {
+        ctx.beginPath();
+        ctx.arc(ssShX + w * dx, ssShY + h * dy, 1.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+      // Drain cross bottom-left
+      const ssDx = -w * 0.3;
+      const ssDy = h * 0.15;
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.5;
+      ctx.beginPath();
+      ctx.arc(ssDx, ssDy, w * 0.04, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(ssDx - w * 0.03, ssDy);
+      ctx.lineTo(ssDx + w * 0.03, ssDy);
+      ctx.moveTo(ssDx, ssDy - h * 0.04);
+      ctx.lineTo(ssDx, ssDy + h * 0.04);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      break;
+    }
+    case "wc_wallhung": {
+      // Cistern rectangle at top (~19% height)
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.12;
+      ctx.fillRect(-w * 0.47, -h / 2, w * 0.94, h * 0.19);
+      ctx.globalAlpha = 1;
+      ctx.strokeRect(-w * 0.47, -h / 2, w * 0.94, h * 0.19);
+      // Flush button ellipse
+      ctx.globalAlpha = 0.4;
+      ctx.beginPath();
+      ctx.ellipse(0, -h / 2 + h * 0.095, w * 0.15, h * 0.047, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      // Bowl: rounded bottom shape
+      const wcwhTop = -h / 2 + h * 0.21;
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.43, wcwhTop);
+      ctx.lineTo(w * 0.43, wcwhTop);
+      ctx.quadraticCurveTo(w * 0.47, h * 0.2, 0, h / 2);
+      ctx.quadraticCurveTo(-w * 0.47, h * 0.2, -w * 0.43, wcwhTop);
+      ctx.closePath();
+      ctx.stroke();
+      // Inner bowl ellipse
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.06;
+      ctx.beginPath();
+      ctx.ellipse(0, h * 0.1, w * 0.28, h * 0.23, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.beginPath();
+      ctx.ellipse(0, h * 0.1, w * 0.28, h * 0.23, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      break;
+    }
+    case "wc_back_to_wall": {
+      // Larger cistern at top (~24% height)
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.15;
+      ctx.fillRect(-w * 0.47, -h / 2, w * 0.94, h * 0.24);
+      ctx.globalAlpha = 1;
+      ctx.strokeRect(-w * 0.47, -h / 2, w * 0.94, h * 0.24);
+      // Inner cistern rectangle
+      ctx.globalAlpha = 0.3;
+      ctx.strokeRect(-w * 0.39, -h / 2 + h * 0.04, w * 0.78, h * 0.16);
+      ctx.globalAlpha = 1;
+      // Flush button ellipse
+      ctx.globalAlpha = 0.4;
+      ctx.beginPath();
+      ctx.ellipse(0, -h / 2 + h * 0.12, w * 0.17, h * 0.045, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      // Bowl: rounded bottom shape
+      const wcbwTop = -h / 2 + h * 0.26;
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.43, wcbwTop);
+      ctx.lineTo(w * 0.43, wcbwTop);
+      ctx.quadraticCurveTo(w * 0.47, h * 0.2, 0, h / 2);
+      ctx.quadraticCurveTo(-w * 0.47, h * 0.2, -w * 0.43, wcbwTop);
+      ctx.closePath();
+      ctx.stroke();
+      // Inner bowl ellipse
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.06;
+      ctx.beginPath();
+      ctx.ellipse(0, h * 0.12, w * 0.28, h * 0.22, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.beginPath();
+      ctx.ellipse(0, h * 0.12, w * 0.28, h * 0.22, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      break;
+    }
+    case "basin_wallhung": {
+      // D-shaped bowl (flat top, curved bottom) — like basin_pedestal but no pedestal
+      ctx.beginPath();
+      const bwhTop = -h / 2 + h * 0.08;
+      ctx.moveTo(-w * 0.42, bwhTop);
+      ctx.quadraticCurveTo(-w * 0.42, -h / 2 + h * 0.52, 0, -h / 2 + h * 0.52);
+      ctx.quadraticCurveTo(w * 0.42, -h / 2 + h * 0.52, w * 0.42, bwhTop);
+      ctx.closePath();
+      ctx.stroke();
+      // Top edge (wall mount line)
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.42, bwhTop);
+      ctx.lineTo(w * 0.42, bwhTop);
+      ctx.stroke();
+      // Basin bowl fill
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.06;
+      ctx.beginPath();
+      ctx.ellipse(0, -h / 2 + h * 0.36, w * 0.3, h * 0.17, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.beginPath();
+      ctx.ellipse(0, -h / 2 + h * 0.36, w * 0.3, h * 0.17, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      // Tap bar at top center
+      ctx.strokeRect(-w * 0.1, -h / 2 + h * 0.01, w * 0.2, h * 0.08);
+      // Drain cross
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.5;
+      ctx.beginPath();
+      ctx.arc(0, -h / 2 + h * 0.38, w * 0.035, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.03, -h / 2 + h * 0.38);
+      ctx.lineTo(w * 0.03, -h / 2 + h * 0.38);
+      ctx.moveTo(0, -h / 2 + h * 0.35);
+      ctx.lineTo(0, -h / 2 + h * 0.41);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      // Wall-mount brackets
+      ctx.globalAlpha = 0.3;
+      ctx.fillStyle = stroke;
+      ctx.fillRect(-w * 0.36, -h / 2, w * 0.1, h * 0.06);
+      ctx.fillRect(w * 0.26, -h / 2, w * 0.1, h * 0.06);
+      ctx.globalAlpha = 1;
+      break;
+    }
+    case "vanity_single": {
+      // Counter surface fill
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.05;
+      ctx.fillRect(-w / 2, -h / 2, w, h);
+      ctx.globalAlpha = 1;
+      // Cabinet divider on left
+      ctx.globalAlpha = 0.4;
+      ctx.setLineDash([3, 2]);
+      const vsDivX = -w / 2 + w * 0.22;
+      ctx.beginPath();
+      ctx.moveTo(vsDivX, -h / 2);
+      ctx.lineTo(vsDivX, h / 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.globalAlpha = 1;
+      // Drawer handle on left
+      ctx.strokeRect(-w / 2 + w * 0.02, -h * 0.04, w * 0.1, h * 0.08);
+      // Basin ellipse (offset right)
+      const vsBx = -w / 2 + w * 0.52;
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.06;
+      ctx.beginPath();
+      ctx.ellipse(vsBx, 0, w * 0.28, h * 0.32, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.beginPath();
+      ctx.ellipse(vsBx, 0, w * 0.28, h * 0.32, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      // Tap bar
+      ctx.strokeRect(vsBx - w * 0.08, -h / 2 + h * 0.02, w * 0.17, h * 0.1);
+      // Drain cross
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.5;
+      ctx.beginPath();
+      ctx.arc(vsBx, h * 0.04, w * 0.03, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(vsBx - w * 0.025, h * 0.04);
+      ctx.lineTo(vsBx + w * 0.025, h * 0.04);
+      ctx.moveTo(vsBx, h * 0.04 - h * 0.05);
+      ctx.lineTo(vsBx, h * 0.04 + h * 0.05);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      // Bottom edge line
+      ctx.globalAlpha = 0.4;
+      ctx.beginPath();
+      ctx.moveTo(-w / 2, h * 0.45);
+      ctx.lineTo(w / 2, h * 0.45);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      break;
+    }
+    case "vanity_double": {
+      // Counter surface fill
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.05;
+      ctx.fillRect(-w / 2, -h / 2, w, h);
+      ctx.globalAlpha = 1;
+      // Dashed center divider
+      ctx.globalAlpha = 0.4;
+      ctx.setLineDash([4, 3]);
+      ctx.beginPath();
+      ctx.moveTo(0, -h / 2);
+      ctx.lineTo(0, h / 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.globalAlpha = 1;
+      // Left basin
+      const vdLx = -w * 0.26;
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.06;
+      ctx.beginPath();
+      ctx.ellipse(vdLx, 0, w * 0.16, h * 0.28, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.beginPath();
+      ctx.ellipse(vdLx, 0, w * 0.16, h * 0.28, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      // Right basin
+      const vdRx = w * 0.26;
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.06;
+      ctx.beginPath();
+      ctx.ellipse(vdRx, 0, w * 0.16, h * 0.28, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.beginPath();
+      ctx.ellipse(vdRx, 0, w * 0.16, h * 0.28, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      // Drain dots
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.4;
+      ctx.beginPath();
+      ctx.arc(vdLx, h * 0.04, w * 0.017, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(vdRx, h * 0.04, w * 0.017, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      // Tap bars
+      ctx.strokeRect(vdLx - w * 0.06, -h / 2 + h * 0.02, w * 0.11, h * 0.11);
+      ctx.strokeRect(vdRx - w * 0.06, -h / 2 + h * 0.02, w * 0.11, h * 0.11);
+      // Bottom edge
+      ctx.globalAlpha = 0.4;
+      ctx.beginPath();
+      ctx.moveTo(-w / 2, h * 0.45);
+      ctx.lineTo(w / 2, h * 0.45);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      break;
+    }
+    case "bidet": {
+      // Rim rectangle at top
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.12;
+      ctx.fillRect(-w * 0.47, -h / 2, w * 0.94, h * 0.12);
+      ctx.globalAlpha = 1;
+      ctx.strokeRect(-w * 0.47, -h / 2, w * 0.94, h * 0.12);
+      // Tap bar
+      ctx.strokeRect(-w * 0.14, -h / 2 + h * 0.01, w * 0.27, h * 0.07);
+      // Bowl body: rounded bottom (same as toilet shape)
+      const bdTop = -h / 2 + h * 0.14;
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.43, bdTop);
+      ctx.lineTo(w * 0.43, bdTop);
+      ctx.quadraticCurveTo(w * 0.47, h * 0.18, 0, h / 2);
+      ctx.quadraticCurveTo(-w * 0.47, h * 0.18, -w * 0.43, bdTop);
+      ctx.closePath();
+      ctx.stroke();
+      // Inner bowl ellipse
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.06;
+      ctx.beginPath();
+      ctx.ellipse(0, h * 0.08, w * 0.27, h * 0.27, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.beginPath();
+      ctx.ellipse(0, h * 0.08, w * 0.27, h * 0.27, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      // Drain cross
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.5;
+      ctx.beginPath();
+      ctx.arc(0, h * 0.12, w * 0.05, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.04, h * 0.12);
+      ctx.lineTo(w * 0.04, h * 0.12);
+      ctx.moveTo(0, h * 0.12 - h * 0.04);
+      ctx.lineTo(0, h * 0.12 + h * 0.04);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      break;
+    }
+    case "towel_rail": {
+      // End caps (left + right)
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.2;
+      ctx.fillRect(-w / 2, -h / 2, w * 0.08, h);
+      ctx.fillRect(w / 2 - w * 0.08, -h / 2, w * 0.08, h);
+      ctx.globalAlpha = 1;
+      ctx.strokeRect(-w / 2, -h / 2, w * 0.08, h);
+      ctx.strokeRect(w / 2 - w * 0.08, -h / 2, w * 0.08, h);
+      // Three horizontal rail lines
+      for (const yf of [-0.3, 0, 0.3]) {
+        ctx.beginPath();
+        ctx.moveTo(-w / 2 + w * 0.1, h * yf);
+        ctx.lineTo(w / 2 - w * 0.1, h * yf);
+        ctx.stroke();
+      }
+      break;
+    }
+    case "storage_unit": {
+      // Inner rectangle
+      ctx.globalAlpha = 0.3;
+      ctx.strokeRect(-w * 0.44, -h * 0.42, w * 0.88, h * 0.84);
+      ctx.globalAlpha = 1;
+      // Center divider (vertical)
+      ctx.beginPath();
+      ctx.moveTo(0, -h * 0.42);
+      ctx.lineTo(0, h * 0.42);
+      ctx.stroke();
+      // Handle rectangles (one each side)
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.3;
+      ctx.fillRect(-w * 0.12, -h * 0.06, w * 0.08, h * 0.12);
+      ctx.fillRect(w * 0.04, -h * 0.06, w * 0.08, h * 0.12);
+      ctx.globalAlpha = 1;
+      ctx.strokeRect(-w * 0.12, -h * 0.06, w * 0.08, h * 0.12);
+      ctx.strokeRect(w * 0.04, -h * 0.06, w * 0.08, h * 0.12);
+      // Bottom edge
+      ctx.globalAlpha = 0.4;
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.44, h * 0.42);
+      ctx.lineTo(w * 0.44, h * 0.42);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      break;
+    }
   }
 }
 
