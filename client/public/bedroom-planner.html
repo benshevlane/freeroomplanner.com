@@ -74,7 +74,7 @@
       <div class="nav-actions">
         <button class="btn-ghost" id="theme-toggle" aria-label="Toggle dark mode" title="Toggle dark mode"><svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg><svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg></button>
         <button class="btn-ghost nav-mobile-toggle" id="mobile-nav-toggle" aria-label="Menu"><svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
-        <a href="/app" class="btn btn-primary btn-sm" style="text-decoration:none">Start planning</a>
+        <a href="/app" class="btn btn-primary btn-sm" style="text-decoration:none" onclick="try{localStorage.setItem('freeroomplanner-intent',JSON.stringify({intent:'bedroom_refresh'}))}catch(e){}">Start planning</a>
       </div>
     </nav>
   </div>
@@ -95,7 +95,7 @@
     <h1 class="hero__title">Free Bedroom Planner — Try Every Layout Before You Move Anything</h1>
     <p class="hero__sub">Try every possible furniture arrangement before you move a single item. Draw your bedroom to scale, drag beds and wardrobes, check clearances, and find the layout that works — all free.</p>
     <div class="hero__cta">
-      <a href="/app" class="btn btn-primary btn-lg">Plan my bedroom free</a>
+      <a href="/app" class="btn btn-primary btn-lg" onclick="try{localStorage.setItem('freeroomplanner-intent',JSON.stringify({intent:'bedroom_refresh'}))}catch(e){}">Plan my bedroom free</a>
       <a href="#how" class="btn btn-secondary btn-lg">How it works</a>
     </div>
     <div class="browser-mock" style="max-width:680px;margin:0 auto">
@@ -247,7 +247,7 @@
   <div class="container fade-in">
     <h2 class="section__title">Find your perfect bedroom layout</h2>
     <p class="section__sub" style="margin:var(--space-4) auto var(--space-8)">Free. No account needed. Works on any device.</p>
-    <a href="/app" class="btn btn-primary btn-lg">Open bedroom planner free</a>
+    <a href="/app" class="btn btn-primary btn-lg" onclick="try{localStorage.setItem('freeroomplanner-intent',JSON.stringify({intent:'bedroom_refresh'}))}catch(e){}">Open bedroom planner free</a>
   </div>
 </section>
 
@@ -298,7 +298,7 @@
         <ul>
           <li><a href="/how-it-works">How it works</a></li>
           <li><a href="/blog">Blog</a></li>
-          <li><a href="/app">Open the planner</a></li>
+          <li><a href="/app" onclick="try{localStorage.setItem('freeroomplanner-intent',JSON.stringify({intent:'bedroom_refresh'}))}catch(e){}">Open the planner</a></li>
         </ul>
       </div>
       <div class="footer-col">
