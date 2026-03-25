@@ -1197,8 +1197,8 @@ export default function FloorPlanCanvas({
         const pxPerCm = (state.gridSize * state.zoom) / 100;
         const worldX = (pos.x - dragItemOffset.x - state.panOffset.x) / pxPerCm;
         const worldY = (pos.y - dragItemOffset.y - state.panOffset.y) / pxPerCm;
-        const snappedX = Math.round(worldX / 5) * 5;
-        const snappedY = Math.round(worldY / 5) * 5;
+        const snappedX = Math.round(worldX);
+        const snappedY = Math.round(worldY);
 
         // Check if it's furniture or label
         const furn = state.furniture.find((f) => f.id === state.selectedItemId);
@@ -1622,8 +1622,8 @@ export default function FloorPlanCanvas({
         const canvasY = e.clientY - canvasRect.top - textBoxDragging.offsetY;
         const worldX = (canvasX - state.panOffset.x) / pxPerCm;
         const worldY = (canvasY - state.panOffset.y) / pxPerCm;
-        const snappedX = Math.round(worldX / 5) * 5;
-        const snappedY = Math.round(worldY / 5) * 5;
+        const snappedX = Math.round(worldX);
+        const snappedY = Math.round(worldY);
         onMoveTextBox(textBoxDragging.id, snappedX, snappedY);
       }
 
