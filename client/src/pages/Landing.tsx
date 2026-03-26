@@ -82,7 +82,7 @@ const faqs = [
 export default function Landing() {
   useDocumentMeta({
     title: "Free Room Planner — Draw Your Floor Plan, No Sign-Up",
-    description: "Draw an accurate floor plan in minutes. Snap-to-grid walls, 30+ furniture items, live measurements. Free, forever. No email or download required.",
+    description: "Free browser-based room planner. Draw any room to scale, arrange furniture, and share your plan — no sign-up, no download, completely free.",
   });
   const [, navigate] = useLocation();
   const [openFaq, setOpenFaq] = useState<number | null>(0);
@@ -550,6 +550,18 @@ export default function Landing() {
 
       <ContactFormDialog open={contactOpen} onOpenChange={setContactOpen} />
       <FeedbackFormDialog open={feedbackOpen} onOpenChange={setFeedbackOpen} />
+
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        "mainEntity": [
+          {"@type":"Question","name":"Is it really free?","acceptedAnswer":{"@type":"Answer","text":"Yes. No trial period, no credit card, no premium tier. Free means free."}},
+          {"@type":"Question","name":"Do I need to give my email?","acceptedAnswer":{"@type":"Answer","text":"No. Open the planner and start immediately. We don't ask for your email, your name, or anything else."}},
+          {"@type":"Question","name":"Does it work on mobile?","acceptedAnswer":{"@type":"Answer","text":"Designed for desktop and tablet, where you have the space to work properly — though it runs on mobile too."}},
+          {"@type":"Question","name":"Is it accurate enough to share with a professional?","acceptedAnswer":{"@type":"Answer","text":"Yes. Everything snaps to a 10cm grid and measurements display in real time. Export as a PNG and send it directly."}},
+          {"@type":"Question","name":"Do I need to install anything?","acceptedAnswer":{"@type":"Answer","text":"Nothing. It runs entirely in your browser — no app, no download, no plugin."}}
+        ]
+      }) }} />
 
       <style>{`
         .rs-fade { opacity: 0; transform: translateY(16px); transition: opacity 0.6s ease, transform 0.6s ease; }
