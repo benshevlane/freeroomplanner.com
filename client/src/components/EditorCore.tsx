@@ -517,6 +517,7 @@ export default function EditorCore({
           onAddWall={editor.addWall}
           onSelectItem={editor.setSelectedItem}
           onMoveFurniture={editor.moveFurniture}
+          onMoveWall={editor.moveWall}
           onMoveLabel={editor.moveLabel}
           onRemoveWall={editor.removeWall}
           onRemoveFurniture={editor.removeFurniture}

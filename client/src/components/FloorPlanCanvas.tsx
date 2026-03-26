@@ -63,6 +63,7 @@ interface FloorPlanCanvasProps {
   onAddWall: (start: Point, end: Point) => void;
   onSelectItem: (id: string | null) => void;
   onMoveFurniture: (id: string, x: number, y: number) => void;
+  onMoveWall: (id: string, updates: Partial<import("../lib/types").Wall>) => void;
   onMoveLabel: (id: string, x: number, y: number) => void;
   onRemoveWall: (id: string) => void;
   onRemoveFurniture: (id: string) => void;
@@ -99,6 +100,7 @@ export default function FloorPlanCanvas({
   onAddWall,
   onSelectItem,
   onMoveFurniture,
+  onMoveWall,
   onMoveLabel,
   onRemoveWall,
   onRemoveFurniture,
@@ -165,6 +167,15 @@ export default function FloorPlanCanvas({
   const [isDraggingRoomLabel, setIsDraggingRoomLabel] = useState(false);
   const [draggingRoomKey, setDraggingRoomKey] = useState<string | null>(null);
   const [roomLabelDragStart, setRoomLabelDragStart] = useState<{ x: number; y: number; offsetX: number; offsetY: number }>({ x: 0, y: 0, offsetX: 0, offsetY: 0 });
+
+  // Wall body drag state
+  const [wallDragStart, setWallDragStart] = useState<{
+    id: string;
+    startX: number; startY: number;
+    endX: number; endY: number;
+    mouseWorldX: number; mouseWorldY: number;
+    constraintAxis: "x" | "y";
+  } | null>(null);
 
   // Wall snap indicator state (transient, only during drag)
   const [wallSnapEdges, setWallSnapEdges] = useState<SnappedWallEdge[]>([]);
@@ -815,6 +826,19 @@ export default function FloorPlanCanvas({
         const hitW = hitTestWall(pos.x, pos.y, state.walls, state.gridSize, state.zoom, state.panOffset);
         if (hitW) {
           onSelectItem(hitW.id);
+          // Start wall body drag
+          const world = screenToWorld(pos.x, pos.y, state.gridSize, state.zoom, state.panOffset);
+          const wdx = hitW.end.x - hitW.start.x;
+          const wdy = hitW.end.y - hitW.start.y;
+          const constraintAxis = Math.abs(wdx) >= Math.abs(wdy) ? "y" : "x";
+          setWallDragStart({
+            id: hitW.id,
+            startX: hitW.start.x, startY: hitW.start.y,
+            endX: hitW.end.x, endY: hitW.end.y,
+            mouseWorldX: world.x, mouseWorldY: world.y,
+            constraintAxis,
+          });
+          (e.target as HTMLElement).setPointerCapture(e.pointerId);
           return;
         }
 
@@ -1193,6 +1217,47 @@ export default function FloorPlanCanvas({
         return;
       }
 
+      // Handle wall body dragging
+      if (wallDragStart) {
+        const world = screenToWorld(pos.x, pos.y, state.gridSize, state.zoom, state.panOffset);
+        let wdx = world.x - wallDragStart.mouseWorldX;
+        let wdy = world.y - wallDragStart.mouseWorldY;
+        if (wallDragStart.constraintAxis === "y") { wdx = 0; }
+        else { wdy = 0; }
+        const newStartX = Math.round((wallDragStart.startX + wdx) / 10) * 10;
+        const newStartY = Math.round((wallDragStart.startY + wdy) / 10) * 10;
+        const snappedDx = newStartX - wallDragStart.startX;
+        const snappedDy = newStartY - wallDragStart.startY;
+        // Move the dragged wall
+        onMoveWall(wallDragStart.id, {
+          start: { x: wallDragStart.startX + snappedDx, y: wallDragStart.startY + snappedDy },
+          end: { x: wallDragStart.endX + snappedDx, y: wallDragStart.endY + snappedDy },
+        });
+        // Stretch connected walls to maintain connectivity
+        const CONNECT_THRESH = 15;
+        state.walls.forEach((w) => {
+          if (w.id === wallDragStart.id) return;
+          const origStart = { x: wallDragStart.startX, y: wallDragStart.startY };
+          const origEnd = { x: wallDragStart.endX, y: wallDragStart.endY };
+          const updates: Partial<import("../lib/types").Wall> = {};
+          // Check if this wall's start connects to the dragged wall's original start or end
+          if (Math.abs(w.start.x - origStart.x) < CONNECT_THRESH && Math.abs(w.start.y - origStart.y) < CONNECT_THRESH) {
+            updates.start = { x: origStart.x + snappedDx, y: origStart.y + snappedDy };
+          } else if (Math.abs(w.start.x - origEnd.x) < CONNECT_THRESH && Math.abs(w.start.y - origEnd.y) < CONNECT_THRESH) {
+            updates.start = { x: origEnd.x + snappedDx, y: origEnd.y + snappedDy };
+          }
+          if (Math.abs(w.end.x - origStart.x) < CONNECT_THRESH && Math.abs(w.end.y - origStart.y) < CONNECT_THRESH) {
+            updates.end = { x: origStart.x + snappedDx, y: origStart.y + snappedDy };
+          } else if (Math.abs(w.end.x - origEnd.x) < CONNECT_THRESH && Math.abs(w.end.y - origEnd.y) < CONNECT_THRESH) {
+            updates.end = { x: origEnd.x + snappedDx, y: origEnd.y + snappedDy };
+          }
+          if (updates.start || updates.end) {
+            onMoveWall(w.id, updates);
+          }
+        });
+        return;
+      }
+
       if (isDragging && state.selectedItemId) {
         const pxPerCm = (state.gridSize * state.zoom) / 100;
         const worldX = (pos.x - dragItemOffset.x - state.panOffset.x) / pxPerCm;
@@ -1279,7 +1344,7 @@ export default function FloorPlanCanvas({
         setEraserHoverId(null);
       }
     },
-    [state, isPanning, isDragging, isDraggingLabel, draggingLabelId, labelDragStart, isDraggingRoomLabel, draggingRoomKey, roomLabelDragStart, isResizing, isRotating, rotateStartAngle, rotateItemStartRot, resizeStart, resizeCorner, dragStart, dragItemOffset, eraserHoverId, arrowDraggingEndpoint, arrowBodyDragStart, isRotatingLabel, rotatingLabelId, labelRotateStartAngle, labelRotateItemStartRot, isResizingLabel, resizingLabelId, labelResizeStart, getCanvasPos, onSetPan, onSetZoom, onMoveFurniture, onMoveLabel, onUpdateFurniture, onUpdateArrow, onSetLabelOffset, onSetRoomLabelOffset]
+    [state, isPanning, isDragging, isDraggingLabel, draggingLabelId, labelDragStart, isDraggingRoomLabel, draggingRoomKey, roomLabelDragStart, isResizing, isRotating, rotateStartAngle, rotateItemStartRot, resizeStart, resizeCorner, dragStart, dragItemOffset, eraserHoverId, arrowDraggingEndpoint, arrowBodyDragStart, wallDragStart, isRotatingLabel, rotatingLabelId, labelRotateStartAngle, labelRotateItemStartRot, isResizingLabel, resizingLabelId, labelResizeStart, getCanvasPos, onSetPan, onSetZoom, onMoveFurniture, onMoveWall, onMoveLabel, onUpdateFurniture, onUpdateArrow, onSetLabelOffset, onSetRoomLabelOffset]
   );
 
   const handlePointerUp = useCallback(
@@ -1342,6 +1407,10 @@ export default function FloorPlanCanvas({
         return;
       }
 
+      if (wallDragStart) {
+        onPushUndo();
+        setWallDragStart(null);
+      }
       if (isDragging) {
         onPushUndo();
         setWallSnapEdges([]);
@@ -1359,6 +1428,7 @@ export default function FloorPlanCanvas({
       setResizeStart(null);
       setArrowDraggingEndpoint(null);
       setArrowBodyDragStart(null);
+      setWallDragStart(null);
       setIsDraggingLabel(false);
       setDraggingLabelId(null);
       setIsDraggingRoomLabel(false);
@@ -1369,7 +1439,7 @@ export default function FloorPlanCanvas({
       setResizingLabelId(null);
       setLabelResizeStart(null);
     },
-    [isDragging, isDraggingLabel, isDraggingRoomLabel, onPushUndo, state.selectedTool, state.gridSize, state.zoom, state.panOffset, state.walls, getCanvasPos, onAddWall, onSetWallDrawing, onSplitWallAndConnect]
+    [isDragging, isDraggingLabel, isDraggingRoomLabel, wallDragStart, onPushUndo, state.selectedTool, state.gridSize, state.zoom, state.panOffset, state.walls, getCanvasPos, onAddWall, onSetWallDrawing, onSplitWallAndConnect]
   );
 
   const handleWheel = useCallback(
@@ -1779,9 +1849,18 @@ export default function FloorPlanCanvas({
     if (state.selectedTool === "arrow") return "crosshair";
     if (state.selectedTool === "eraser") return "crosshair";
     if (state.selectedTool === "label") return "text";
+    if (wallDragStart) return "grabbing";
     if (isDraggingLabel) return "grabbing";
     if (isDraggingRoomLabel) return "grabbing";
-    if (state.selectedTool === "select") return isDragging ? "grabbing" : "default";
+    if (state.selectedTool === "select") {
+      if (isDragging) return "grabbing";
+      // Show grab cursor when hovering over a wall body
+      if (mousePos.x !== 0 || mousePos.y !== 0) {
+        const hoveredWall = hitTestWall(mousePos.x, mousePos.y, state.walls, state.gridSize, state.zoom, state.panOffset);
+        if (hoveredWall) return "grab";
+      }
+      return "default";
+    }
     return "default";
   })();
 

@@ -203,6 +203,13 @@ export function useEditor(storageKey: string = DEFAULT_AUTOSAVE_KEY) {
     }));
   }, []);
 
+  const moveWall = useCallback((id: string, updates: Partial<Wall>) => {
+    setState((s) => ({
+      ...s,
+      walls: s.walls.map((w) => w.id === id ? { ...w, ...updates } : w),
+    }));
+  }, []);
+
   const rotateFurniture = useCallback((id: string) => {
     pushUndo();
     setState((s) => ({
@@ -481,6 +488,7 @@ export function useEditor(storageKey: string = DEFAULT_AUTOSAVE_KEY) {
     removeWall,
     updateWall,
     addFurniture,
+    moveWall,
     moveFurniture,
     rotateFurniture,
     mirrorFurniture,

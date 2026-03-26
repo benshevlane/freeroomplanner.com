@@ -1,3 +1,4 @@
+import { useState, useRef } from "react";
 import { Wall, WallType, FurnitureItem, RoomLabel, TextBox, Arrow, ArrowStyle, ArrowHeadStyle, LabelSize, LabelColor, UnitSystem, isWallCupboard, cmToDisplay, displayToCm, dimensionSuffix, FURNITURE_LIBRARY } from "../lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -79,10 +80,46 @@ export default function PropertiesPanel({
     );
   }
 
+  const [lengthInput, setLengthInput] = useState("");
+  const [thicknessInput, setThicknessInput] = useState("");
+  const [editingLength, setEditingLength] = useState(false);
+  const [editingThickness, setEditingThickness] = useState(false);
+  const lengthRef = useRef<HTMLInputElement>(null);
+  const thicknessRef = useRef<HTMLInputElement>(null);
+
   if (selectedWall) {
     const dx = selectedWall.end.x - selectedWall.start.x;
     const dy = selectedWall.end.y - selectedWall.start.y;
     const lengthCm = Math.sqrt(dx * dx + dy * dy);
+
+    const commitLength = (val: string) => {
+      setEditingLength(false);
+      if (!onUpdateWall) return;
+      const parsed = parseFloat(val.replace(/m$/i, ""));
+      if (isNaN(parsed)) return;
+      const newLengthCm = Math.max(10, parsed * 100); // min 0.10m = 10cm
+      if (Math.abs(newLengthCm - lengthCm) < 0.01) return;
+      const len = Math.sqrt(dx * dx + dy * dy);
+      if (len < 0.01) return;
+      const dirX = dx / len;
+      const dirY = dy / len;
+      onUpdateWall(selectedWall.id, {
+        end: {
+          x: Math.round(selectedWall.start.x + dirX * newLengthCm),
+          y: Math.round(selectedWall.start.y + dirY * newLengthCm),
+        },
+      });
+    };
+
+    const commitThickness = (val: string) => {
+      setEditingThickness(false);
+      if (!onUpdateWall) return;
+      const parsed = parseFloat(val.replace(/m$/i, ""));
+      if (isNaN(parsed)) return;
+      const newThickCm = Math.max(5, Math.min(60, parsed * 100)); // 0.05m–0.60m
+      if (Math.abs(newThickCm - selectedWall.thickness) < 0.01) return;
+      onUpdateWall(selectedWall.id, { thickness: Math.round(newThickCm) });
+    };
 
     return (
       <div className="p-4 space-y-3" data-testid="properties-wall">
@@ -91,11 +128,47 @@ export default function PropertiesPanel({
           <div className="flex items-center gap-2">
             <Ruler className="h-3.5 w-3.5 text-muted-foreground" />
             <span className="text-muted-foreground">Length:</span>
-            <span className="font-medium">{formatDimension(lengthCm, units)}</span>
+            {editingLength ? (
+              <input
+                ref={lengthRef}
+                type="text"
+                value={lengthInput}
+                onChange={(e) => setLengthInput(e.target.value)}
+                onBlur={() => commitLength(lengthInput)}
+                onKeyDown={(e) => { if (e.key === "Enter") commitLength(lengthInput); if (e.key === "Escape") setEditingLength(false); }}
+                className="bg-transparent border-b-2 border-teal-500 outline-none font-medium w-20 text-sm px-0"
+                autoFocus
+              />
+            ) : (
+              <span
+                className="font-medium cursor-pointer hover:border-b hover:border-teal-500/50 transition-colors"
+                onClick={() => { setLengthInput((lengthCm / 100).toFixed(2)); setEditingLength(true); }}
+              >
+                {formatDimension(lengthCm, units)}
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <span className="text-muted-foreground ml-5">Thickness:</span>
-            <span className="font-medium">{formatDimension(selectedWall.thickness, units)}</span>
+            {editingThickness ? (
+              <input
+                ref={thicknessRef}
+                type="text"
+                value={thicknessInput}
+                onChange={(e) => setThicknessInput(e.target.value)}
+                onBlur={() => commitThickness(thicknessInput)}
+                onKeyDown={(e) => { if (e.key === "Enter") commitThickness(thicknessInput); if (e.key === "Escape") setEditingThickness(false); }}
+                className="bg-transparent border-b-2 border-teal-500 outline-none font-medium w-20 text-sm px-0"
+                autoFocus
+              />
+            ) : (
+              <span
+                className="font-medium cursor-pointer hover:border-b hover:border-teal-500/50 transition-colors"
+                onClick={() => { setThicknessInput((selectedWall.thickness / 100).toFixed(2)); setEditingThickness(true); }}
+              >
+                {formatDimension(selectedWall.thickness, units)}
+              </span>
+            )}
           </div>
           {onUpdateWall && (
             <div className="space-y-1.5">

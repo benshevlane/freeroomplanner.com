@@ -533,9 +533,9 @@ export function drawWalls(
     ctx.fill();
   });
 
-  // Second pass: fill junction squares where walls meet (avoids gaps at corners)
+  // Second pass: fill junction squares where walls meet (sharp corners)
   const CONNECT_THRESHOLD = 15; // cm, same as wall snap threshold
-  const endpointMap = new Map<string, { x: number; y: number; thickness: number }[]>();
+  const endpointMap = new Map<string, { x: number; y: number; thickness: number; wallId: string }[]>();
   walls.forEach((wall) => {
     const points = [
       { x: wall.start.x, y: wall.start.y },
@@ -544,12 +544,12 @@ export function drawWalls(
     points.forEach((pt) => {
       const key = `${Math.round(pt.x / CONNECT_THRESHOLD) * CONNECT_THRESHOLD},${Math.round(pt.y / CONNECT_THRESHOLD) * CONNECT_THRESHOLD}`;
       if (!endpointMap.has(key)) endpointMap.set(key, []);
-      endpointMap.get(key)!.push({ ...pt, thickness: wall.thickness });
+      endpointMap.get(key)!.push({ ...pt, thickness: wall.thickness, wallId: wall.id });
     });
   });
   endpointMap.forEach((endpoints) => {
     if (endpoints.length < 2) return;
-    // Draw a filled circle at the junction to cover corner gaps
+    // Draw a filled square at the junction for sharp corners
     const avgX = endpoints.reduce((s, e) => s + e.x, 0) / endpoints.length;
     const avgY = endpoints.reduce((s, e) => s + e.y, 0) / endpoints.length;
     const maxThick = Math.max(...endpoints.map((e) => e.thickness));
@@ -557,7 +557,21 @@ export function drawWalls(
     const px = avgX * pxPerCm + panOffset.x;
     const py = avgY * pxPerCm + panOffset.y;
 
-    ctx.fillStyle = isDark ? WALL_COLOR_DARK : WALL_COLOR_LIGHT;
+    const hasSelected = endpoints.some((e) => e.wallId === selectedId);
+    ctx.fillStyle = hasSelected ? SELECT_COLOR : (isDark ? WALL_COLOR_DARK : WALL_COLOR_LIGHT);
+    ctx.fillRect(px - halfThick, py - halfThick, halfThick * 2, halfThick * 2);
+  });
+
+  // Third pass: draw small circle caps at free (unconnected) wall endpoints
+  endpointMap.forEach((endpoints) => {
+    if (endpoints.length >= 2) return; // connected junction, already drawn as square
+    const ep = endpoints[0];
+    const halfThick = (ep.thickness * pxPerCm) / 2;
+    const px = ep.x * pxPerCm + panOffset.x;
+    const py = ep.y * pxPerCm + panOffset.y;
+
+    const isSelected = ep.wallId === selectedId;
+    ctx.fillStyle = isSelected ? SELECT_COLOR : (isDark ? WALL_COLOR_DARK : WALL_COLOR_LIGHT);
     ctx.beginPath();
     ctx.arc(px, py, halfThick, 0, Math.PI * 2);
     ctx.fill();
