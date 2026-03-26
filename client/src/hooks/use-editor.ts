@@ -88,18 +88,29 @@ const DEFAULT_STATE: EditorState = {
 function getInitialState(storageKey: string): EditorState {
   const saved = loadSavedState(storageKey);
   if (!saved) return DEFAULT_STATE;
+
+  const walls = saved.walls ?? [];
+  const furniture = (saved.furniture ?? []).map((f: any) => ({
+    ...f,
+    labelOffset: f.labelOffset ?? { x: 0, y: 0 },
+    labelInside: f.labelInside ?? LABEL_INSIDE_TYPES.has(f.type),
+  }));
+  const labels = saved.labels ?? [];
+  const textBoxes = saved.textBoxes ?? [];
+  const arrows = saved.arrows ?? [];
+
+  const hasContent = walls.length > 0 || furniture.length > 0 ||
+    labels.length > 0 || textBoxes.length > 0 || arrows.length > 0;
+
   return {
     ...DEFAULT_STATE,
+    selectedTool: hasContent ? "select" : "wall",
     roomName: saved.roomName ?? DEFAULT_STATE.roomName,
-    walls: saved.walls ?? [],
-    furniture: (saved.furniture ?? []).map((f: any) => ({
-      ...f,
-      labelOffset: f.labelOffset ?? { x: 0, y: 0 },
-      labelInside: f.labelInside ?? LABEL_INSIDE_TYPES.has(f.type),
-    })),
-    labels: saved.labels ?? [],
-    textBoxes: saved.textBoxes ?? [],
-    arrows: saved.arrows ?? [],
+    walls,
+    furniture,
+    labels,
+    textBoxes,
+    arrows,
     roomNames: saved.roomNames ?? {},
     roomLabelOffsets: saved.roomLabelOffsets ?? {},
     componentLabelsVisible: saved.componentLabelsVisible ?? true,
