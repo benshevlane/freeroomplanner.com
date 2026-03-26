@@ -543,6 +543,7 @@ export default function EditorCore({
           onSetLabelOffset={editor.setLabelOffset}
           onSetTool={editor.setTool}
           onSetRoomLabelOffset={editor.setRoomLabelOffset}
+          onUpdateWallLabelOffset={editor.updateWallLabelOffset}
           autoEditTextBoxId={autoEditTextBoxId}
           onClearAutoEditTextBox={() => setAutoEditTextBoxId(null)}
         />

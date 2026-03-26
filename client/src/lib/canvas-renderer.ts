@@ -491,7 +491,8 @@ export function drawWalls(
   units: UnitSystem = "m",
   measureMode: MeasureMode = "inside",
   furniture: FurnitureItem[] = [],
-  rooms: DetectedRoom[] = []
+  rooms: DetectedRoom[] = [],
+  hoveredWallLabelId?: string | null
 ) {
   const pxPerCm = (gridSize * zoom) / 100;
 
@@ -609,7 +610,7 @@ export function drawWalls(
     const displayLengthCm = measureMode === "inside"
       ? Math.max(0, lengthCm - wallThick)
       : lengthCm + startExtension + endExtension;
-    drawWallDimensionLabel(ctx, sx, sy, ex, ey, displayLengthCm, wall.thickness * pxPerCm, zoom, isDark, units, wall, furniture, gridSize, panOffset, rooms, walls, measureMode);
+    drawWallDimensionLabel(ctx, sx, sy, ex, ey, displayLengthCm, wall.thickness * pxPerCm, zoom, isDark, units, wall, furniture, gridSize, panOffset, rooms, walls, measureMode, hoveredWallLabelId);
   });
 
   // Draw merged labels for collinear groups (skip if group has door/window occupants)
@@ -640,7 +641,7 @@ export function drawWalls(
     // Find the actual wall for collision detection
     const groupWallIds = group.wallIds;
     const representativeWall = walls.find((w) => groupWallIds.has(w.id)) || walls[0];
-    drawWallDimensionLabel(ctx, sx, sy, ex, ey, displayLengthCm, thickness * pxPerCm, zoom, isDark, units, representativeWall, furniture, gridSize, panOffset, rooms, walls, measureMode);
+    drawWallDimensionLabel(ctx, sx, sy, ex, ey, displayLengthCm, thickness * pxPerCm, zoom, isDark, units, representativeWall, furniture, gridSize, panOffset, rooms, walls, measureMode, hoveredWallLabelId);
   }
 }
 
@@ -1438,53 +1439,160 @@ function findOptimalLabelPosition(
   return { position: 0.5, offsetPerp: true };
 }
 
-/** Shared helper to draw a wall dimension label */
-function drawWallDimensionLabel(
-  ctx: CanvasRenderingContext2D,
+/**
+ * Find furniture items (excluding doors/windows) whose AABB overlaps the wall label zone.
+ * Returns occupant fractions [0..1] along the wall, same format as findComponentsOnWall.
+ */
+function findFurnitureNearWallLabel(
+  wall: Wall,
+  furniture: FurnitureItem[],
+  insideNormX: number,
+  insideNormY: number,
+  perpOffsetPx: number,
+  pxPerCm: number
+): { start: number; end: number }[] {
+  const wdx = wall.end.x - wall.start.x;
+  const wdy = wall.end.y - wall.start.y;
+  const wallLen = Math.sqrt(wdx * wdx + wdy * wdy);
+  if (wallLen < 1) return [];
+
+  const wallDirX = wdx / wallLen;
+  const wallDirY = wdy / wallLen;
+  const wallNormX = -wallDirY;
+  const wallNormY = wallDirX;
+
+  // Label sits at perpOffsetPx from wall center in screen space; convert to world cm
+  const labelPerpCm = perpOffsetPx / pxPerCm;
+  // Determine which side of the wall the label is on using the inside normal
+  const normDot = insideNormX * wallNormX + insideNormY * wallNormY;
+  const labelSideSign = normDot >= 0 ? 1 : -1;
+
+  const occupants: { start: number; end: number }[] = [];
+  // Margin in world cm around the label line to check for overlap (~20px)
+  const marginCm = 20 / pxPerCm;
+
+  for (const item of furniture) {
+    // Skip doors/windows — handled separately by findComponentsOnWall
+    if (item.type === "door" || item.type === "door_double" || item.type === "window") continue;
+
+    const aabb = getFurnitureAABB(item);
+
+    // Project AABB center onto wall normal to check perpendicular distance
+    const aabbCx = (aabb.minX + aabb.maxX) / 2;
+    const aabbCy = (aabb.minY + aabb.maxY) / 2;
+    const relX = aabbCx - (wall.start.x + wall.end.x) / 2;
+    const relY = aabbCy - (wall.start.y + wall.end.y) / 2;
+
+    // Check if item is on the same side as the label and within range
+    const wallMidX = (wall.start.x + wall.end.x) / 2;
+    const wallMidY = (wall.start.y + wall.end.y) / 2;
+
+    // Check each corner of the AABB for proximity to the label line
+    const aabbCorners = [
+      { x: aabb.minX, y: aabb.minY }, { x: aabb.maxX, y: aabb.minY },
+      { x: aabb.maxX, y: aabb.maxY }, { x: aabb.minX, y: aabb.maxY },
+    ];
+
+    // Project furniture AABB onto wall axis
+    let minAlong = Infinity, maxAlong = -Infinity;
+    let anyNearLabel = false;
+
+    for (const corner of aabbCorners) {
+      const cRelX = corner.x - wall.start.x;
+      const cRelY = corner.y - wall.start.y;
+      const along = cRelX * wallDirX + cRelY * wallDirY;
+      const perp = cRelX * wallNormX + cRelY * wallNormY;
+
+      minAlong = Math.min(minAlong, along);
+      maxAlong = Math.max(maxAlong, along);
+
+      // Check if this corner is near the label's perpendicular line
+      const perpFromLabel = perp * labelSideSign;
+      const labelLineCm = Math.abs(labelPerpCm);
+      if (perpFromLabel > -marginCm && perpFromLabel < labelLineCm + marginCm) {
+        anyNearLabel = true;
+      }
+    }
+
+    if (!anyNearLabel) continue;
+
+    // Convert along-wall distances to fractions
+    const fracStart = Math.max(0, minAlong / wallLen);
+    const fracEnd = Math.min(1, maxAlong / wallLen);
+
+    if (fracEnd > 0 && fracStart < 1) {
+      occupants.push({ start: fracStart, end: fracEnd });
+    }
+  }
+
+  occupants.sort((a, b) => a.start - b.start);
+  return occupants;
+}
+
+/** Result of computing wall label position — reused for rendering and hit testing */
+export interface WallLabelPositionResult {
+  finalX: number;
+  finalY: number;
+  angle: number;         // wall angle
+  textAngle: number;     // text rotation (flipped for readability)
+  textWidth: number;
+  textHeight: number;
+  baseFontSize: number;
+  text: string;
+  pad: number;
+  labelFrac: number;     // fraction along wall
+  defaultFrac: number;   // default fraction (0.5 typically)
+  insideNormX: number;
+  insideNormY: number;
+  perpOffsetPx: number;
+  flippedSide: boolean;  // true if label moved to opposite side
+  wallId: string;        // wall id for identification
+  wallStartScreen: Point; // wall start in screen coords
+  wallEndScreen: Point;   // wall end in screen coords
+}
+
+/**
+ * Compute wall label position without drawing — shared by drawWallDimensionLabel and hit testing.
+ */
+function computeWallLabelPosition(
   sx: number, sy: number, ex: number, ey: number,
   lengthCm: number, wallThicknessPx: number,
-  zoom: number, isDark: boolean,
-  units: UnitSystem = "m",
-  wall?: Wall,
-  furniture?: FurnitureItem[],
-  gridSize?: number,
-  panOffset?: Point,
-  rooms: DetectedRoom[] = [],
-  allWalls: Wall[] = [],
-  measureMode: MeasureMode = "inside"
-) {
+  zoom: number,
+  units: UnitSystem,
+  wall: Wall | undefined,
+  furniture: FurnitureItem[] | undefined,
+  gridSize: number | undefined,
+  panOffset: Point | undefined,
+  rooms: DetectedRoom[],
+  allWalls: Wall[],
+  measureMode: MeasureMode,
+  ctx?: CanvasRenderingContext2D
+): WallLabelPositionResult | null {
   const angle = Math.atan2(ey - sy, ex - sx);
   const wallLengthPx = Math.sqrt((ex - sx) ** 2 + (ey - sy) ** 2);
 
   const baseFontSize = Math.max(11, 12 * zoom);
   const text = formatLength(lengthCm, units);
-  ctx.font = `500 ${baseFontSize}px 'General Sans', 'DM Sans', sans-serif`;
-  const textWidth = ctx.measureText(text).width;
-  const pad = 4;
 
-  // Collision avoidance: find optimal position along wall
-  let labelFrac = 0.5;
-  if (wall && furniture && gridSize && panOffset) {
-    const occupants = findComponentsOnWall(wall, furniture, gridSize, zoom, panOffset);
-    if (occupants.length > 0) {
-      const textFrac = wallLengthPx > 0 ? (textWidth + pad * 2) / wallLengthPx : 1;
-      const result = findOptimalLabelPosition(occupants, textFrac);
-      labelFrac = result.position;
-    }
+  // Measure text width — use ctx if available, else estimate
+  let textWidth: number;
+  if (ctx) {
+    ctx.font = `500 ${baseFontSize}px 'General Sans', 'DM Sans', sans-serif`;
+    textWidth = ctx.measureText(text).width;
+  } else {
+    // Approximate: ~0.6 * fontSize per character
+    textWidth = text.length * baseFontSize * 0.6;
   }
+  const pad = 4;
+  const textHeight = baseFontSize;
 
-  // Compute label center position along wall
-  const mx = sx + (ex - sx) * labelFrac;
-  const my = sy + (ey - sy) * labelFrac;
-
-  // Determine inside normal direction using room centroid (same logic as drawMeasurementIndicatorLines)
+  // Determine inside normal direction
   const normX = -Math.sin(angle);
   const normY = Math.cos(angle);
   let insideNormX = normX;
   let insideNormY = normY;
 
   if (wall) {
-    const wallMid = { x: (wall.start.x + wall.end.x) / 2, y: (wall.start.y + wall.end.y) / 2 };
     const wdx = wall.end.x - wall.start.x;
     const wdy = wall.end.y - wall.start.y;
     const wlen = Math.sqrt(wdx * wdx + wdy * wdy);
@@ -1493,8 +1601,6 @@ function drawWallDimensionLabel(
       const wny = wdx / wlen;
 
       let foundRoom = false;
-      // For walls shared between nested rooms, use the largest room to determine
-      // the "inside" direction so that "full" mode measures from the correct (outer) side.
       let bestRoom: DetectedRoom | null = null;
       for (const room of rooms) {
         const hasStart = room.vertices.some(v =>
@@ -1520,7 +1626,6 @@ function drawWallDimensionLabel(
       }
 
       if (!foundRoom && allWalls.length > 0) {
-        // Fallback: use center of all wall endpoints
         let cx = 0, cy = 0, cnt = 0;
         for (const w of allWalls) {
           cx += w.start.x + w.end.x;
@@ -1530,6 +1635,7 @@ function drawWallDimensionLabel(
         if (cnt > 0) {
           cx /= cnt;
           cy /= cnt;
+          const wallMid = { x: (wall.start.x + wall.end.x) / 2, y: (wall.start.y + wall.end.y) / 2 };
           const toCentroid = { x: cx - wallMid.x, y: cy - wallMid.y };
           const dot = toCentroid.x * wnx + toCentroid.y * wny;
           insideNormX = dot >= 0 ? normX : -normX;
@@ -1539,20 +1645,157 @@ function drawWallDimensionLabel(
     }
   }
 
-  // Offset label perpendicular to wall: inside mode → toward room, full → away from room
+  // Perpendicular offset
   const dirSign = measureMode === "inside" ? 1 : -1;
   const perpOffsetPx = dirSign * (wallThicknessPx / 2 + baseFontSize * 0.6 + 4);
-  const finalX = mx + insideNormX * perpOffsetPx;
-  const finalY = my + insideNormY * perpOffsetPx;
 
-  ctx.save();
-  ctx.translate(finalX, finalY);
+  const pxPerCm = (gridSize && zoom) ? (gridSize * zoom) / 100 : 1;
+
+  // Check if label is pinned (user-dragged)
+  let labelFrac = 0.5;
+  let flippedSide = false;
+  const defaultFrac = 0.5;
+
+  if (wall?.measurementLabelPinned && wall.measurementLabelOffset !== undefined) {
+    // Convert cm offset from midpoint to fraction
+    const wallLenCm = Math.sqrt((wall.end.x - wall.start.x) ** 2 + (wall.end.y - wall.start.y) ** 2);
+    if (wallLenCm > 0) {
+      labelFrac = 0.5 + wall.measurementLabelOffset / wallLenCm;
+      labelFrac = Math.max(0.05, Math.min(0.95, labelFrac));
+    }
+  } else if (wall && furniture && gridSize && panOffset) {
+    // Auto-positioning: avoid doors/windows
+    const doorOccupants = findComponentsOnWall(wall, furniture, gridSize, zoom, panOffset);
+
+    // Also avoid general furniture near label zone
+    const furnitureOccupants = findFurnitureNearWallLabel(
+      wall, furniture, insideNormX, insideNormY, perpOffsetPx, pxPerCm
+    );
+
+    // Merge all occupants
+    const allOccupants = [...doorOccupants, ...furnitureOccupants].sort((a, b) => a.start - b.start);
+
+    if (allOccupants.length > 0) {
+      const textFrac = wallLengthPx > 0 ? (textWidth + pad * 2) / wallLengthPx : 1;
+      const result = findOptimalLabelPosition(allOccupants, textFrac);
+      labelFrac = result.position;
+
+      // If no clear gap on this side, try opposite side
+      if (result.offsetPerp) {
+        const oppPerpOffset = -perpOffsetPx;
+        const oppFurnitureOccupants = findFurnitureNearWallLabel(
+          wall, furniture, -insideNormX, -insideNormY, oppPerpOffset, pxPerCm
+        );
+        const oppAllOccupants = [...doorOccupants, ...oppFurnitureOccupants].sort((a, b) => a.start - b.start);
+        const oppResult = findOptimalLabelPosition(oppAllOccupants, textFrac);
+        if (!oppResult.offsetPerp) {
+          // Opposite side has clear space — flip
+          labelFrac = oppResult.position;
+          flippedSide = true;
+        }
+      }
+    }
+  }
+
+  // Compute final position
+  const mx = sx + (ex - sx) * labelFrac;
+  const my = sy + (ey - sy) * labelFrac;
+  const actualPerpOffset = flippedSide ? -perpOffsetPx : perpOffsetPx;
+  const finalX = mx + insideNormX * actualPerpOffset;
+  const finalY = my + insideNormY * actualPerpOffset;
+
   let textAngle = angle;
   if (textAngle > Math.PI / 2 || textAngle < -Math.PI / 2) {
     textAngle += Math.PI;
   }
+
+  return {
+    finalX, finalY, angle, textAngle,
+    textWidth, textHeight: textHeight, baseFontSize, text, pad,
+    labelFrac, defaultFrac, insideNormX, insideNormY,
+    perpOffsetPx: actualPerpOffset,
+    flippedSide,
+    wallId: wall?.id ?? "",
+    wallStartScreen: { x: sx, y: sy },
+    wallEndScreen: { x: ex, y: ey },
+  };
+}
+
+/** Shared helper to draw a wall dimension label */
+function drawWallDimensionLabel(
+  ctx: CanvasRenderingContext2D,
+  sx: number, sy: number, ex: number, ey: number,
+  lengthCm: number, wallThicknessPx: number,
+  zoom: number, isDark: boolean,
+  units: UnitSystem = "m",
+  wall?: Wall,
+  furniture?: FurnitureItem[],
+  gridSize?: number,
+  panOffset?: Point,
+  rooms: DetectedRoom[] = [],
+  allWalls: Wall[] = [],
+  measureMode: MeasureMode = "inside",
+  hoveredWallLabelId?: string | null
+) {
+  const pos = computeWallLabelPosition(
+    sx, sy, ex, ey, lengthCm, wallThicknessPx, zoom,
+    units, wall, furniture, gridSize, panOffset, rooms, allWalls, measureMode, ctx
+  );
+  if (!pos) return;
+
+  const { finalX, finalY, textAngle, textWidth, baseFontSize, text, pad,
+          labelFrac, defaultFrac, insideNormX, insideNormY, perpOffsetPx } = pos;
+
+  const isHovered = wall?.id != null && hoveredWallLabelId === wall.id;
+  const isPinned = wall?.measurementLabelPinned === true;
+
+  // Draw leader line when label moved from default position
+  if (Math.abs(labelFrac - defaultFrac) > 0.02 && !isPinned) {
+    const midX = sx + (ex - sx) * defaultFrac;
+    const midY = sy + (ey - sy) * defaultFrac;
+    const midLabelX = midX + insideNormX * perpOffsetPx;
+    const midLabelY = midY + insideNormY * perpOffsetPx;
+
+    ctx.save();
+    ctx.strokeStyle = isDark ? "rgba(79,152,163,0.3)" : "rgba(1,105,111,0.3)";
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(finalX, finalY);
+    ctx.lineTo(midLabelX, midLabelY);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  ctx.save();
+  ctx.translate(finalX, finalY);
   ctx.rotate(textAngle);
 
+  // Hover highlight
+  if (isHovered) {
+    const hlPad = pad + 2;
+    ctx.strokeStyle = isDark ? "rgba(79,152,163,0.5)" : "rgba(1,105,111,0.4)";
+    ctx.lineWidth = 1.5;
+    const hlX = -textWidth / 2 - hlPad;
+    const hlY = -baseFontSize * 0.5 - hlPad;
+    const hlW = textWidth + hlPad * 2;
+    const hlH = baseFontSize + hlPad * 2;
+    const r = 3;
+    ctx.beginPath();
+    ctx.moveTo(hlX + r, hlY);
+    ctx.lineTo(hlX + hlW - r, hlY);
+    ctx.arcTo(hlX + hlW, hlY, hlX + hlW, hlY + r, r);
+    ctx.lineTo(hlX + hlW, hlY + hlH - r);
+    ctx.arcTo(hlX + hlW, hlY + hlH, hlX + hlW - r, hlY + hlH, r);
+    ctx.lineTo(hlX + r, hlY + hlH);
+    ctx.arcTo(hlX, hlY + hlH, hlX, hlY + hlH - r, r);
+    ctx.lineTo(hlX, hlY + r);
+    ctx.arcTo(hlX, hlY, hlX + r, hlY, r);
+    ctx.closePath();
+    ctx.stroke();
+  }
+
+  // Background pill
   ctx.fillStyle = isDark ? "#1c1b19" : "#f9f8f5";
   ctx.fillRect(
     -textWidth / 2 - pad,
@@ -1560,10 +1803,29 @@ function drawWallDimensionLabel(
     textWidth + pad * 2,
     baseFontSize + pad * 2
   );
+
+  // Text
   ctx.fillStyle = isDark ? DIMENSION_COLOR_DARK : DIMENSION_COLOR_LIGHT;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillText(text, 0, 0);
+
+  // Reset icon when pinned
+  if (isPinned) {
+    const iconX = textWidth / 2 + pad + 10;
+    const iconSize = Math.max(9, baseFontSize * 0.7);
+    // Draw small circle background
+    ctx.fillStyle = isDark ? "rgba(79,152,163,0.15)" : "rgba(1,105,111,0.1)";
+    ctx.beginPath();
+    ctx.arc(iconX, 0, iconSize * 0.65, 0, Math.PI * 2);
+    ctx.fill();
+    // Draw reset icon text
+    ctx.fillStyle = isDark ? DIMENSION_COLOR_DARK : DIMENSION_COLOR_LIGHT;
+    ctx.font = `${iconSize}px sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("↺", iconX, 0);
+  }
 
   ctx.restore();
 }
@@ -3515,6 +3777,195 @@ export function drawSnapIndicator(
   ctx.stroke();
   ctx.fillStyle = "rgba(1, 105, 111, 0.3)";
   ctx.fill();
+}
+
+/**
+ * Hit test wall measurement labels. Returns the wall whose label was clicked, or null.
+ * For collinear groups, returns the representative wall.
+ */
+export function hitTestWallMeasurementLabel(
+  screenX: number,
+  screenY: number,
+  walls: Wall[],
+  gridSize: number,
+  zoom: number,
+  panOffset: Point,
+  isDark: boolean,
+  units: UnitSystem,
+  measureMode: MeasureMode,
+  furniture: FurnitureItem[],
+  rooms: DetectedRoom[]
+): Wall | null {
+  const pxPerCm = (gridSize * zoom) / 100;
+  const doorsWindows = furniture.filter((f) => f.type === "door" || f.type === "door_double" || f.type === "window");
+
+  const collinearGroups = findCollinearGroups(walls);
+  const mergedWallIds = new Set<string>();
+  for (const group of collinearGroups.values()) {
+    for (const id of group.wallIds) mergedWallIds.add(id);
+  }
+
+  // Test individual wall labels
+  for (const wall of walls) {
+    if (mergedWallIds.has(wall.id)) continue;
+    const wallThick = wall.thickness || 15;
+    const occupants = getWallOccupants(wall.start, wall.end, wallThick, doorsWindows);
+    if (occupants.length > 0) continue;
+
+    const dx = wall.end.x - wall.start.x;
+    const dy = wall.end.y - wall.start.y;
+    const lengthCm = Math.sqrt(dx * dx + dy * dy);
+    if (lengthCm <= 10) continue;
+
+    const { startExtension, endExtension } = measureMode === "full"
+      ? getEndpointExtensions(wall.start, wall.end, wallThick, walls)
+      : { startExtension: 0, endExtension: 0 };
+    const udx = dx / lengthCm;
+    const udy = dy / lengthCm;
+    const sx = (wall.start.x - udx * startExtension) * pxPerCm + panOffset.x;
+    const sy = (wall.start.y - udy * startExtension) * pxPerCm + panOffset.y;
+    const ex = (wall.end.x + udx * endExtension) * pxPerCm + panOffset.x;
+    const ey = (wall.end.y + udy * endExtension) * pxPerCm + panOffset.y;
+    const displayLengthCm = measureMode === "inside"
+      ? Math.max(0, lengthCm - wallThick)
+      : lengthCm + startExtension + endExtension;
+
+    const pos = computeWallLabelPosition(
+      sx, sy, ex, ey, displayLengthCm, wall.thickness * pxPerCm, zoom,
+      units, wall, furniture, gridSize, panOffset, rooms, walls, measureMode
+    );
+    if (!pos) continue;
+    if (hitTestLabelRect(screenX, screenY, pos)) return wall;
+  }
+
+  // Test collinear group labels
+  for (const group of collinearGroups.values()) {
+    const repWall = walls.find((w) => group.wallIds.has(w.id));
+    const thickness = repWall?.thickness ?? 15;
+    const groupOccupants = getWallOccupants(group.minP, group.maxP, thickness, doorsWindows);
+    if (groupOccupants.length > 0) continue;
+
+    const { startExtension, endExtension } = measureMode === "full"
+      ? getEndpointExtensions(group.minP, group.maxP, thickness, walls)
+      : { startExtension: 0, endExtension: 0 };
+    const gdx = group.maxP.x - group.minP.x;
+    const gdy = group.maxP.y - group.minP.y;
+    const glen = Math.sqrt(gdx * gdx + gdy * gdy);
+    const gudx = glen > 0 ? gdx / glen : 0;
+    const gudy = glen > 0 ? gdy / glen : 0;
+    const sx = (group.minP.x - gudx * startExtension) * pxPerCm + panOffset.x;
+    const sy = (group.minP.y - gudy * startExtension) * pxPerCm + panOffset.y;
+    const ex = (group.maxP.x + gudx * endExtension) * pxPerCm + panOffset.x;
+    const ey = (group.maxP.y + gudy * endExtension) * pxPerCm + panOffset.y;
+    const displayLengthCm = measureMode === "inside"
+      ? Math.max(0, group.totalLengthCm - thickness)
+      : group.totalLengthCm + startExtension + endExtension;
+
+    const representativeWall = walls.find((w) => group.wallIds.has(w.id)) || walls[0];
+    const pos = computeWallLabelPosition(
+      sx, sy, ex, ey, displayLengthCm, thickness * pxPerCm, zoom,
+      units, representativeWall, furniture, gridSize, panOffset, rooms, walls, measureMode
+    );
+    if (!pos) continue;
+    if (hitTestLabelRect(screenX, screenY, pos)) return representativeWall;
+  }
+
+  return null;
+}
+
+/**
+ * Hit test the reset icon on a pinned wall measurement label.
+ * Returns the wall if the reset icon was clicked, null otherwise.
+ */
+export function hitTestWallLabelResetIcon(
+  screenX: number,
+  screenY: number,
+  walls: Wall[],
+  gridSize: number,
+  zoom: number,
+  panOffset: Point,
+  isDark: boolean,
+  units: UnitSystem,
+  measureMode: MeasureMode,
+  furniture: FurnitureItem[],
+  rooms: DetectedRoom[]
+): Wall | null {
+  const pxPerCm = (gridSize * zoom) / 100;
+  const doorsWindows = furniture.filter((f) => f.type === "door" || f.type === "door_double" || f.type === "window");
+
+  const collinearGroups = findCollinearGroups(walls);
+  const mergedWallIds = new Set<string>();
+  for (const group of collinearGroups.values()) {
+    for (const id of group.wallIds) mergedWallIds.add(id);
+  }
+
+  for (const wall of walls) {
+    if (!wall.measurementLabelPinned) continue;
+    if (mergedWallIds.has(wall.id)) continue;
+    const wallThick = wall.thickness || 15;
+    const occupants = getWallOccupants(wall.start, wall.end, wallThick, doorsWindows);
+    if (occupants.length > 0) continue;
+
+    const dx = wall.end.x - wall.start.x;
+    const dy = wall.end.y - wall.start.y;
+    const lengthCm = Math.sqrt(dx * dx + dy * dy);
+    if (lengthCm <= 10) continue;
+
+    const { startExtension, endExtension } = measureMode === "full"
+      ? getEndpointExtensions(wall.start, wall.end, wallThick, walls)
+      : { startExtension: 0, endExtension: 0 };
+    const udx = dx / lengthCm;
+    const udy = dy / lengthCm;
+    const sx = (wall.start.x - udx * startExtension) * pxPerCm + panOffset.x;
+    const sy = (wall.start.y - udy * startExtension) * pxPerCm + panOffset.y;
+    const ex = (wall.end.x + udx * endExtension) * pxPerCm + panOffset.x;
+    const ey = (wall.end.y + udy * endExtension) * pxPerCm + panOffset.y;
+    const displayLengthCm = measureMode === "inside"
+      ? Math.max(0, lengthCm - wallThick)
+      : lengthCm + startExtension + endExtension;
+
+    const pos = computeWallLabelPosition(
+      sx, sy, ex, ey, displayLengthCm, wall.thickness * pxPerCm, zoom,
+      units, wall, furniture, gridSize, panOffset, rooms, walls, measureMode
+    );
+    if (!pos) continue;
+    if (hitTestResetIcon(screenX, screenY, pos)) return wall;
+  }
+
+  return null;
+}
+
+/** Check if a screen point is inside a rotated label rectangle */
+function hitTestLabelRect(screenX: number, screenY: number, pos: WallLabelPositionResult): boolean {
+  // Transform screen point into label's local coordinate system
+  const dx = screenX - pos.finalX;
+  const dy = screenY - pos.finalY;
+  const cos = Math.cos(-pos.textAngle);
+  const sin = Math.sin(-pos.textAngle);
+  const localX = dx * cos - dy * sin;
+  const localY = dx * sin + dy * cos;
+
+  const halfW = pos.textWidth / 2 + pos.pad + 2;
+  const halfH = pos.baseFontSize * 0.5 + pos.pad + 2;
+
+  return localX >= -halfW && localX <= halfW && localY >= -halfH && localY <= halfH;
+}
+
+/** Check if a screen point hits the reset icon on a pinned label */
+function hitTestResetIcon(screenX: number, screenY: number, pos: WallLabelPositionResult): boolean {
+  // Transform screen point into label's local coordinate system
+  const dx = screenX - pos.finalX;
+  const dy = screenY - pos.finalY;
+  const cos = Math.cos(-pos.textAngle);
+  const sin = Math.sin(-pos.textAngle);
+  const localX = dx * cos - dy * sin;
+  const localY = dx * sin + dy * cos;
+
+  const iconX = pos.textWidth / 2 + pos.pad + 10;
+  const iconR = Math.max(9, pos.baseFontSize * 0.7) * 0.65 + 4; // hit area slightly larger
+
+  const distSq = (localX - iconX) ** 2 + localY ** 2;
+  return distSq <= iconR * iconR;
 }
 
 export function hitTestWall(

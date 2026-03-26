@@ -51,6 +51,8 @@ import {
   hitTestComponentLabel,
   hitTestLabelRotateHandle,
   hitTestLabelResizeHandle,
+  hitTestWallMeasurementLabel,
+  hitTestWallLabelResetIcon,
   ComponentLabelInfo,
 } from "../lib/canvas-renderer";
 import { isWallCupboard } from "../lib/types";
@@ -89,6 +91,7 @@ interface FloorPlanCanvasProps {
   onSetLabelOffset: (id: string, offset: { x: number; y: number }) => void;
   onSetTool: (tool: EditorTool) => void;
   onSetRoomLabelOffset: (roomKey: string, offset: Point) => void;
+  onUpdateWallLabelOffset: (wallId: string, offset: number, pinned: boolean) => void;
   autoEditTextBoxId?: string | null;
   onClearAutoEditTextBox?: () => void;
 }
@@ -126,6 +129,7 @@ export default function FloorPlanCanvas({
   onSetLabelOffset,
   onSetTool,
   onSetRoomLabelOffset,
+  onUpdateWallLabelOffset,
   autoEditTextBoxId,
   onClearAutoEditTextBox,
 }: FloorPlanCanvasProps) {
@@ -176,6 +180,11 @@ export default function FloorPlanCanvas({
     mouseWorldX: number; mouseWorldY: number;
     constraintAxis: "x" | "y";
   } | null>(null);
+
+  // Wall measurement label dragging state
+  const [isDraggingWallLabel, setIsDraggingWallLabel] = useState(false);
+  const [draggingWallLabelId, setDraggingWallLabelId] = useState<string | null>(null);
+  const hoveredWallLabelIdRef = useRef<string | null>(null);
 
   // Wall snap indicator state (transient, only during drag)
   const [wallSnapEdges, setWallSnapEdges] = useState<SnappedWallEdge[]>([]);
@@ -282,7 +291,7 @@ export default function FloorPlanCanvas({
     }
 
     // Walls
-    drawWalls(ctx, state.walls, state.gridSize, state.zoom, state.panOffset, isDark, state.selectedItemId, state.units, measureMode, state.furniture, rooms);
+    drawWalls(ctx, state.walls, state.gridSize, state.zoom, state.panOffset, isDark, state.selectedItemId, state.units, measureMode, state.furniture, rooms, hoveredWallLabelIdRef.current);
 
     // Measurement indicator lines (on top of walls, below labels/furniture)
     drawMeasurementIndicatorLines(ctx, state.walls, rooms, state.gridSize, state.zoom, state.panOffset, measureMode);
@@ -823,6 +832,30 @@ export default function FloorPlanCanvas({
           return;
         }
 
+        // Wall measurement label: check reset icon first, then label drag
+        {
+          const wallLabelRooms = detectRooms(state.walls);
+          const resetHit = hitTestWallLabelResetIcon(
+            pos.x, pos.y, state.walls, state.gridSize, state.zoom, state.panOffset,
+            isDark, state.units, measureMode, state.furniture, wallLabelRooms
+          );
+          if (resetHit) {
+            onUpdateWallLabelOffset(resetHit.id, 0, false);
+            return;
+          }
+          const labelHit = hitTestWallMeasurementLabel(
+            pos.x, pos.y, state.walls, state.gridSize, state.zoom, state.panOffset,
+            isDark, state.units, measureMode, state.furniture, wallLabelRooms
+          );
+          if (labelHit) {
+            setIsDraggingWallLabel(true);
+            setDraggingWallLabelId(labelHit.id);
+            // Use pointer capture to isolate drag from other interactions
+            (e.target as HTMLElement).setPointerCapture(e.pointerId);
+            return;
+          }
+        }
+
         const hitW = hitTestWall(pos.x, pos.y, state.walls, state.gridSize, state.zoom, state.panOffset);
         if (hitW) {
           onSelectItem(hitW.id);
@@ -990,6 +1023,32 @@ export default function FloorPlanCanvas({
           x: pos.x - dragStart.x,
           y: pos.y - dragStart.y,
         });
+        return;
+      }
+
+      // Handle wall measurement label dragging
+      if (isDraggingWallLabel && draggingWallLabelId) {
+        const wall = state.walls.find(w => w.id === draggingWallLabelId);
+        if (wall) {
+          const world = screenToWorld(pos.x, pos.y, state.gridSize, state.zoom, state.panOffset);
+          // Project mouse world position onto wall axis to get offset from midpoint
+          const wdx = wall.end.x - wall.start.x;
+          const wdy = wall.end.y - wall.start.y;
+          const wallLen = Math.sqrt(wdx * wdx + wdy * wdy);
+          if (wallLen > 0) {
+            const wallDirX = wdx / wallLen;
+            const wallDirY = wdy / wallLen;
+            const midX = (wall.start.x + wall.end.x) / 2;
+            const midY = (wall.start.y + wall.end.y) / 2;
+            const relX = world.x - midX;
+            const relY = world.y - midY;
+            let offsetCm = relX * wallDirX + relY * wallDirY;
+            // Constrain to wall extent (leave 5% margin at each end)
+            const maxOffset = wallLen * 0.45;
+            offsetCm = Math.max(-maxOffset, Math.min(maxOffset, offsetCm));
+            onUpdateWallLabelOffset(draggingWallLabelId, offsetCm, true);
+          }
+        }
         return;
       }
 
@@ -1317,6 +1376,18 @@ export default function FloorPlanCanvas({
         }
       }
 
+      // Wall measurement label hover detection (select tool only, when not dragging)
+      if (state.selectedTool === "select" && !isDragging && !isDraggingLabel && !isDraggingRoomLabel && !isDraggingWallLabel && !isResizing && !isRotating) {
+        const wallLabelRooms = detectRooms(state.walls);
+        const labelHit = hitTestWallMeasurementLabel(
+          pos.x, pos.y, state.walls, state.gridSize, state.zoom, state.panOffset,
+          isDark, state.units, measureMode, state.furniture, wallLabelRooms
+        );
+        hoveredWallLabelIdRef.current = labelHit ? labelHit.id : null;
+      } else if (!isDraggingWallLabel) {
+        hoveredWallLabelIdRef.current = null;
+      }
+
       // Eraser hover detection
       if (state.selectedTool === "eraser") {
         const canvas = canvasRef.current;
@@ -1344,7 +1415,7 @@ export default function FloorPlanCanvas({
         setEraserHoverId(null);
       }
     },
-    [state, isPanning, isDragging, isDraggingLabel, draggingLabelId, labelDragStart, isDraggingRoomLabel, draggingRoomKey, roomLabelDragStart, isResizing, isRotating, rotateStartAngle, rotateItemStartRot, resizeStart, resizeCorner, dragStart, dragItemOffset, eraserHoverId, arrowDraggingEndpoint, arrowBodyDragStart, wallDragStart, isRotatingLabel, rotatingLabelId, labelRotateStartAngle, labelRotateItemStartRot, isResizingLabel, resizingLabelId, labelResizeStart, getCanvasPos, onSetPan, onSetZoom, onMoveFurniture, onMoveWall, onMoveLabel, onUpdateFurniture, onUpdateArrow, onSetLabelOffset, onSetRoomLabelOffset]
+    [state, isPanning, isDragging, isDraggingLabel, draggingLabelId, labelDragStart, isDraggingRoomLabel, draggingRoomKey, roomLabelDragStart, isDraggingWallLabel, draggingWallLabelId, isResizing, isRotating, rotateStartAngle, rotateItemStartRot, resizeStart, resizeCorner, dragStart, dragItemOffset, eraserHoverId, arrowDraggingEndpoint, arrowBodyDragStart, wallDragStart, isRotatingLabel, rotatingLabelId, labelRotateStartAngle, labelRotateItemStartRot, isResizingLabel, resizingLabelId, labelResizeStart, getCanvasPos, onSetPan, onSetZoom, onMoveFurniture, onMoveWall, onMoveLabel, onUpdateFurniture, onUpdateArrow, onSetLabelOffset, onSetRoomLabelOffset, onUpdateWallLabelOffset, isDark, measureMode]
   );
 
   const handlePointerUp = useCallback(
@@ -1420,6 +1491,10 @@ export default function FloorPlanCanvas({
       if (isDraggingLabel) {
         onPushUndo();
       }
+      if (isDraggingWallLabel) {
+        // Release pointer capture
+        try { (e.target as HTMLElement).releasePointerCapture(e.pointerId); } catch {}
+      }
       setIsDragging(false);
       setIsPanning(false);
       setIsResizing(false);
@@ -1438,8 +1513,10 @@ export default function FloorPlanCanvas({
       setIsResizingLabel(false);
       setResizingLabelId(null);
       setLabelResizeStart(null);
+      setIsDraggingWallLabel(false);
+      setDraggingWallLabelId(null);
     },
-    [isDragging, isDraggingLabel, isDraggingRoomLabel, wallDragStart, onPushUndo, state.selectedTool, state.gridSize, state.zoom, state.panOffset, state.walls, getCanvasPos, onAddWall, onSetWallDrawing, onSplitWallAndConnect]
+    [isDragging, isDraggingLabel, isDraggingRoomLabel, isDraggingWallLabel, wallDragStart, onPushUndo, state.selectedTool, state.gridSize, state.zoom, state.panOffset, state.walls, getCanvasPos, onAddWall, onSetWallDrawing, onSplitWallAndConnect]
   );
 
   const handleWheel = useCallback(
@@ -1852,8 +1929,10 @@ export default function FloorPlanCanvas({
     if (wallDragStart) return "grabbing";
     if (isDraggingLabel) return "grabbing";
     if (isDraggingRoomLabel) return "grabbing";
+    if (isDraggingWallLabel) return "grabbing";
     if (state.selectedTool === "select") {
       if (isDragging) return "grabbing";
+      if (hoveredWallLabelIdRef.current) return "grab";
       // Show grab cursor when hovering over a wall body
       if (mousePos.x !== 0 || mousePos.y !== 0) {
         const hoveredWall = hitTestWall(mousePos.x, mousePos.y, state.walls, state.gridSize, state.zoom, state.panOffset);

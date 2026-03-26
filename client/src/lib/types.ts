@@ -11,6 +11,8 @@ export interface Wall {
   end: Point;
   thickness: number; // in cm
   wallType?: WallType; // defaults to "exterior" (30cm) when creating new walls
+  measurementLabelOffset?: number;    // cm along wall axis from midpoint (positive = toward end)
+  measurementLabelPinned?: boolean;   // true = user manually dragged, skip auto-positioning
 }
 
 export interface FurnitureItem {

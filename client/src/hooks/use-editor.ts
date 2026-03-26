@@ -455,6 +455,16 @@ export function useEditor(storageKey: string = DEFAULT_AUTOSAVE_KEY) {
     setState((s) => ({ ...s, componentLabelsVisible: !s.componentLabelsVisible }));
   }, []);
 
+  /** Update wall measurement label offset — cosmetic preference, NOT added to undo stack */
+  const updateWallLabelOffset = useCallback((id: string, offset: number, pinned: boolean) => {
+    setState((s) => ({
+      ...s,
+      walls: s.walls.map((w) => w.id === id
+        ? { ...w, measurementLabelOffset: offset, measurementLabelPinned: pinned }
+        : w),
+    }));
+  }, []);
+
   const exportState = useCallback(() => {
     return {
       version: 1,
@@ -534,5 +544,6 @@ export function useEditor(storageKey: string = DEFAULT_AUTOSAVE_KEY) {
     setRoomNameForRoom,
     setRoomLabelOffset,
     toggleComponentLabels,
+    updateWallLabelOffset,
   };
 }
