@@ -1,5 +1,13 @@
 {
   "cleanUrls": true,
+  "redirects": [
+    {
+      "source": "/:path(.*)",
+      "has": [{ "type": "host", "value": "www.freeroomplanner.com" }],
+      "destination": "https://freeroomplanner.com/:path",
+      "permanent": true
+    }
+  ],
   "buildCommand": "npx vite build && cp dist/public/index.html dist/public/app.html && cp dist/public/index.html dist/public/embed.html && cp dist/public/index.html dist/public/admin.html && cp dist/public/index.html dist/public/get-embed.html",
   "outputDirectory": "dist/public",
   "framework": null,
