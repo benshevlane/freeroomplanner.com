@@ -28,8 +28,14 @@ function LoginForm({ onSuccess }: { onSuccess: () => void }) {
     try {
       await apiRequest("POST", "/api/admin/login", { password });
       onSuccess();
-    } catch {
-      setError("Invalid password");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.startsWith("401")) {
+        setError("Invalid password");
+      } else {
+        setError("Login failed. Please try again.");
+        console.error("Admin login error:", msg);
+      }
     }
     setLoading(false);
   };
@@ -187,7 +193,7 @@ export default function Admin() {
 
   // Check auth status on mount
   useEffect(() => {
-    fetch("/api/admin/auth-status")
+    fetch("/api/admin/auth-status", { credentials: "include" })
       .then((r) => r.json())
       .then((d) => setIsAuthenticated(d.authenticated))
       .catch(() => setIsAuthenticated(false));
