@@ -296,6 +296,41 @@ export default function PropertiesPanel({
             <span className="text-muted-foreground">Category:</span>
             <span className="font-medium">{selectedFurniture.category}</span>
           </div>
+          {selectedFurniture.type === "door" && (
+            <div className="space-y-1.5 pt-1">
+              <span className="text-muted-foreground">Hinge Side:</span>
+              <div className="flex gap-1">
+                {(["left", "right"] as const).map((side) => {
+                  const isActive = side === "left" ? !selectedFurniture.mirrored : !!selectedFurniture.mirrored;
+                  return (
+                    <Button
+                      key={side}
+                      size="sm"
+                      variant={isActive ? "default" : "outline"}
+                      className="flex-1 text-xs gap-1.5 min-h-[36px] md:min-h-0"
+                      onClick={() => onUpdateFurniture(selectedFurniture.id, { mirrored: side === "right" })}
+                      data-testid={`btn-hinge-${side}`}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                        {side === "left" ? (
+                          <>
+                            <line x1="3" y1="3" x2="3" y2="13" />
+                            <path d="M3 3 Q13 3 13 13" fill="none" />
+                          </>
+                        ) : (
+                          <>
+                            <line x1="13" y1="3" x2="13" y2="13" />
+                            <path d="M13 3 Q3 3 3 13" fill="none" />
+                          </>
+                        )}
+                      </svg>
+                      {side === "left" ? "Left" : "Right"}
+                    </Button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
         <div className="flex gap-1 pt-1">
           <Button size="sm" variant="secondary" onClick={onRotate} className="flex-1 min-h-[44px] md:min-h-0" data-testid="btn-rotate-furniture">
