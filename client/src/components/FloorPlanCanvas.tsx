@@ -1191,8 +1191,8 @@ export default function FloorPlanCanvas({
           const currentAngle = Math.atan2(pos.y - centerY, pos.x - centerX);
           let deltaDeg = ((currentAngle - rotateStartAngle) * 180) / Math.PI;
           let newRot = rotateItemStartRot + deltaDeg;
-          // Snap to 15° increments when within 3° threshold
-          const snapDeg = 15;
+          // Snap to 90° increments when within 3° threshold
+          const snapDeg = 90;
           const nearestSnap = Math.round(newRot / snapDeg) * snapDeg;
           if (Math.abs(newRot - nearestSnap) < 3) newRot = nearestSnap;
           // Normalize to 0-360

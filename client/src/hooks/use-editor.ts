@@ -331,12 +331,9 @@ export function useEditor(storageKey: string = DEFAULT_AUTOSAVE_KEY) {
         const template = FURNITURE_LIBRARY.find((t) => t.type === f.type);
         const snap = template?.rotationSnap ?? 90;
         const newRotation = (f.rotation + snap) % 360;
-        // Only swap width/height for 90° increments
-        const swapDims = snap === 90;
         return {
           ...f,
           rotation: newRotation,
-          ...(swapDims ? { width: f.height, height: f.width } : {}),
         };
       }),
     }));
