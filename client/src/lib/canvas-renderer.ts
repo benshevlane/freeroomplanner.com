@@ -1,4 +1,4 @@
-import { Wall, FurnitureItem, RoomLabel, Arrow, ArrowHeadStyle, Point, UnitSystem, MeasureMode, LabelColor, isWallCupboard } from "./types";
+import { Wall, FurnitureItem, RoomLabel, Arrow, ArrowHeadStyle, Point, UnitSystem, MeasureMode, LabelColor, isWallCupboard, DEFAULT_WALL_THICKNESS } from "./types";
 import { DetectedRoom } from "./room-detection";
 
 const CONNECT_THRESHOLD_EXT = 15; // cm, same as wall snap threshold
@@ -512,7 +512,7 @@ export function drawWalls(
     const ey = wall.end.y * pxPerCm + panOffset.y;
 
     const isSelected = wall.id === selectedId;
-    const halfThick = (wall.thickness * pxPerCm) / 2;
+    const halfThick = ((wall.thickness || DEFAULT_WALL_THICKNESS) * pxPerCm) / 2;
 
     // Compute perpendicular offset for wall polygon corners
     const dx = ex - sx;
@@ -545,7 +545,7 @@ export function drawWalls(
     points.forEach((pt) => {
       const key = `${Math.round(pt.x / CONNECT_THRESHOLD) * CONNECT_THRESHOLD},${Math.round(pt.y / CONNECT_THRESHOLD) * CONNECT_THRESHOLD}`;
       if (!endpointMap.has(key)) endpointMap.set(key, []);
-      endpointMap.get(key)!.push({ ...pt, thickness: wall.thickness, wallId: wall.id });
+      endpointMap.get(key)!.push({ ...pt, thickness: wall.thickness || DEFAULT_WALL_THICKNESS, wallId: wall.id });
     });
   });
   endpointMap.forEach((endpoints) => {
@@ -588,7 +588,7 @@ export function drawWalls(
     const dy = ey - sy;
     const len = Math.sqrt(dx * dx + dy * dy);
     if (len < 0.01) return;
-    const halfThick = (wall.thickness * pxPerCm) / 2;
+    const halfThick = ((wall.thickness || DEFAULT_WALL_THICKNESS) * pxPerCm) / 2;
     const nx = (-dy / len) * halfThick;
     const ny = (dx / len) * halfThick;
 
@@ -620,7 +620,7 @@ export function drawWalls(
   walls.forEach((wall) => {
     if (mergedWallIds.has(wall.id)) return; // will be labeled by group
 
-    const wallThick = wall.thickness || 15;
+    const wallThick = wall.thickness || DEFAULT_WALL_THICKNESS;
 
     // Skip walls with door/window occupants — total measurement is drawn by drawWallSegmentMeasurements
     const occupants = getWallOccupants(wall.start, wall.end, wallThick, doorsWindows);
@@ -645,13 +645,13 @@ export function drawWalls(
     const displayLengthCm = measureMode === "inside"
       ? Math.max(0, lengthCm - wallThick)
       : lengthCm + startExtension + endExtension;
-    drawWallDimensionLabel(ctx, sx, sy, ex, ey, displayLengthCm, wall.thickness * pxPerCm, zoom, isDark, units, wall, furniture, gridSize, panOffset, rooms, walls, measureMode, hoveredWallLabelId);
+    drawWallDimensionLabel(ctx, sx, sy, ex, ey, displayLengthCm, (wall.thickness || DEFAULT_WALL_THICKNESS) * pxPerCm, zoom, isDark, units, wall, furniture, gridSize, panOffset, rooms, walls, measureMode, hoveredWallLabelId);
   });
 
   // Draw merged labels for collinear groups (skip if group has door/window occupants)
   for (const group of collinearGroups.values()) {
     const representativeWallForThickness = walls.find((w) => group.wallIds.has(w.id));
-    const thickness = representativeWallForThickness?.thickness ?? 15;
+    const thickness = representativeWallForThickness?.thickness ?? DEFAULT_WALL_THICKNESS;
 
     // Skip groups with door/window occupants — total measurement is drawn by drawWallSegmentMeasurements
     const groupOccupants = getWallOccupants(group.minP, group.maxP, thickness, doorsWindows);
@@ -1041,11 +1041,11 @@ export function drawWallSegmentMeasurements(
       const group = collinearGroups.get(groupKey)!;
       wallStart = group.minP;
       wallEnd = group.maxP;
-      wallThick = wall.thickness || 15;
+      wallThick = wall.thickness || DEFAULT_WALL_THICKNESS;
     } else {
       wallStart = wall.start;
       wallEnd = wall.end;
-      wallThick = wall.thickness || 15;
+      wallThick = wall.thickness || DEFAULT_WALL_THICKNESS;
     }
 
     const wdx = wallEnd.x - wallStart.x;
@@ -1295,7 +1295,7 @@ export function drawMeasurementIndicatorLines(
     }
 
     // Offset: half wall thickness, direction depends on measure mode
-    const halfThickness = wall.thickness / 2;
+    const halfThickness = (wall.thickness || DEFAULT_WALL_THICKNESS) / 2;
     let offsetX: number, offsetY: number;
     if (measureMode === "inside") {
       offsetX = insideNx * halfThickness;
@@ -1316,7 +1316,7 @@ export function drawMeasurementIndicatorLines(
       startInset = halfThickness;
       endInset = halfThickness;
     } else {
-      const { startExtension, endExtension } = getEndpointExtensions(wall.start, wall.end, wall.thickness, walls);
+      const { startExtension, endExtension } = getEndpointExtensions(wall.start, wall.end, wall.thickness || DEFAULT_WALL_THICKNESS, walls);
       startInset = -startExtension;
       endInset = -endExtension;
     }
@@ -1374,7 +1374,7 @@ function findComponentsOnWall(
     const perp = Math.abs(relX * wallNormX + relY * wallNormY);
 
     // Check if close enough to wall (within wall thickness + item size)
-    const threshold = (wall.thickness || 15) + Math.max(item.width, item.height);
+    const threshold = (wall.thickness || DEFAULT_WALL_THICKNESS) + Math.max(item.width, item.height);
     if (perp > threshold) continue;
 
     // Calculate item extent along wall direction
@@ -1427,7 +1427,7 @@ function computeOutsideLabelOffset(
 
     // Must be within wall extent and close enough perpendicularly
     if (along < -10 || along > wallLen + 10) continue;
-    const threshold = (wall.thickness || 15) + Math.max(item.width, item.height);
+    const threshold = (wall.thickness || DEFAULT_WALL_THICKNESS) + Math.max(item.width, item.height);
     if (perp > threshold) continue;
 
     if (perp < bestDist) {
@@ -1847,7 +1847,7 @@ export function collectWallMeasurementLabelRects(
     const lengthPx = Math.sqrt((ex - sx) ** 2 + (ey - sy) ** 2);
     if (lengthPx < 30) continue;
 
-    const thickness = wall.thickness;
+    const thickness = wall.thickness || DEFAULT_WALL_THICKNESS;
     const { startExtension, endExtension } = getEndpointExtensions(wall.start, wall.end, thickness, walls);
     const halfThick = thickness / 2;
     const displayLengthCm = measureMode === "inside"
@@ -3681,7 +3681,8 @@ export function drawWallPreview(
   angleDeg?: number,
   units: UnitSystem = "m",
   measureMode: MeasureMode = "inside",
-  adjWallAngleRad?: number
+  adjWallAngleRad?: number,
+  wallThickness: number = DEFAULT_WALL_THICKNESS
 ) {
   const pxPerCm = (gridSize * zoom) / 100;
   const sx = start.x * pxPerCm + panOffset.x;
@@ -3690,7 +3691,7 @@ export function drawWallPreview(
   const ey = end.y * pxPerCm + panOffset.y;
 
   ctx.strokeStyle = isDark ? DIMENSION_COLOR_DARK : DIMENSION_COLOR_LIGHT;
-  ctx.lineWidth = 15 * pxPerCm; // 15cm wall
+  ctx.lineWidth = wallThickness * pxPerCm;
   ctx.lineCap = "round";
   ctx.setLineDash([8, 4]);
   ctx.beginPath();
@@ -3703,7 +3704,7 @@ export function drawWallPreview(
   const dx = end.x - start.x;
   const dy = end.y - start.y;
   const lengthCm = Math.sqrt(dx * dx + dy * dy);
-  const wallThick = 15;
+  const wallThick = wallThickness;
   const displayLengthCm = measureMode === "inside"
     ? Math.max(0, lengthCm - wallThick)
     : lengthCm;
@@ -4070,7 +4071,7 @@ export function hitTestWallMeasurementLabel(
   // Test individual wall labels
   for (const wall of walls) {
     if (mergedWallIds.has(wall.id)) continue;
-    const wallThick = wall.thickness || 15;
+    const wallThick = wall.thickness || DEFAULT_WALL_THICKNESS;
     const occupants = getWallOccupants(wall.start, wall.end, wallThick, doorsWindows);
     if (occupants.length > 0) continue;
 
@@ -4093,7 +4094,7 @@ export function hitTestWallMeasurementLabel(
       : lengthCm + startExtension + endExtension;
 
     const pos = computeWallLabelPosition(
-      sx, sy, ex, ey, displayLengthCm, wall.thickness * pxPerCm, zoom,
+      sx, sy, ex, ey, displayLengthCm, (wall.thickness || DEFAULT_WALL_THICKNESS) * pxPerCm, zoom,
       units, wall, furniture, gridSize, panOffset, rooms, walls, measureMode
     );
     if (!pos) continue;
@@ -4164,7 +4165,7 @@ export function hitTestWallLabelResetIcon(
   for (const wall of walls) {
     if (!wall.measurementLabelPinned) continue;
     if (mergedWallIds.has(wall.id)) continue;
-    const wallThick = wall.thickness || 15;
+    const wallThick = wall.thickness || DEFAULT_WALL_THICKNESS;
     const occupants = getWallOccupants(wall.start, wall.end, wallThick, doorsWindows);
     if (occupants.length > 0) continue;
 
@@ -4187,7 +4188,7 @@ export function hitTestWallLabelResetIcon(
       : lengthCm + startExtension + endExtension;
 
     const pos = computeWallLabelPosition(
-      sx, sy, ex, ey, displayLengthCm, wall.thickness * pxPerCm, zoom,
+      sx, sy, ex, ey, displayLengthCm, (wall.thickness || DEFAULT_WALL_THICKNESS) * pxPerCm, zoom,
       units, wall, furniture, gridSize, panOffset, rooms, walls, measureMode
     );
     if (!pos) continue;
@@ -4261,7 +4262,7 @@ export function hitTestWall(
       (screenX - closestX) ** 2 + (screenY - closestY) ** 2
     );
 
-    if (dist < threshold + (wall.thickness * pxPerCm) / 2) {
+    if (dist < threshold + ((wall.thickness || DEFAULT_WALL_THICKNESS) * pxPerCm) / 2) {
       return wall;
     }
   }
@@ -4603,7 +4604,7 @@ function computeEdgeToWallDistances(
       const wallY = (ws.y + we.y) / 2;
       const wallMinX = Math.min(ws.x, we.x);
       const wallMaxX = Math.max(ws.x, we.x);
-      const halfThick = wall.thickness / 2;
+      const halfThick = (wall.thickness || DEFAULT_WALL_THICKNESS) / 2;
 
       // Check overlap in X range
       if (bb.right > wallMinX && bb.left < wallMaxX) {
@@ -4642,7 +4643,7 @@ function computeEdgeToWallDistances(
       const wallX = (ws.x + we.x) / 2;
       const wallMinY = Math.min(ws.y, we.y);
       const wallMaxY = Math.max(ws.y, we.y);
-      const halfThick = wall.thickness / 2;
+      const halfThick = (wall.thickness || DEFAULT_WALL_THICKNESS) / 2;
 
       // Check overlap in Y range
       if (bb.bottom > wallMinY && bb.top < wallMaxY) {
@@ -4757,7 +4758,7 @@ function findHostWall(item: FurnitureItem, walls: Wall[]): Wall | null {
     const perp = Math.abs(relX * wallNormX + relY * wallNormY);
 
     const halfExtent = Math.max(item.width, item.height) / 2;
-    const threshold = (wall.thickness || 15) / 2 + Math.min(item.width, item.height);
+    const threshold = (wall.thickness || DEFAULT_WALL_THICKNESS) / 2 + Math.min(item.width, item.height);
     if (perp > threshold) continue;
     if (along > -halfExtent && along < wallLen + halfExtent) return wall;
   }
@@ -4778,7 +4779,7 @@ function computeAlongWallDistances(
 
   // Inset wall endpoints by half thickness so measurement lines stop at the
   // inner wall face instead of the centerline (which visually appears mid-wall).
-  const halfThick = (wall.thickness || 15) / 2;
+  const halfThick = (wall.thickness || DEFAULT_WALL_THICKNESS) / 2;
 
   const cx = item.x + item.width / 2;
   const cy = item.y + item.height / 2;
@@ -5097,7 +5098,8 @@ export function snapFurnitureToWalls(
     const wlen = Math.sqrt(wdx * wdx + wdy * wdy);
     if (wlen < 1) continue;
 
-    const halfThick = wall.thickness / 2;
+    const wallThick = wall.thickness || DEFAULT_WALL_THICKNESS;
+    const halfThick = wallThick / 2;
     const isHorizontal = Math.abs(wdy / wlen) < 0.15;
     const isVertical = Math.abs(wdx / wlen) < 0.15;
 
@@ -5126,7 +5128,7 @@ export function snapFurnitureToWalls(
         if (candidates.length > 0) {
           candidates.sort((a, b) => a.dist - b.dist);
           y = candidates[0].newY;
-          didSnap = true; snappedWallThickness = wall.thickness;
+          didSnap = true; snappedWallThickness = wallThick;
           snappedEdges.push({ wall, axis: 'y', edgeCoord: candidates[0].edgeCoord, segStart: wallMinX, segEnd: wallMaxX });
         }
       }
@@ -5135,12 +5137,12 @@ export function snapFurnitureToWalls(
         // Left edge to wall left end
         if (Math.abs(bb.left - wallMinX) < threshold) {
           x = wallMinX - aabbOffX;
-          didSnap = true; snappedWallThickness = wall.thickness;
+          didSnap = true; snappedWallThickness = wallThick;
         }
         // Right edge to wall right end
         if (Math.abs(bb.right - wallMaxX) < threshold) {
           x = wallMaxX - aabbW - aabbOffX;
-          didSnap = true; snappedWallThickness = wall.thickness;
+          didSnap = true; snappedWallThickness = wallThick;
         }
       }
     }
@@ -5170,7 +5172,7 @@ export function snapFurnitureToWalls(
         if (candidates.length > 0) {
           candidates.sort((a, b) => a.dist - b.dist);
           x = candidates[0].newX;
-          didSnap = true; snappedWallThickness = wall.thickness;
+          didSnap = true; snappedWallThickness = wallThick;
           snappedEdges.push({ wall, axis: 'x', edgeCoord: candidates[0].edgeCoord, segStart: wallMinY, segEnd: wallMaxY });
         }
       }
@@ -5179,12 +5181,12 @@ export function snapFurnitureToWalls(
         // Top edge to wall top end
         if (Math.abs(bb.top - wallMinY) < threshold) {
           y = wallMinY - aabbOffY;
-          didSnap = true; snappedWallThickness = wall.thickness;
+          didSnap = true; snappedWallThickness = wallThick;
         }
         // Bottom edge to wall bottom end
         if (Math.abs(bb.bottom - wallMaxY) < threshold) {
           y = wallMaxY - aabbH - aabbOffY;
-          didSnap = true; snappedWallThickness = wall.thickness;
+          didSnap = true; snappedWallThickness = wallThick;
         }
       }
     }
@@ -5540,7 +5542,7 @@ export function drawEraserHighlight(
 
     ctx.save();
     ctx.strokeStyle = ERASER_COLOR;
-    ctx.lineWidth = wall.thickness * pxPerCm + 4;
+    ctx.lineWidth = (wall.thickness || DEFAULT_WALL_THICKNESS) * pxPerCm + 4;
     ctx.lineCap = "round";
     ctx.globalAlpha = 0.35;
     ctx.beginPath();
@@ -5550,7 +5552,7 @@ export function drawEraserHighlight(
 
     // Red outline on top
     ctx.globalAlpha = 1;
-    ctx.lineWidth = wall.thickness * pxPerCm + 4;
+    ctx.lineWidth = (wall.thickness || DEFAULT_WALL_THICKNESS) * pxPerCm + 4;
     ctx.setLineDash([6, 4]);
     ctx.beginPath();
     ctx.moveTo(sx, sy);
@@ -6360,7 +6362,7 @@ export function drawWallLabelsWithDiscrepancy(
     if (mx < -50 || mx > canvasWidth + 50 || my < -50 || my > canvasHeight + 50) return;
 
     const displayLengthCm = measureMode === "inside"
-      ? Math.max(0, lengthCm - 2 * (wall.thickness || 15))
+      ? Math.max(0, lengthCm - 2 * (wall.thickness || DEFAULT_WALL_THICKNESS))
       : lengthCm;
     const baseFontSize = Math.max(11, 12 * zoom);
     const text = formatLength(displayLengthCm, units);
