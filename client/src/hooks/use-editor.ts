@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from "react";
-import { EditorState, RoomData, Wall, FurnitureItem, RoomLabel, TextBox, Arrow, Point, EditorTool, FurnitureTemplate, UnitSystem, DEFAULT_TEXT_BOX, DEFAULT_ARROW, FURNITURE_LIBRARY } from "../lib/types";
+import { EditorState, RoomData, Wall, FurnitureItem, RoomLabel, TextBox, Arrow, Point, EditorTool, FurnitureTemplate, UnitSystem, DEFAULT_TEXT_BOX, DEFAULT_ARROW, FURNITURE_LIBRARY, DEFAULT_WALL_THICKNESS } from "../lib/types";
 
 const DEFAULT_AUTOSAVE_KEY = "freeroomplanner-autosave";
 
@@ -142,6 +142,13 @@ function makeDefaultState(): EditorState {
   };
 }
 
+function normalizeWalls(walls: any[]): Wall[] {
+  return walls.map((w: any) => ({
+    ...w,
+    thickness: w.thickness ?? DEFAULT_WALL_THICKNESS,
+  }));
+}
+
 function normalizeFurniture(furniture: any[]): FurnitureItem[] {
   return furniture.map((f: any) => ({
     ...f,
@@ -165,7 +172,7 @@ function getInitialState(storageKey: string): EditorState {
   const rooms: RoomData[] = (saved.rooms ?? defaultState.rooms).map((r: any) => ({
     ...r,
     furniture: normalizeFurniture(r.furniture ?? []),
-    walls: r.walls ?? [],
+    walls: normalizeWalls(r.walls ?? []),
     labels: r.labels ?? [],
     textBoxes: r.textBoxes ?? [],
     arrows: r.arrows ?? [],
@@ -269,7 +276,7 @@ export function useEditor(storageKey: string = DEFAULT_AUTOSAVE_KEY) {
       id: generateId(),
       start,
       end,
-      thickness: 15,
+      thickness: DEFAULT_WALL_THICKNESS,
     };
     setState((s) => ({ ...s, walls: [...s.walls, wall] }));
   }, [pushUndo]);
@@ -437,7 +444,7 @@ export function useEditor(storageKey: string = DEFAULT_AUTOSAVE_KEY) {
       newWalls.push({ id: generateId(), start: wall.start, end: splitPoint, thickness: wall.thickness });
       newWalls.push({ id: generateId(), start: splitPoint, end: wall.end, thickness: wall.thickness });
       // Add the connecting wall from the drawing start to the split point
-      newWalls.push({ id: generateId(), start: newWallStart, end: splitPoint, thickness: 15 });
+      newWalls.push({ id: generateId(), start: newWallStart, end: splitPoint, thickness: DEFAULT_WALL_THICKNESS });
       return { ...s, walls: newWalls };
     });
   }, [pushUndo]);
@@ -644,7 +651,7 @@ export function useEditor(storageKey: string = DEFAULT_AUTOSAVE_KEY) {
         rooms: syncedRooms,
         activeRoomId: roomId,
         roomName: targetRoom.name,
-        walls: targetRoom.walls,
+        walls: normalizeWalls(targetRoom.walls),
         furniture: normalizeFurniture(targetRoom.furniture),
         labels: targetRoom.labels,
         textBoxes: targetRoom.textBoxes,
