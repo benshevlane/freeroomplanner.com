@@ -5479,6 +5479,42 @@ export function drawComponentSnapIndicators(
   ctx.restore();
 }
 
+/** Draw hover highlight on furniture when select tool is active */
+export function drawSelectHoverHighlight(
+  ctx: CanvasRenderingContext2D,
+  hoveredId: string,
+  furniture: FurnitureItem[],
+  gridSize: number,
+  zoom: number,
+  panOffset: Point
+) {
+  const pxPerCm = (gridSize * zoom) / 100;
+  const item = furniture.find((f) => f.id === hoveredId);
+  if (!item) return;
+
+  const x = item.x * pxPerCm + panOffset.x;
+  const y = item.y * pxPerCm + panOffset.y;
+  const w = item.width * pxPerCm;
+  const h = item.height * pxPerCm;
+
+  ctx.save();
+  ctx.translate(x + w / 2, y + h / 2);
+  ctx.rotate((item.rotation * Math.PI) / 180);
+
+  // Subtle teal fill
+  ctx.fillStyle = "rgba(1, 105, 111, 0.10)";
+  ctx.fillRect(-w / 2 - 3, -h / 2 - 3, w + 6, h + 6);
+
+  // Dashed teal border
+  ctx.strokeStyle = "rgba(1, 105, 111, 0.5)";
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([4, 3]);
+  ctx.strokeRect(-w / 2 - 3, -h / 2 - 3, w + 6, h + 6);
+  ctx.setLineDash([]);
+
+  ctx.restore();
+}
+
 /** Draw eraser hover highlight on the item that will be deleted */
 export function drawEraserHighlight(
   ctx: CanvasRenderingContext2D,
