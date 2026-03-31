@@ -890,6 +890,7 @@ export default function FloorPlanCanvas({
             isDark, state.units, measureMode, state.furniture, wallLabelRooms
           );
           if (labelHit) {
+            onPushUndo();
             setIsDraggingWallLabel(true);
             setDraggingWallLabelId(labelHit.id);
             // Use pointer capture to isolate drag from other interactions
