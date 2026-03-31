@@ -1749,17 +1749,20 @@ function computeWallLabelPosition(
   // Check if label is pinned (user-dragged)
   let labelFrac = 0.5;
   let flippedSide = false;
-  const defaultFrac = 0.5;
+  let defaultFrac = 0.5;
 
+  // If pinned, compute the user's chosen fraction and use it as the starting point
   if (wall?.measurementLabelPinned && wall.measurementLabelOffset !== undefined) {
-    // Convert cm offset from midpoint to fraction
     const wallLenCm = Math.sqrt((wall.end.x - wall.start.x) ** 2 + (wall.end.y - wall.start.y) ** 2);
     if (wallLenCm > 0) {
-      labelFrac = 0.5 + wall.measurementLabelOffset / wallLenCm;
-      labelFrac = Math.max(0.05, Math.min(0.95, labelFrac));
+      const pinnedFrac = Math.max(0.05, Math.min(0.95, 0.5 + wall.measurementLabelOffset / wallLenCm));
+      labelFrac = pinnedFrac;
+      defaultFrac = pinnedFrac;
     }
-  } else if (wall && furniture && gridSize && panOffset) {
-    // Auto-positioning: avoid doors/windows
+  }
+
+  // Auto-positioning: avoid doors/windows/furniture (runs for both pinned and unpinned labels)
+  if (wall && furniture && gridSize && panOffset) {
     const doorOccupants = findComponentsOnWall(wall, furniture, gridSize, zoom, panOffset);
 
     // Also avoid general furniture near label zone
@@ -1772,21 +1775,30 @@ function computeWallLabelPosition(
 
     if (allOccupants.length > 0) {
       const textFrac = wallLengthPx > 0 ? (textWidth + pad * 2) / wallLengthPx : 1;
-      const result = findOptimalLabelPosition(allOccupants, textFrac);
-      labelFrac = result.position;
+      const halfText = textFrac / 2;
 
-      // If no clear gap on this side, try opposite side
-      if (result.offsetPerp) {
-        const oppPerpOffset = -perpOffsetPx;
-        const oppFurnitureOccupants = findFurnitureNearWallLabel(
-          wall, furniture, -insideNormX, -insideNormY, oppPerpOffset, pxPerCm
-        );
-        const oppAllOccupants = [...doorOccupants, ...oppFurnitureOccupants].sort((a, b) => a.start - b.start);
-        const oppResult = findOptimalLabelPosition(oppAllOccupants, textFrac);
-        if (!oppResult.offsetPerp) {
-          // Opposite side has clear space — flip
-          labelFrac = oppResult.position;
-          flippedSide = true;
+      // Check if the current position (pinned or default) collides with any occupant
+      const hasCollision = allOccupants.some(
+        occ => occ.start < labelFrac + halfText && occ.end > labelFrac - halfText
+      );
+
+      if (hasCollision) {
+        const result = findOptimalLabelPosition(allOccupants, textFrac);
+        labelFrac = result.position;
+
+        // If no clear gap on this side, try opposite side
+        if (result.offsetPerp) {
+          const oppPerpOffset = -perpOffsetPx;
+          const oppFurnitureOccupants = findFurnitureNearWallLabel(
+            wall, furniture, -insideNormX, -insideNormY, oppPerpOffset, pxPerCm
+          );
+          const oppAllOccupants = [...doorOccupants, ...oppFurnitureOccupants].sort((a, b) => a.start - b.start);
+          const oppResult = findOptimalLabelPosition(oppAllOccupants, textFrac);
+          if (!oppResult.offsetPerp) {
+            // Opposite side has clear space — flip
+            labelFrac = oppResult.position;
+            flippedSide = true;
+          }
         }
       }
     }
@@ -1930,8 +1942,8 @@ function drawWallDimensionLabel(
   const isHovered = wall?.id != null && hoveredWallLabelId === wall.id;
   const isPinned = wall?.measurementLabelPinned === true;
 
-  // Draw leader line when label moved from default position
-  if (Math.abs(labelFrac - defaultFrac) > 0.02 && !isPinned) {
+  // Draw leader line when label moved from default/pinned position
+  if (Math.abs(labelFrac - defaultFrac) > 0.02) {
     const midX = sx + (ex - sx) * defaultFrac;
     const midY = sy + (ey - sy) * defaultFrac;
     const midLabelX = midX + insideNormX * perpOffsetPx;

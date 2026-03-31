@@ -865,6 +865,7 @@ export default function FloorPlanCanvas({
             isDark, state.units, measureMode, state.furniture, wallLabelRooms
           );
           if (labelHit) {
+            onPushUndo();
             setIsDraggingWallLabel(true);
             setDraggingWallLabelId(labelHit.id);
             // Use pointer capture to isolate drag from other interactions
@@ -1981,7 +1982,7 @@ export default function FloorPlanCanvas({
     if (state.selectedTool === "select") {
       if (isDragging) return "grabbing";
       if (emptyCanvasDragStart.current) return "grabbing";
-      if (hoveredWallLabelIdRef.current) return "default";
+      if (hoveredWallLabelIdRef.current) return "grab";
       // Show pointer cursor when hovering over items, grab cursor on empty canvas
       if (mousePos.x !== 0 || mousePos.y !== 0) {
         const canvas = canvasRef.current;
