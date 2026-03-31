@@ -578,6 +578,41 @@ export function drawWalls(
     ctx.fill();
   });
 
+  // Fourth pass: dashed edge strokes along inner and outer wall faces
+  walls.forEach((wall) => {
+    const sx = wall.start.x * pxPerCm + panOffset.x;
+    const sy = wall.start.y * pxPerCm + panOffset.y;
+    const ex = wall.end.x * pxPerCm + panOffset.x;
+    const ey = wall.end.y * pxPerCm + panOffset.y;
+    const dx = ex - sx;
+    const dy = ey - sy;
+    const len = Math.sqrt(dx * dx + dy * dy);
+    if (len < 0.01) return;
+    const halfThick = (wall.thickness * pxPerCm) / 2;
+    const nx = (-dy / len) * halfThick;
+    const ny = (dx / len) * halfThick;
+
+    const isSelected = wall.id === selectedId;
+    if (isSelected) return; // skip for selected walls (already highlighted)
+
+    ctx.save();
+    ctx.setLineDash([8, 4]);
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = isDark ? "rgba(255, 255, 255, 0.18)" : "rgba(0, 0, 0, 0.15)";
+    // Inner face
+    ctx.beginPath();
+    ctx.moveTo(sx + nx, sy + ny);
+    ctx.lineTo(ex + nx, ey + ny);
+    ctx.stroke();
+    // Outer face
+    ctx.beginPath();
+    ctx.moveTo(sx - nx, sy - ny);
+    ctx.lineTo(ex - nx, ey - ny);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+  });
+
   // Identify doors/windows for occupant checks
   const doorsWindows = furniture.filter((f) => f.type === "door" || f.type === "door_double" || f.type === "window");
 
@@ -1572,7 +1607,11 @@ function computeWallLabelPosition(
   const wallLengthPx = Math.sqrt((ex - sx) ** 2 + (ey - sy) ** 2);
 
   const baseFontSize = Math.max(11, 12 * zoom);
-  const text = formatLength(lengthCm, units);
+  let text = formatLength(lengthCm, units);
+  // Add measurement mode suffix
+  if (measureMode === "full") {
+    text += " (outside wall)";
+  }
 
   // Measure text width — use ctx if available, else estimate
   let textWidth: number;
@@ -1645,9 +1684,9 @@ function computeWallLabelPosition(
     }
   }
 
-  // Perpendicular offset
-  const dirSign = measureMode === "inside" ? 1 : -1;
-  const perpOffsetPx = dirSign * (wallThicknessPx / 2 + baseFontSize * 0.6 + 4);
+  // Perpendicular offset — always render outside the room boundary
+  const dirSign = -1;
+  const perpOffsetPx = dirSign * (wallThicknessPx / 2 + baseFontSize * 0.6 + 8);
 
   const pxPerCm = (gridSize && zoom) ? (gridSize * zoom) / 100 : 1;
 
@@ -1719,6 +1758,92 @@ function computeWallLabelPosition(
     wallStartScreen: { x: sx, y: sy },
     wallEndScreen: { x: ex, y: ey },
   };
+}
+
+/** Collect bounding boxes of all wall measurement labels for collision avoidance */
+export function collectWallMeasurementLabelRects(
+  walls: Wall[],
+  gridSize: number,
+  zoom: number,
+  panOffset: Point,
+  units: UnitSystem = "m",
+  measureMode: MeasureMode = "inside",
+  furniture: FurnitureItem[] = [],
+  rooms: DetectedRoom[] = [],
+  ctx?: CanvasRenderingContext2D
+): { centerX: number; centerY: number; halfW: number; halfH: number }[] {
+  const pxPerCm = (gridSize * zoom) / 100;
+  const results: { centerX: number; centerY: number; halfW: number; halfH: number }[] = [];
+
+  const collinearGroups = findCollinearGroups(walls);
+  const mergedWallIds = new Set<string>();
+  for (const group of collinearGroups.values()) {
+    for (const id of group.wallIds) mergedWallIds.add(id);
+  }
+
+  // Individual walls (not merged)
+  for (const wall of walls) {
+    if (mergedWallIds.has(wall.id)) continue;
+    const sx = wall.start.x * pxPerCm + panOffset.x;
+    const sy = wall.start.y * pxPerCm + panOffset.y;
+    const ex = wall.end.x * pxPerCm + panOffset.x;
+    const ey = wall.end.y * pxPerCm + panOffset.y;
+    const lengthPx = Math.sqrt((ex - sx) ** 2 + (ey - sy) ** 2);
+    if (lengthPx < 30) continue;
+
+    const thickness = wall.thickness;
+    const { startExtension, endExtension } = getEndpointExtensions(wall.start, wall.end, thickness, walls);
+    const halfThick = thickness / 2;
+    const displayLengthCm = measureMode === "inside"
+      ? Math.sqrt((wall.end.x - wall.start.x) ** 2 + (wall.end.y - wall.start.y) ** 2) - thickness
+      : Math.sqrt((wall.end.x - wall.start.x) ** 2 + (wall.end.y - wall.start.y) ** 2) + startExtension + endExtension;
+
+    const pos = computeWallLabelPosition(
+      sx, sy, ex, ey, displayLengthCm, thickness * pxPerCm, zoom,
+      units, wall, furniture, gridSize, panOffset, rooms, walls, measureMode, ctx
+    );
+    if (pos) {
+      results.push({
+        centerX: pos.finalX,
+        centerY: pos.finalY,
+        halfW: pos.textWidth / 2 + pos.pad + 4,
+        halfH: pos.baseFontSize / 2 + pos.pad + 4,
+      });
+    }
+  }
+
+  // Merged groups
+  for (const group of collinearGroups.values()) {
+    const sx = group.mergedStart.x * pxPerCm + panOffset.x;
+    const sy = group.mergedStart.y * pxPerCm + panOffset.y;
+    const ex = group.mergedEnd.x * pxPerCm + panOffset.x;
+    const ey = group.mergedEnd.y * pxPerCm + panOffset.y;
+    const lengthPx = Math.sqrt((ex - sx) ** 2 + (ey - sy) ** 2);
+    if (lengthPx < 30) continue;
+
+    const thickness = group.thickness;
+    const { startExtension, endExtension } = getEndpointExtensions(group.mergedStart, group.mergedEnd, thickness, walls);
+    const halfThick = thickness / 2;
+    const displayLengthCm = measureMode === "inside"
+      ? group.totalLengthCm - thickness
+      : group.totalLengthCm + startExtension + endExtension;
+
+    const representativeWall = walls.find(w => group.wallIds.has(w.id));
+    const pos = computeWallLabelPosition(
+      sx, sy, ex, ey, displayLengthCm, thickness * pxPerCm, zoom,
+      units, representativeWall, furniture, gridSize, panOffset, rooms, walls, measureMode, ctx
+    );
+    if (pos) {
+      results.push({
+        centerX: pos.finalX,
+        centerY: pos.finalY,
+        halfW: pos.textWidth / 2 + pos.pad + 4,
+        halfH: pos.baseFontSize / 2 + pos.pad + 4,
+      });
+    }
+  }
+
+  return results;
 }
 
 /** Shared helper to draw a wall dimension label */
@@ -1876,6 +2001,10 @@ export function drawFurniture(
       ctx.moveTo(w / 2, -h / 2);
       ctx.lineTo(-w / 2, h / 2);
       ctx.stroke();
+    } else if (item.type === "internal_wall") {
+      // Internal wall: solid dark fill matching exterior wall color
+      ctx.fillStyle = isSelected ? SELECT_COLOR : (isDark ? WALL_COLOR_DARK : WALL_COLOR_LIGHT);
+      ctx.fillRect(-w / 2, -h / 2, w, h);
     } else {
       // Fill
       ctx.fillStyle = isDark ? FURNITURE_FILL_DARK : FURNITURE_FILL_LIGHT;
@@ -1926,13 +2055,30 @@ function drawFurnitureDetail(
       ctx.arc(-w * 0.25, -h * 0.25, 3, 0, Math.PI * 2);
       ctx.fill();
       break;
-    case "toilet":
-      ctx.beginPath();
-      ctx.ellipse(0, h * 0.1, w * 0.35, h * 0.3, 0, 0, Math.PI * 2);
-      ctx.stroke();
+    case "toilet": {
+      // Cistern rectangle at top
       ctx.fillStyle = stroke;
-      ctx.fillRect(-w * 0.35, -h * 0.45, w * 0.7, h * 0.15);
+      ctx.globalAlpha = 0.12;
+      ctx.fillRect(-w * 0.4, -h / 2, w * 0.8, h * 0.22);
+      ctx.globalAlpha = 1;
+      ctx.strokeRect(-w * 0.4, -h / 2, w * 0.8, h * 0.22);
+      // Rounder seat (circular)
+      const tSeatR = w * 0.38;
+      ctx.beginPath();
+      ctx.arc(0, h * 0.1, tSeatR, 0, Math.PI * 2);
+      ctx.stroke();
+      // Inner bowl
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.06;
+      ctx.beginPath();
+      ctx.arc(0, h * 0.1, tSeatR * 0.65, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.beginPath();
+      ctx.arc(0, h * 0.1, tSeatR * 0.65, 0, Math.PI * 2);
+      ctx.stroke();
       break;
+    }
     case "basin":
       ctx.beginPath();
       ctx.ellipse(0, 0, w * 0.35, h * 0.3, 0, 0, Math.PI * 2);
@@ -2709,70 +2855,12 @@ function drawFurnitureDetail(
       break;
     }
     case "shower_screen": {
-      // Tray fill
-      ctx.fillStyle = stroke;
-      ctx.globalAlpha = 0.05;
+      // Thin glass panel — semi-transparent light blue fill + solid border
+      ctx.fillStyle = isDark ? "rgba(120, 180, 210, 0.35)" : "rgba(173, 216, 230, 0.4)";
       ctx.fillRect(-w / 2, -h / 2, w, h);
-      ctx.globalAlpha = 1;
-      // Screen panel bar at bottom
-      ctx.fillStyle = stroke;
-      ctx.globalAlpha = 0.15;
-      ctx.fillRect(-w / 2, h * 0.35, w * 0.49, h * 0.07);
-      ctx.globalAlpha = 0.08;
-      ctx.fillRect(0, h * 0.35, w * 0.49, h * 0.07);
-      ctx.globalAlpha = 1;
-      ctx.strokeRect(-w / 2, h * 0.35, w * 0.49, h * 0.07);
-      ctx.strokeRect(0, h * 0.35, w * 0.49, h * 0.07);
-      // Hinge/handle dots
-      ctx.fillStyle = stroke;
-      ctx.globalAlpha = 0.5;
-      ctx.beginPath();
-      ctx.arc(-w * 0.03, h * 0.39, 2, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.arc(w * 0.05, h * 0.39, 2, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.globalAlpha = 1;
-      // Shower head circle top-right
-      const ssShX = w * 0.3;
-      const ssShY = -h * 0.25;
-      const ssShR = Math.min(w, h) * 0.16;
-      ctx.fillStyle = stroke;
-      ctx.globalAlpha = 0.08;
-      ctx.beginPath();
-      ctx.arc(ssShX, ssShY, ssShR, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.globalAlpha = 1;
-      ctx.beginPath();
-      ctx.arc(ssShX, ssShY, ssShR, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.arc(ssShX, ssShY, ssShR * 0.4, 0, Math.PI * 2);
-      ctx.stroke();
-      // Spray dots
-      ctx.fillStyle = stroke;
-      ctx.globalAlpha = 0.5;
-      for (const [dx, dy] of [[-0.05, -0.06], [0, -0.08], [0.05, -0.06], [-0.07, 0], [0.07, 0], [-0.05, 0.06], [0.05, 0.06]]) {
-        ctx.beginPath();
-        ctx.arc(ssShX + w * dx, ssShY + h * dy, 1.5, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      ctx.globalAlpha = 1;
-      // Drain cross bottom-left
-      const ssDx = -w * 0.3;
-      const ssDy = h * 0.15;
-      ctx.fillStyle = stroke;
-      ctx.globalAlpha = 0.5;
-      ctx.beginPath();
-      ctx.arc(ssDx, ssDy, w * 0.04, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.moveTo(ssDx - w * 0.03, ssDy);
-      ctx.lineTo(ssDx + w * 0.03, ssDy);
-      ctx.moveTo(ssDx, ssDy - h * 0.04);
-      ctx.lineTo(ssDx, ssDy + h * 0.04);
-      ctx.stroke();
-      ctx.globalAlpha = 1;
+      ctx.strokeStyle = isDark ? "rgba(150, 200, 220, 0.7)" : "rgba(100, 160, 190, 0.8)";
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(-w / 2, -h / 2, w, h);
       break;
     }
     case "wc_wallhung": {
@@ -2788,24 +2876,26 @@ function drawFurnitureDetail(
       ctx.ellipse(0, -h / 2 + h * 0.095, w * 0.15, h * 0.047, 0, 0, Math.PI * 2);
       ctx.stroke();
       ctx.globalAlpha = 1;
-      // Bowl: rounded bottom shape
-      const wcwhTop = -h / 2 + h * 0.21;
+      // Rounder seat (circular)
+      const wcwhSeatR = w * 0.4;
+      const wcwhSeatY = -h / 2 + h * 0.21 + wcwhSeatR;
       ctx.beginPath();
-      ctx.moveTo(-w * 0.43, wcwhTop);
-      ctx.lineTo(w * 0.43, wcwhTop);
-      ctx.quadraticCurveTo(w * 0.47, h * 0.2, 0, h / 2);
-      ctx.quadraticCurveTo(-w * 0.47, h * 0.2, -w * 0.43, wcwhTop);
-      ctx.closePath();
+      ctx.arc(0, wcwhSeatY, wcwhSeatR, 0, Math.PI * 2);
       ctx.stroke();
-      // Inner bowl ellipse
+      // Flat top edge across cistern junction
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.43, -h / 2 + h * 0.21);
+      ctx.lineTo(w * 0.43, -h / 2 + h * 0.21);
+      ctx.stroke();
+      // Inner bowl circle
       ctx.fillStyle = stroke;
       ctx.globalAlpha = 0.06;
       ctx.beginPath();
-      ctx.ellipse(0, h * 0.1, w * 0.28, h * 0.23, 0, 0, Math.PI * 2);
+      ctx.arc(0, wcwhSeatY, wcwhSeatR * 0.65, 0, Math.PI * 2);
       ctx.fill();
       ctx.globalAlpha = 1;
       ctx.beginPath();
-      ctx.ellipse(0, h * 0.1, w * 0.28, h * 0.23, 0, 0, Math.PI * 2);
+      ctx.arc(0, wcwhSeatY, wcwhSeatR * 0.65, 0, Math.PI * 2);
       ctx.stroke();
       break;
     }
@@ -2826,24 +2916,26 @@ function drawFurnitureDetail(
       ctx.ellipse(0, -h / 2 + h * 0.12, w * 0.17, h * 0.045, 0, 0, Math.PI * 2);
       ctx.stroke();
       ctx.globalAlpha = 1;
-      // Bowl: rounded bottom shape
-      const wcbwTop = -h / 2 + h * 0.26;
+      // Rounder seat (circular)
+      const wcbwSeatR = w * 0.4;
+      const wcbwSeatY = -h / 2 + h * 0.26 + wcbwSeatR;
       ctx.beginPath();
-      ctx.moveTo(-w * 0.43, wcbwTop);
-      ctx.lineTo(w * 0.43, wcbwTop);
-      ctx.quadraticCurveTo(w * 0.47, h * 0.2, 0, h / 2);
-      ctx.quadraticCurveTo(-w * 0.47, h * 0.2, -w * 0.43, wcbwTop);
-      ctx.closePath();
+      ctx.arc(0, wcbwSeatY, wcbwSeatR, 0, Math.PI * 2);
       ctx.stroke();
-      // Inner bowl ellipse
+      // Flat top edge across cistern junction
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.43, -h / 2 + h * 0.26);
+      ctx.lineTo(w * 0.43, -h / 2 + h * 0.26);
+      ctx.stroke();
+      // Inner bowl circle
       ctx.fillStyle = stroke;
       ctx.globalAlpha = 0.06;
       ctx.beginPath();
-      ctx.ellipse(0, h * 0.12, w * 0.28, h * 0.22, 0, 0, Math.PI * 2);
+      ctx.arc(0, wcbwSeatY, wcbwSeatR * 0.65, 0, Math.PI * 2);
       ctx.fill();
       ctx.globalAlpha = 1;
       ctx.beginPath();
-      ctx.ellipse(0, h * 0.12, w * 0.28, h * 0.22, 0, 0, Math.PI * 2);
+      ctx.arc(0, wcbwSeatY, wcbwSeatR * 0.65, 0, Math.PI * 2);
       ctx.stroke();
       break;
     }
@@ -3094,6 +3186,120 @@ function drawFurnitureDetail(
       ctx.globalAlpha = 1;
       break;
     }
+    case "shower_drain_round": {
+      // Dark grey filled circle with smaller inner circle (drain appearance)
+      const sdrR = Math.min(w, h) * 0.42;
+      ctx.fillStyle = isDark ? "#555" : "#4a4a4a";
+      ctx.beginPath();
+      ctx.arc(0, 0, sdrR, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = isDark ? "#777" : "#333";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      // Inner circle
+      ctx.fillStyle = isDark ? "#333" : "#2a2a2a";
+      ctx.beginPath();
+      ctx.arc(0, 0, sdrR * 0.45, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = isDark ? "#555" : "#1a1a1a";
+      ctx.stroke();
+      // Cross lines
+      ctx.strokeStyle = isDark ? "#666" : "#555";
+      ctx.lineWidth = 0.8;
+      ctx.beginPath();
+      ctx.moveTo(-sdrR * 0.3, 0); ctx.lineTo(sdrR * 0.3, 0);
+      ctx.moveTo(0, -sdrR * 0.3); ctx.lineTo(0, sdrR * 0.3);
+      ctx.stroke();
+      break;
+    }
+    case "shower_drain_linear": {
+      // Dark grey filled rectangle with horizontal line details
+      ctx.fillStyle = isDark ? "#555" : "#4a4a4a";
+      ctx.fillRect(-w / 2, -h / 2, w, h);
+      ctx.strokeStyle = isDark ? "#777" : "#333";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(-w / 2, -h / 2, w, h);
+      // Horizontal slot lines
+      ctx.strokeStyle = isDark ? "#333" : "#2a2a2a";
+      ctx.lineWidth = 0.8;
+      const slotCount = Math.max(3, Math.round(w / 12));
+      const slotSpacing = w / (slotCount + 1);
+      for (let i = 1; i <= slotCount; i++) {
+        const sx = -w / 2 + i * slotSpacing;
+        ctx.beginPath();
+        ctx.moveTo(sx, -h * 0.25);
+        ctx.lineTo(sx, h * 0.25);
+        ctx.stroke();
+      }
+      break;
+    }
+    case "shower_head": {
+      // Top-down: circle disc (shower rose) with short arm line from top edge
+      const shR = Math.min(w, h) * 0.38;
+      // Arm line from top edge to circle
+      ctx.strokeStyle = stroke;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(0, -h / 2);
+      ctx.lineTo(0, -shR);
+      ctx.stroke();
+      // Outer disc
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.08;
+      ctx.beginPath();
+      ctx.arc(0, 0, shR, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(0, 0, shR, 0, Math.PI * 2);
+      ctx.stroke();
+      // Inner ring
+      ctx.beginPath();
+      ctx.arc(0, 0, shR * 0.5, 0, Math.PI * 2);
+      ctx.stroke();
+      // Spray dots
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.5;
+      for (const [dx, dy] of [[-0.2, -0.2], [0, -0.28], [0.2, -0.2], [-0.28, 0], [0.28, 0], [-0.2, 0.2], [0, 0.28], [0.2, 0.2]]) {
+        ctx.beginPath();
+        ctx.arc(shR * dx, shR * dy, 1.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+      break;
+    }
+    case "shower_mixer": {
+      // Small rectangular panel flush to wall with circle dial
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.1;
+      ctx.fillRect(-w / 2, -h / 2, w, h);
+      ctx.globalAlpha = 1;
+      ctx.strokeRect(-w * 0.42, -h * 0.42, w * 0.84, h * 0.84);
+      // Dial circle
+      const smR = Math.min(w, h) * 0.28;
+      ctx.beginPath();
+      ctx.arc(0, 0, smR, 0, Math.PI * 2);
+      ctx.stroke();
+      // Dial indicator line
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(0, -smR * 0.7);
+      ctx.stroke();
+      ctx.lineWidth = 1;
+      // Center dot
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.5;
+      ctx.beginPath();
+      ctx.arc(0, 0, 2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      break;
+    }
+    case "internal_wall":
+      // No-op: solid fill handled in drawFurniture
+      break;
   }
 }
 
@@ -5801,7 +6007,8 @@ export function resolveAndDrawLabelCollisions(
   componentLabelsVisible: boolean,
   selectedId: string | null,
   labelPositions: Map<string, Point> = new Map(),
-  distanceMeasurementRects: DistanceMeasurementLabelInfo[] = []
+  distanceMeasurementRects: DistanceMeasurementLabelInfo[] = [],
+  wallMeasurementRects: { centerX: number; centerY: number; halfW: number; halfH: number }[] = []
 ): void {
   // Collect all label rects with priority
   const allRects: LabelRect[] = [];
@@ -5830,6 +6037,14 @@ export function resolveAndDrawLabelCollisions(
     allRects.push({
       x: dm.centerX, y: dm.centerY, w: dm.halfW, h: dm.halfH,
       priority: 1, anchorX: dm.centerX, anchorY: dm.centerY, sourceIndex: -1,
+    });
+  }
+
+  // Wall measurement labels (priority 1) — immovable anchors, already drawn by drawWalls
+  for (const wm of wallMeasurementRects) {
+    allRects.push({
+      x: wm.centerX, y: wm.centerY, w: wm.halfW, h: wm.halfH,
+      priority: 1, anchorX: wm.centerX, anchorY: wm.centerY, sourceIndex: -1,
     });
   }
 
@@ -5898,6 +6113,27 @@ export function resolveAndDrawLabelCollisions(
       ctx.moveTo(rect.anchorX, rect.anchorY);
       ctx.lineTo(rect.x, rect.y);
       ctx.stroke();
+    }
+  }
+
+  // Draw connector lines for manually-dragged labels (labelOffset)
+  if (componentLabelsVisible) {
+    for (const info of componentLabelInfos) {
+      if (info.isInside) continue;
+      const item = info.item;
+      if (!item.labelOffset || (item.labelOffset.x === 0 && item.labelOffset.y === 0)) continue;
+      // Item center in screen px
+      const itemCx = (item.x + item.width / 2) * pxPerCm + panOffset.x;
+      const itemCy = (item.y + item.height / 2) * pxPerCm + panOffset.y;
+      const labelCx = info.centerX;
+      const labelCy = info.labelY + info.pillH / 2;
+      const dist = Math.sqrt((labelCx - itemCx) ** 2 + (labelCy - itemCy) ** 2);
+      if (dist > 30) {
+        ctx.beginPath();
+        ctx.moveTo(itemCx, itemCy);
+        ctx.lineTo(labelCx, labelCy);
+        ctx.stroke();
+      }
     }
   }
 
