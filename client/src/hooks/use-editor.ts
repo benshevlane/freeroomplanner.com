@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from "react";
-import { EditorState, Wall, FurnitureItem, RoomLabel, TextBox, Arrow, Point, EditorTool, FurnitureTemplate, UnitSystem, DEFAULT_TEXT_BOX, DEFAULT_ARROW, FURNITURE_LIBRARY } from "../lib/types";
+import { EditorState, RoomData, Wall, FurnitureItem, RoomLabel, TextBox, Arrow, Point, EditorTool, FurnitureTemplate, UnitSystem, DEFAULT_TEXT_BOX, DEFAULT_ARROW, FURNITURE_LIBRARY } from "../lib/types";
 
 const DEFAULT_AUTOSAVE_KEY = "freeroomplanner-autosave";
 
@@ -8,8 +8,31 @@ function loadSavedState(storageKey: string): Partial<EditorState> | null {
     const saved = localStorage.getItem(storageKey);
     if (!saved) return null;
     const parsed = JSON.parse(saved);
-    if (parsed && parsed.version === 1 && Array.isArray(parsed.walls)) {
+    // v2: multi-room format
+    if (parsed && parsed.version === 2 && Array.isArray(parsed.rooms)) {
       return parsed;
+    }
+    // v1: single-room format — migrate to multi-room
+    if (parsed && parsed.version === 1 && Array.isArray(parsed.walls)) {
+      const roomId = generateId();
+      const room: RoomData = {
+        id: roomId,
+        name: parsed.roomName || "Room 1",
+        walls: parsed.walls || [],
+        furniture: parsed.furniture || [],
+        labels: parsed.labels || [],
+        textBoxes: parsed.textBoxes || [],
+        arrows: parsed.arrows || [],
+        roomNames: parsed.roomNames || {},
+        roomLabelOffsets: parsed.roomLabelOffsets || {},
+        componentLabelsVisible: parsed.componentLabelsVisible ?? true,
+      };
+      return {
+        ...parsed,
+        rooms: [room],
+        activeRoomId: roomId,
+        roomOrder: [roomId],
+      };
     }
   } catch {
     // Ignore corrupted data
@@ -19,17 +42,29 @@ function loadSavedState(storageKey: string): Partial<EditorState> | null {
 
 function saveStateToStorage(state: EditorState, storageKey: string): void {
   try {
+    // Build rooms array: update the active room with current working state
+    const updatedRooms = state.rooms.map((r) =>
+      r.id === state.activeRoomId
+        ? {
+            ...r,
+            name: state.roomName,
+            walls: state.walls,
+            furniture: state.furniture,
+            labels: state.labels,
+            textBoxes: state.textBoxes,
+            arrows: state.arrows,
+            roomNames: state.roomNames,
+            roomLabelOffsets: state.roomLabelOffsets,
+            componentLabelsVisible: state.componentLabelsVisible,
+          }
+        : r
+    );
     const data = {
-      version: 1,
-      roomName: state.roomName,
-      walls: state.walls,
-      furniture: state.furniture,
-      labels: state.labels,
-      textBoxes: state.textBoxes,
-      arrows: state.arrows,
-      roomNames: state.roomNames,
-      roomLabelOffsets: state.roomLabelOffsets,
-      componentLabelsVisible: state.componentLabelsVisible,
+      version: 2,
+      rooms: updatedRooms,
+      activeRoomId: state.activeRoomId,
+      roomOrder: state.roomOrder,
+      units: state.units,
     };
     localStorage.setItem(storageKey, JSON.stringify(data));
   } catch {
@@ -65,94 +100,160 @@ const LABEL_INSIDE_TYPES = new Set([
   "dining_table_4", "dining_table_6",
 ]);
 
-const DEFAULT_STATE: EditorState = {
-  walls: [],
-  furniture: [],
-  labels: [],
-  textBoxes: [],
-  arrows: [],
-  gridSize: 80, // 80px = 1m at default zoom
-  zoom: 1,
-  panOffset: { x: 200, y: 100 },
-  selectedTool: "wall",
-  selectedItemId: null,
-  wallDrawing: null,
-  wallChainStart: null,
-  roomName: "My Room",
-  units: "m" as UnitSystem,
-  roomNames: {},
-  roomLabelOffsets: {},
-  componentLabelsVisible: true,
-};
+function makeDefaultRoom(): RoomData {
+  const id = generateId();
+  return {
+    id,
+    name: "Room 1",
+    walls: [],
+    furniture: [],
+    labels: [],
+    textBoxes: [],
+    arrows: [],
+    roomNames: {},
+    roomLabelOffsets: {},
+    componentLabelsVisible: true,
+  };
+}
 
-function getInitialState(storageKey: string): EditorState {
-  const saved = loadSavedState(storageKey);
-  if (!saved) return DEFAULT_STATE;
+function makeDefaultState(): EditorState {
+  const room = makeDefaultRoom();
+  return {
+    walls: [],
+    furniture: [],
+    labels: [],
+    textBoxes: [],
+    arrows: [],
+    gridSize: 80,
+    zoom: 1,
+    panOffset: { x: 200, y: 100 },
+    selectedTool: "wall",
+    selectedItemId: null,
+    wallDrawing: null,
+    wallChainStart: null,
+    roomName: room.name,
+    units: "m" as UnitSystem,
+    roomNames: {},
+    roomLabelOffsets: {},
+    componentLabelsVisible: true,
+    rooms: [room],
+    activeRoomId: room.id,
+    roomOrder: [room.id],
+  };
+}
 
-  const walls = saved.walls ?? [];
-  const furniture = (saved.furniture ?? []).map((f: any) => ({
+function normalizeFurniture(furniture: any[]): FurnitureItem[] {
+  return furniture.map((f: any) => ({
     ...f,
     labelOffset: f.labelOffset ?? { x: 0, y: 0 },
     labelInside: f.labelInside ?? LABEL_INSIDE_TYPES.has(f.type),
   }));
-  const labels = saved.labels ?? [];
-  const textBoxes = saved.textBoxes ?? [];
-  const arrows = saved.arrows ?? [];
+}
 
-  const hasContent = walls.length > 0 || furniture.length > 0 ||
-    labels.length > 0 || textBoxes.length > 0 || arrows.length > 0;
+function roomHasContent(room: RoomData): boolean {
+  return room.walls.length > 0 || room.furniture.length > 0 ||
+    room.labels.length > 0 || room.textBoxes.length > 0 || room.arrows.length > 0;
+}
+
+function getInitialState(storageKey: string): EditorState {
+  const saved = loadSavedState(storageKey);
+  if (!saved) return makeDefaultState();
+
+  const defaultState = makeDefaultState();
+
+  // Multi-room state (v2 migration already done in loadSavedState)
+  const rooms: RoomData[] = (saved.rooms ?? defaultState.rooms).map((r: any) => ({
+    ...r,
+    furniture: normalizeFurniture(r.furniture ?? []),
+    walls: r.walls ?? [],
+    labels: r.labels ?? [],
+    textBoxes: r.textBoxes ?? [],
+    arrows: r.arrows ?? [],
+    roomNames: r.roomNames ?? {},
+    roomLabelOffsets: r.roomLabelOffsets ?? {},
+    componentLabelsVisible: r.componentLabelsVisible ?? true,
+  }));
+  const activeRoomId = saved.activeRoomId ?? rooms[0]?.id ?? defaultState.activeRoomId;
+  const roomOrder = saved.roomOrder ?? rooms.map((r: RoomData) => r.id);
+  const activeRoom = rooms.find((r: RoomData) => r.id === activeRoomId) ?? rooms[0];
+  const hasContent = activeRoom ? roomHasContent(activeRoom) : false;
 
   return {
-    ...DEFAULT_STATE,
+    ...defaultState,
     selectedTool: hasContent ? "select" : "wall",
-    roomName: saved.roomName ?? DEFAULT_STATE.roomName,
-    walls,
-    furniture,
-    labels,
-    textBoxes,
-    arrows,
-    roomNames: saved.roomNames ?? {},
-    roomLabelOffsets: saved.roomLabelOffsets ?? {},
-    componentLabelsVisible: saved.componentLabelsVisible ?? true,
+    roomName: activeRoom?.name ?? defaultState.roomName,
+    walls: activeRoom?.walls ?? [],
+    furniture: normalizeFurniture(activeRoom?.furniture ?? []),
+    labels: activeRoom?.labels ?? [],
+    textBoxes: activeRoom?.textBoxes ?? [],
+    arrows: activeRoom?.arrows ?? [],
+    roomNames: activeRoom?.roomNames ?? {},
+    roomLabelOffsets: activeRoom?.roomLabelOffsets ?? {},
+    componentLabelsVisible: activeRoom?.componentLabelsVisible ?? true,
+    rooms,
+    activeRoomId,
+    roomOrder,
+    units: (saved as any).units ?? defaultState.units,
   };
 }
 
 export function useEditor(storageKey: string = DEFAULT_AUTOSAVE_KEY) {
   const [state, setState] = useState<EditorState>(() => getInitialState(storageKey));
-  const undoStack = useRef<EditorState[]>([]);
-  const redoStack = useRef<EditorState[]>([]);
+  // Per-room undo/redo stacks keyed by room ID
+  const undoStacks = useRef<Record<string, EditorState[]>>({});
+  const redoStacks = useRef<Record<string, EditorState[]>>({});
+
+  const getUndoStack = useCallback((roomId?: string) => {
+    const id = roomId ?? state.activeRoomId;
+    if (!undoStacks.current[id]) undoStacks.current[id] = [];
+    return undoStacks.current[id];
+  }, [state.activeRoomId]);
+
+  const getRedoStack = useCallback((roomId?: string) => {
+    const id = roomId ?? state.activeRoomId;
+    if (!redoStacks.current[id]) redoStacks.current[id] = [];
+    return redoStacks.current[id];
+  }, [state.activeRoomId]);
 
   const pushUndo = useCallback(() => {
     setState((s) => {
-      undoStack.current.push(deepCopyState(s));
-      redoStack.current = [];
-      if (undoStack.current.length > 50) undoStack.current.shift();
+      const stack = undoStacks.current[s.activeRoomId] ?? [];
+      stack.push(deepCopyState(s));
+      if (stack.length > 50) stack.shift();
+      undoStacks.current[s.activeRoomId] = stack;
+      redoStacks.current[s.activeRoomId] = [];
       return s;
     });
   }, []);
 
   const undo = useCallback(() => {
-    if (undoStack.current.length === 0) return;
-    const prev = undoStack.current.pop()!;
+    const stack = getUndoStack();
+    if (stack.length === 0) return;
+    const prev = stack.pop()!;
     setState((s) => {
-      redoStack.current.push(deepCopyState(s));
+      const redoStack = redoStacks.current[s.activeRoomId] ?? [];
+      redoStack.push(deepCopyState(s));
+      redoStacks.current[s.activeRoomId] = redoStack;
       return prev;
     });
-  }, []);
+  }, [getUndoStack]);
 
   const redo = useCallback(() => {
-    if (redoStack.current.length === 0) return;
-    const next = redoStack.current.pop()!;
+    const stack = getRedoStack();
+    if (stack.length === 0) return;
+    const next = stack.pop()!;
     setState((s) => {
-      undoStack.current.push(deepCopyState(s));
+      const undoStack = undoStacks.current[s.activeRoomId] ?? [];
+      undoStack.push(deepCopyState(s));
+      undoStacks.current[s.activeRoomId] = undoStack;
       return next;
     });
-  }, []);
+  }, [getRedoStack]);
 
   // Auto-save plan data to localStorage whenever it changes
   useEffect(() => {
     saveStateToStorage(state, storageKey);
-  }, [state.walls, state.furniture, state.labels, state.textBoxes, state.arrows, state.roomName, state.roomNames, state.componentLabelsVisible, storageKey]);
+  }, [state.walls, state.furniture, state.labels, state.textBoxes, state.arrows, state.roomName, state.roomNames, state.componentLabelsVisible, state.rooms, state.activeRoomId, state.roomOrder, storageKey]);
 
   const setTool = useCallback((tool: EditorTool) => {
     setState((s) => ({ ...s, selectedTool: tool, selectedItemId: null, wallDrawing: null, wallChainStart: null }));
@@ -465,6 +566,157 @@ export function useEditor(storageKey: string = DEFAULT_AUTOSAVE_KEY) {
     }));
   }, []);
 
+  // --- Room tab management ---
+
+  /** Save the current working state back into the rooms array */
+  const syncActiveRoomToRooms = (s: EditorState): RoomData[] => {
+    return s.rooms.map((r) =>
+      r.id === s.activeRoomId
+        ? {
+            ...r,
+            name: s.roomName,
+            walls: s.walls,
+            furniture: s.furniture,
+            labels: s.labels,
+            textBoxes: s.textBoxes,
+            arrows: s.arrows,
+            roomNames: s.roomNames,
+            roomLabelOffsets: s.roomLabelOffsets,
+            componentLabelsVisible: s.componentLabelsVisible,
+          }
+        : r
+    );
+  };
+
+  const addRoom = useCallback(() => {
+    setState((s) => {
+      const syncedRooms = syncActiveRoomToRooms(s);
+      // Auto-increment name: find max "Room N" number
+      let maxNum = 0;
+      for (const r of syncedRooms) {
+        const match = r.name.match(/^Room (\d+)$/);
+        if (match) maxNum = Math.max(maxNum, parseInt(match[1], 10));
+      }
+      const newRoom: RoomData = {
+        id: generateId(),
+        name: `Room ${maxNum + 1}`,
+        walls: [],
+        furniture: [],
+        labels: [],
+        textBoxes: [],
+        arrows: [],
+        roomNames: {},
+        roomLabelOffsets: {},
+        componentLabelsVisible: true,
+      };
+      const newRooms = [...syncedRooms, newRoom];
+      return {
+        ...s,
+        rooms: newRooms,
+        activeRoomId: newRoom.id,
+        roomOrder: [...s.roomOrder, newRoom.id],
+        // Load new room into working state
+        roomName: newRoom.name,
+        walls: [],
+        furniture: [],
+        labels: [],
+        textBoxes: [],
+        arrows: [],
+        roomNames: {},
+        roomLabelOffsets: {},
+        componentLabelsVisible: true,
+        selectedTool: "wall" as EditorTool,
+        selectedItemId: null,
+        wallDrawing: null,
+        wallChainStart: null,
+        panOffset: { x: 200, y: 100 },
+        zoom: 1,
+      };
+    });
+  }, []);
+
+  const switchRoom = useCallback((roomId: string) => {
+    setState((s) => {
+      if (roomId === s.activeRoomId) return s;
+      const syncedRooms = syncActiveRoomToRooms(s);
+      const targetRoom = syncedRooms.find((r) => r.id === roomId);
+      if (!targetRoom) return s;
+      const hasContent = roomHasContent(targetRoom);
+      return {
+        ...s,
+        rooms: syncedRooms,
+        activeRoomId: roomId,
+        roomName: targetRoom.name,
+        walls: targetRoom.walls,
+        furniture: normalizeFurniture(targetRoom.furniture),
+        labels: targetRoom.labels,
+        textBoxes: targetRoom.textBoxes,
+        arrows: targetRoom.arrows,
+        roomNames: targetRoom.roomNames,
+        roomLabelOffsets: targetRoom.roomLabelOffsets,
+        componentLabelsVisible: targetRoom.componentLabelsVisible,
+        selectedTool: hasContent ? "select" as EditorTool : "wall" as EditorTool,
+        selectedItemId: null,
+        wallDrawing: null,
+        wallChainStart: null,
+      };
+    });
+  }, []);
+
+  const renameRoom = useCallback((roomId: string, name: string) => {
+    setState((s) => {
+      const newRooms = s.rooms.map((r) => r.id === roomId ? { ...r, name } : r);
+      return {
+        ...s,
+        rooms: newRooms,
+        ...(roomId === s.activeRoomId ? { roomName: name } : {}),
+      };
+    });
+  }, []);
+
+  const deleteRoom = useCallback((roomId: string) => {
+    setState((s) => {
+      if (s.roomOrder.length <= 1) return s; // Can't delete last room
+      const syncedRooms = syncActiveRoomToRooms(s);
+      const newRooms = syncedRooms.filter((r) => r.id !== roomId);
+      const newOrder = s.roomOrder.filter((id) => id !== roomId);
+      // Clean up undo/redo for deleted room
+      delete undoStacks.current[roomId];
+      delete redoStacks.current[roomId];
+      // If we're deleting the active room, switch to adjacent
+      if (roomId === s.activeRoomId) {
+        const oldIdx = s.roomOrder.indexOf(roomId);
+        const newActiveId = newOrder[Math.min(oldIdx, newOrder.length - 1)];
+        const newActive = newRooms.find((r) => r.id === newActiveId)!;
+        const hasContent = roomHasContent(newActive);
+        return {
+          ...s,
+          rooms: newRooms,
+          roomOrder: newOrder,
+          activeRoomId: newActiveId,
+          roomName: newActive.name,
+          walls: newActive.walls,
+          furniture: normalizeFurniture(newActive.furniture),
+          labels: newActive.labels,
+          textBoxes: newActive.textBoxes,
+          arrows: newActive.arrows,
+          roomNames: newActive.roomNames,
+          roomLabelOffsets: newActive.roomLabelOffsets,
+          componentLabelsVisible: newActive.componentLabelsVisible,
+          selectedTool: hasContent ? "select" as EditorTool : "wall" as EditorTool,
+          selectedItemId: null,
+          wallDrawing: null,
+          wallChainStart: null,
+        };
+      }
+      return { ...s, rooms: newRooms, roomOrder: newOrder };
+    });
+  }, []);
+
+  const reorderRooms = useCallback((newOrder: string[]) => {
+    setState((s) => ({ ...s, roomOrder: newOrder }));
+  }, []);
+
   const exportState = useCallback(() => {
     return {
       version: 1,
@@ -524,8 +776,8 @@ export function useEditor(storageKey: string = DEFAULT_AUTOSAVE_KEY) {
     clearAll,
     undo,
     redo,
-    canUndo: undoStack.current.length > 0,
-    canRedo: redoStack.current.length > 0,
+    canUndo: getUndoStack().length > 0,
+    canRedo: getRedoStack().length > 0,
     pushUndo,
     updateFurniture,
     setLabelOffset,
@@ -545,5 +797,11 @@ export function useEditor(storageKey: string = DEFAULT_AUTOSAVE_KEY) {
     setRoomLabelOffset,
     toggleComponentLabels,
     updateWallLabelOffset,
+    // Room tab management
+    addRoom,
+    switchRoom,
+    renameRoom,
+    deleteRoom,
+    reorderRooms,
   };
 }

@@ -127,7 +127,7 @@ export const DEFAULT_TEXT_BOX: Omit<TextBox, "id" | "x" | "y"> = {
   zIndex: 0,
 };
 
-export type EditorTool = "select" | "wall" | "arrow" | "furniture" | "label" | "eraser" | "pan";
+export type EditorTool = "select" | "wall" | "arrow" | "furniture" | "label" | "eraser";
 
 export type UnitSystem = "m" | "cm" | "mm" | "ft";
 
@@ -179,6 +179,20 @@ export function dimensionSuffix(units: UnitSystem): string {
 
 export type MeasureMode = "full" | "inside";
 
+/** Data for a single room tab */
+export interface RoomData {
+  id: string;
+  name: string;
+  walls: Wall[];
+  furniture: FurnitureItem[];
+  labels: RoomLabel[];
+  textBoxes: TextBox[];
+  arrows: Arrow[];
+  roomNames: Record<string, string>;
+  roomLabelOffsets: Record<string, Point>;
+  componentLabelsVisible: boolean;
+}
+
 export interface EditorState {
   walls: Wall[];
   furniture: FurnitureItem[];
@@ -200,6 +214,10 @@ export interface EditorState {
   roomLabelOffsets: Record<string, Point>;
   // Toggle for component labels visibility
   componentLabelsVisible: boolean;
+  // Multi-room tabs
+  rooms: RoomData[];
+  activeRoomId: string;
+  roomOrder: string[];
 }
 
 export interface FurnitureTemplate {

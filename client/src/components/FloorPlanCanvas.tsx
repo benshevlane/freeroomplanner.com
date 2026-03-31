@@ -187,6 +187,9 @@ export default function FloorPlanCanvas({
   const [draggingWallLabelId, setDraggingWallLabelId] = useState<string | null>(null);
   const hoveredWallLabelIdRef = useRef<string | null>(null);
 
+  // Smart cursor: click-vs-drag on empty canvas (deselect on click, pan on drag)
+  const emptyCanvasDragStart = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null);
+
   // Wall snap indicator state (transient, only during drag)
   const [wallSnapEdges, setWallSnapEdges] = useState<SnappedWallEdge[]>([]);
   const [componentSnapEdges, setComponentSnapEdges] = useState<SnappedComponentEdge[]>([]);
@@ -642,8 +645,8 @@ export default function FloorPlanCanvas({
         return;
       }
 
-      // Middle mouse or alt+click or pan tool for panning
-      if (e.button === 1 || (e.button === 0 && e.altKey) || (e.button === 0 && state.selectedTool === "pan")) {
+      // Middle mouse or alt+click for panning
+      if (e.button === 1 || (e.button === 0 && e.altKey)) {
         setIsPanning(true);
         setDragStart({ x: pos.x - state.panOffset.x, y: pos.y - state.panOffset.y });
         return;
@@ -882,8 +885,8 @@ export default function FloorPlanCanvas({
           return;
         }
 
-        onSelectItem(null);
-        setSelectedRoomKey(null);
+        // Defer deselection — if user drags, pan instead; if they release, deselect
+        emptyCanvasDragStart.current = { x: pos.x, y: pos.y, panX: state.panOffset.x, panY: state.panOffset.y };
         setEditingTextBoxId(null);
       } else if (state.selectedTool === "wall") {
         const world = screenToWorld(pos.x, pos.y, state.gridSize, state.zoom, state.panOffset);
@@ -1022,6 +1025,21 @@ export default function FloorPlanCanvas({
 
         prevPinchDist.current = dist;
         prevPinchCenter.current = { x: centerX, y: centerY };
+        return;
+      }
+
+      // Smart cursor: detect drag from empty canvas to start panning
+      if (emptyCanvasDragStart.current) {
+        const dx = pos.x - emptyCanvasDragStart.current.x;
+        const dy = pos.y - emptyCanvasDragStart.current.y;
+        if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+          // Transition to pan mode
+          setIsPanning(true);
+          setDragStart({ x: emptyCanvasDragStart.current.x - emptyCanvasDragStart.current.panX, y: emptyCanvasDragStart.current.y - emptyCanvasDragStart.current.panY });
+          onSelectItem(null);
+          setSelectedRoomKey(null);
+          emptyCanvasDragStart.current = null;
+        }
         return;
       }
 
@@ -1422,7 +1440,7 @@ export default function FloorPlanCanvas({
         setEraserHoverId(null);
       }
     },
-    [state, isPanning, isDragging, isDraggingLabel, draggingLabelId, labelDragStart, isDraggingRoomLabel, draggingRoomKey, roomLabelDragStart, isDraggingWallLabel, draggingWallLabelId, isResizing, isRotating, rotateStartAngle, rotateItemStartRot, resizeStart, resizeCorner, dragStart, dragItemOffset, eraserHoverId, arrowDraggingEndpoint, arrowBodyDragStart, wallDragStart, isRotatingLabel, rotatingLabelId, labelRotateStartAngle, labelRotateItemStartRot, isResizingLabel, resizingLabelId, labelResizeStart, getCanvasPos, onSetPan, onSetZoom, onMoveFurniture, onMoveWall, onMoveLabel, onUpdateFurniture, onUpdateArrow, onSetLabelOffset, onSetRoomLabelOffset, onUpdateWallLabelOffset, isDark, measureMode]
+    [state, isPanning, isDragging, isDraggingLabel, draggingLabelId, labelDragStart, isDraggingRoomLabel, draggingRoomKey, roomLabelDragStart, isDraggingWallLabel, draggingWallLabelId, isResizing, isRotating, rotateStartAngle, rotateItemStartRot, resizeStart, resizeCorner, dragStart, dragItemOffset, eraserHoverId, arrowDraggingEndpoint, arrowBodyDragStart, wallDragStart, isRotatingLabel, rotatingLabelId, labelRotateStartAngle, labelRotateItemStartRot, isResizingLabel, resizingLabelId, labelResizeStart, getCanvasPos, onSetPan, onSetZoom, onMoveFurniture, onMoveWall, onMoveLabel, onUpdateFurniture, onUpdateArrow, onSetLabelOffset, onSetRoomLabelOffset, onUpdateWallLabelOffset, isDark, measureMode, onSelectItem]
   );
 
   const handlePointerUp = useCallback(
@@ -1431,6 +1449,14 @@ export default function FloorPlanCanvas({
       if (pointerCache.current.size < 2) {
         prevPinchDist.current = null;
         prevPinchCenter.current = null;
+      }
+
+      // Smart cursor: click on empty canvas without drag → deselect
+      if (emptyCanvasDragStart.current) {
+        emptyCanvasDragStart.current = null;
+        onSelectItem(null);
+        setSelectedRoomKey(null);
+        return;
       }
 
       // Commit pending wall on touch release (mobile drag-to-adjust)
@@ -1523,7 +1549,7 @@ export default function FloorPlanCanvas({
       setIsDraggingWallLabel(false);
       setDraggingWallLabelId(null);
     },
-    [isDragging, isDraggingLabel, isDraggingRoomLabel, isDraggingWallLabel, wallDragStart, onPushUndo, state.selectedTool, state.gridSize, state.zoom, state.panOffset, state.walls, getCanvasPos, onAddWall, onSetWallDrawing, onSplitWallAndConnect]
+    [isDragging, isDraggingLabel, isDraggingRoomLabel, isDraggingWallLabel, wallDragStart, onPushUndo, state.selectedTool, state.gridSize, state.zoom, state.panOffset, state.walls, getCanvasPos, onAddWall, onSetWallDrawing, onSplitWallAndConnect, onSelectItem]
   );
 
   const handleWheel = useCallback(
@@ -1928,7 +1954,6 @@ export default function FloorPlanCanvas({
       if (resizeCorner === "tr" || resizeCorner === "bl") return "nesw-resize";
       return "nwse-resize";
     }
-    if (state.selectedTool === "pan") return "grab";
     if (state.selectedTool === "wall") return "crosshair";
     if (state.selectedTool === "arrow") return "crosshair";
     if (state.selectedTool === "eraser") return "crosshair";
@@ -1939,9 +1964,16 @@ export default function FloorPlanCanvas({
     if (isDraggingWallLabel) return "grabbing";
     if (state.selectedTool === "select") {
       if (isDragging) return "grabbing";
+      if (emptyCanvasDragStart.current) return "grabbing";
       if (hoveredWallLabelIdRef.current) return "grab";
-      // Show grab cursor when hovering over a wall body
+      // Show grab cursor when hovering over items
       if (mousePos.x !== 0 || mousePos.y !== 0) {
+        const canvas = canvasRef.current;
+        const ctx = canvas?.getContext("2d");
+        if (canvas && ctx) {
+          const hoveredFurn = hitTestFurniture(mousePos.x, mousePos.y, state.furniture, state.gridSize, state.zoom, state.panOffset, ctx);
+          if (hoveredFurn) return "grab";
+        }
         const hoveredWall = hitTestWall(mousePos.x, mousePos.y, state.walls, state.gridSize, state.zoom, state.panOffset);
         if (hoveredWall) return "grab";
       }

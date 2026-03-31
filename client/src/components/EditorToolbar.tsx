@@ -15,7 +15,6 @@ import {
   MoveRight,
   Type,
   Eraser,
-  Hand,
   Undo2,
   Redo2,
   ZoomIn,
@@ -62,8 +61,7 @@ interface EditorToolbarProps {
 }
 
 const tools: { tool: EditorTool; icon: typeof MousePointer2; label: string; shortcut: string }[] = [
-  { tool: "select", icon: MousePointer2, label: "Select & Move", shortcut: "V" },
-  { tool: "pan", icon: Hand, label: "Pan / Drag", shortcut: "H" },
+  { tool: "select", icon: MousePointer2, label: "Select / Pan", shortcut: "V" },
   { tool: "wall", icon: Pencil, label: "Draw Walls", shortcut: "W" },
   { tool: "arrow", icon: MoveRight, label: "Draw Arrow", shortcut: "A" },
   { tool: "eraser", icon: Eraser, label: "Eraser", shortcut: "E" },

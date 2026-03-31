@@ -5,6 +5,7 @@ import FloorPlanCanvas from "./FloorPlanCanvas";
 import EditorToolbar from "./EditorToolbar";
 import FurniturePanel from "./FurniturePanel";
 import PropertiesPanel from "./PropertiesPanel";
+import RoomTabs from "./RoomTabs";
 import { FurnitureTemplate, FurnitureItem, RoomLabel, TextBox, Arrow, Point, UnitSystem, MeasureMode, isWallCupboard } from "../lib/types";
 import html2canvas from "html2canvas";
 import { trackEvent } from "@/lib/analytics";
@@ -252,9 +253,6 @@ export default function EditorCore({
       }
       if (e.key === "e" || e.key === "E") {
         if (!e.ctrlKey && !e.metaKey) editor.setTool("eraser");
-      }
-      if (e.key === "h" || e.key === "H") {
-        if (!e.ctrlKey && !e.metaKey) editor.setTool("pan");
       }
       if (e.key === "t" || e.key === "T") {
         if (!e.ctrlKey && !e.metaKey) handleAddTextBox();
@@ -558,6 +556,18 @@ export default function EditorCore({
           onAddTextBox={handleAddTextBox}
         />
       )}
+
+      {/* Room tabs */}
+      <RoomTabs
+        rooms={state.rooms}
+        activeRoomId={state.activeRoomId}
+        roomOrder={state.roomOrder}
+        onSwitchRoom={editor.switchRoom}
+        onAddRoom={editor.addRoom}
+        onRenameRoom={editor.renameRoom}
+        onDeleteRoom={editor.deleteRoom}
+        onReorderRooms={editor.reorderRooms}
+      />
 
       {/* Main area */}
       <div className="flex flex-1 overflow-hidden">
