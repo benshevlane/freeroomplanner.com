@@ -16,6 +16,7 @@ import {
   drawDistanceMeasurements,
   collectDistanceMeasurementRects,
   drawEraserHighlight,
+  drawSelectHoverHighlight,
   collectComponentLabelRects,
   resolveAndDrawLabelCollisions,
   findParallelWallDiscrepancies,
@@ -146,6 +147,7 @@ export default function FloorPlanCanvas({
   const [resizeStart, setResizeStart] = useState<{ x: number; y: number; itemX: number; itemY: number; itemW: number; itemH: number } | null>(null);
   const [wallSnapPoint, setWallSnapPoint] = useState<Point | null>(null);
   const [eraserHoverId, setEraserHoverId] = useState<string | null>(null);
+  const [selectHoverId, setSelectHoverId] = useState<string | null>(null);
   const [isRotating, setIsRotating] = useState(false);
   const [rotateStartAngle, setRotateStartAngle] = useState(0);
   const [rotateItemStartRot, setRotateItemStartRot] = useState(0);
@@ -529,6 +531,11 @@ export default function FloorPlanCanvas({
     // Eraser hover highlight
     if (state.selectedTool === "eraser" && eraserHoverId) {
       drawEraserHighlight(ctx, eraserHoverId, state.walls, state.furniture, state.labels, state.gridSize, state.zoom, state.panOffset);
+    }
+
+    // Select tool hover highlight
+    if (state.selectedTool === "select" && selectHoverId) {
+      drawSelectHoverHighlight(ctx, selectHoverId, state.furniture, state.gridSize, state.zoom, state.panOffset);
     }
 
     // Scale indicator
@@ -1439,8 +1446,17 @@ export default function FloorPlanCanvas({
       } else if (eraserHoverId) {
         setEraserHoverId(null);
       }
+
+      // Select tool hover detection
+      if (state.selectedTool === "select" && !isDragging && !isPanning && !isResizing && !isRotating) {
+        const hitFurn = hitTestFurniture(pos.x, pos.y, state.furniture, state.gridSize, state.zoom, state.panOffset);
+        const newHoverId = (hitFurn && hitFurn.id !== state.selectedItemId) ? hitFurn.id : null;
+        if (newHoverId !== selectHoverId) setSelectHoverId(newHoverId);
+      } else if (selectHoverId) {
+        setSelectHoverId(null);
+      }
     },
-    [state, isPanning, isDragging, isDraggingLabel, draggingLabelId, labelDragStart, isDraggingRoomLabel, draggingRoomKey, roomLabelDragStart, isDraggingWallLabel, draggingWallLabelId, isResizing, isRotating, rotateStartAngle, rotateItemStartRot, resizeStart, resizeCorner, dragStart, dragItemOffset, eraserHoverId, arrowDraggingEndpoint, arrowBodyDragStart, wallDragStart, isRotatingLabel, rotatingLabelId, labelRotateStartAngle, labelRotateItemStartRot, isResizingLabel, resizingLabelId, labelResizeStart, getCanvasPos, onSetPan, onSetZoom, onMoveFurniture, onMoveWall, onMoveLabel, onUpdateFurniture, onUpdateArrow, onSetLabelOffset, onSetRoomLabelOffset, onUpdateWallLabelOffset, isDark, measureMode, onSelectItem]
+    [state, isPanning, isDragging, isDraggingLabel, draggingLabelId, labelDragStart, isDraggingRoomLabel, draggingRoomKey, roomLabelDragStart, isDraggingWallLabel, draggingWallLabelId, isResizing, isRotating, rotateStartAngle, rotateItemStartRot, resizeStart, resizeCorner, dragStart, dragItemOffset, eraserHoverId, selectHoverId, arrowDraggingEndpoint, arrowBodyDragStart, wallDragStart, isRotatingLabel, rotatingLabelId, labelRotateStartAngle, labelRotateItemStartRot, isResizingLabel, resizingLabelId, labelResizeStart, getCanvasPos, onSetPan, onSetZoom, onMoveFurniture, onMoveWall, onMoveLabel, onUpdateFurniture, onUpdateArrow, onSetLabelOffset, onSetRoomLabelOffset, onUpdateWallLabelOffset, isDark, measureMode, onSelectItem]
   );
 
   const handlePointerUp = useCallback(
@@ -1965,19 +1981,19 @@ export default function FloorPlanCanvas({
     if (state.selectedTool === "select") {
       if (isDragging) return "grabbing";
       if (emptyCanvasDragStart.current) return "grabbing";
-      if (hoveredWallLabelIdRef.current) return "grab";
-      // Show grab cursor when hovering over items
+      if (hoveredWallLabelIdRef.current) return "default";
+      // Show pointer cursor when hovering over items, grab cursor on empty canvas
       if (mousePos.x !== 0 || mousePos.y !== 0) {
         const canvas = canvasRef.current;
         const ctx = canvas?.getContext("2d");
         if (canvas && ctx) {
           const hoveredFurn = hitTestFurniture(mousePos.x, mousePos.y, state.furniture, state.gridSize, state.zoom, state.panOffset, ctx);
-          if (hoveredFurn) return "grab";
+          if (hoveredFurn) return "default";
         }
         const hoveredWall = hitTestWall(mousePos.x, mousePos.y, state.walls, state.gridSize, state.zoom, state.panOffset);
-        if (hoveredWall) return "grab";
+        if (hoveredWall) return "default";
       }
-      return "default";
+      return "grab";
     }
     return "default";
   })();
