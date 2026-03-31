@@ -6,6 +6,7 @@ import {
   drawWalls,
   drawWallSegmentMeasurements,
   drawMeasurementIndicatorLines,
+  collectWallMeasurementLabelRects,
   drawFurniture,
   drawWallPreview,
   drawRoomAreas,
@@ -479,12 +480,18 @@ export default function FloorPlanCanvas({
       distanceMeasurementRects = collectDistanceMeasurementRects(ctx, selectedFurn, state.walls, state.furniture, state.gridSize, state.zoom, state.panOffset, isDark, state.units);
     }
 
+    // Collect wall measurement label rects for collision avoidance
+    const wallMeasurementRects = collectWallMeasurementLabelRects(
+      state.walls, state.gridSize, state.zoom, state.panOffset,
+      state.units, measureMode, state.furniture, rooms, ctx
+    );
+
     // Resolve label collisions and draw all labels (component + freeform) at resolved positions
     resolveAndDrawLabelCollisions(
       ctx, rooms, state.walls, componentLabelInfos, state.labels,
       state.gridSize, state.zoom, state.panOffset, isDark,
       state.roomNames, state.componentLabelsVisible, state.selectedItemId,
-      roomLabelPositions, distanceMeasurementRects
+      roomLabelPositions, distanceMeasurementRects, wallMeasurementRects
     );
 
     // Arrows
@@ -1161,7 +1168,7 @@ export default function FloorPlanCanvas({
         const dyCm = localDyPx / pxPerCm;
 
         // Doors/windows allow smaller height (thickness) than regular furniture
-        const isStructural = resizingItem && (resizingItem.type === "door" || resizingItem.type === "door_double" || resizingItem.type === "window" || resizingItem.type === "radiator");
+        const isStructural = resizingItem && (resizingItem.type === "door" || resizingItem.type === "door_double" || resizingItem.type === "window" || resizingItem.type === "radiator" || resizingItem.type === "internal_wall");
         const minW = 20;
         const minH = isStructural ? 5 : 20;
 
@@ -1283,8 +1290,8 @@ export default function FloorPlanCanvas({
         let wdy = world.y - wallDragStart.mouseWorldY;
         if (wallDragStart.constraintAxis === "y") { wdx = 0; }
         else { wdy = 0; }
-        const newStartX = Math.round((wallDragStart.startX + wdx) / 10) * 10;
-        const newStartY = Math.round((wallDragStart.startY + wdy) / 10) * 10;
+        const newStartX = Math.round(wallDragStart.startX + wdx);
+        const newStartY = Math.round(wallDragStart.startY + wdy);
         const snappedDx = newStartX - wallDragStart.startX;
         const snappedDy = newStartY - wallDragStart.startY;
         // Move the dragged wall

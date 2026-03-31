@@ -5,9 +5,27 @@ import FloorPlanCanvas from "./FloorPlanCanvas";
 import EditorToolbar from "./EditorToolbar";
 import FurniturePanel from "./FurniturePanel";
 import PropertiesPanel from "./PropertiesPanel";
-import { FurnitureTemplate, FurnitureItem, RoomLabel, TextBox, Arrow, Point, UnitSystem, MeasureMode } from "../lib/types";
+import { FurnitureTemplate, FurnitureItem, RoomLabel, TextBox, Arrow, Point, UnitSystem, MeasureMode, isWallCupboard } from "../lib/types";
 import html2canvas from "html2canvas";
 import { trackEvent } from "@/lib/analytics";
+import {
+  drawGrid,
+  drawWalls,
+  drawWallSegmentMeasurements,
+  drawMeasurementIndicatorLines,
+  drawFurniture,
+  drawRoomAreas,
+  drawLabels,
+  drawArrows,
+  collectComponentLabelRects,
+  resolveAndDrawLabelCollisions,
+  collectWallMeasurementLabelRects,
+  findParallelWallDiscrepancies,
+  drawWallLabelsWithDiscrepancy,
+  computeRoomLabelPositions,
+  collectDistanceMeasurementRects,
+} from "../lib/canvas-renderer";
+import { detectRooms } from "../lib/room-detection";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -299,27 +317,108 @@ export default function EditorCore({
 
   const handleSavePlan = useCallback(async () => {
     try {
-      const canvasContainer = document.querySelector('[data-testid="canvas-container"]') as HTMLElement;
-      if (!canvasContainer) return;
-
-      const capture = await html2canvas(canvasContainer, {
-        backgroundColor: null,
-        scale: 2,
-        useCORS: true,
+      // Compute bounding box of all content (walls, furniture, labels) with padding for measurement lines
+      const allPoints: { x: number; y: number }[] = [];
+      state.walls.forEach((w) => {
+        // Include wall thickness + measurement line offset in bounds
+        const thick = w.thickness || 15;
+        allPoints.push(
+          { x: w.start.x - thick, y: w.start.y - thick },
+          { x: w.start.x + thick, y: w.start.y + thick },
+          { x: w.end.x - thick, y: w.end.y - thick },
+          { x: w.end.x + thick, y: w.end.y + thick },
+        );
       });
+      state.furniture.forEach((f) => {
+        allPoints.push({ x: f.x, y: f.y }, { x: f.x + f.width, y: f.y + f.height });
+      });
+      state.labels.forEach((l) => {
+        allPoints.push({ x: l.x - 100, y: l.y - 50 }, { x: l.x + 100, y: l.y + 50 });
+      });
+      (state.textBoxes || []).forEach((t) => {
+        allPoints.push({ x: t.x, y: t.y }, { x: t.x + t.width, y: t.y + t.height });
+      });
+      state.arrows.forEach((a) => {
+        allPoints.push({ x: a.startX, y: a.startY }, { x: a.endX, y: a.endY });
+      });
+      if (allPoints.length === 0) {
+        allPoints.push({ x: 0, y: 0 }, { x: 500, y: 400 });
+      }
+
+      // Add 80cm padding for measurement lines and labels
+      const padding = 80;
+      const minX = Math.min(...allPoints.map((p) => p.x)) - padding;
+      const minY = Math.min(...allPoints.map((p) => p.y)) - padding;
+      const maxX = Math.max(...allPoints.map((p) => p.x)) + padding;
+      const maxY = Math.max(...allPoints.map((p) => p.y)) + padding;
+      const contentW = maxX - minX;
+      const contentH = maxY - minY;
+
+      // Create offscreen canvas at 2x resolution
+      const exportScale = 2;
+      const pxPerCm = 1.2; // base scale for export
+      const canvasW = Math.ceil(contentW * pxPerCm * exportScale);
+      const canvasH = Math.ceil(contentH * pxPerCm * exportScale);
 
       const finalCanvas = document.createElement('canvas');
-      finalCanvas.width = capture.width;
-      finalCanvas.height = capture.height;
+      finalCanvas.width = canvasW;
+      finalCanvas.height = canvasH;
       const ctx = finalCanvas.getContext('2d')!;
-      ctx.drawImage(capture, 0, 0);
+      ctx.scale(exportScale, exportScale);
 
-      const w = finalCanvas.width;
-      const h = finalCanvas.height;
-      const text = "Made with freeroomplanner.com";
+      const gridSize = 100 * pxPerCm; // 1m = 100cm
+      const zoom = 1;
+      const panOffset = { x: -minX * pxPerCm, y: -minY * pxPerCm };
+      const isDark = false; // always export in light mode
+
+      // Background
+      ctx.fillStyle = "#f7f6f2";
+      ctx.fillRect(0, 0, canvasW / exportScale, canvasH / exportScale);
+
+      // Grid
+      drawGrid(ctx, canvasW / exportScale, canvasH / exportScale, gridSize, zoom, panOffset, isDark);
+
+      // Room areas
+      const rooms = detectRooms(state.walls);
+      const roomLabelPositions = rooms.length > 0
+        ? computeRoomLabelPositions(ctx, rooms, state.furniture, gridSize, zoom, state.roomNames, state.units)
+        : new Map<string, Point>();
+      if (rooms.length > 0) {
+        drawRoomAreas(ctx, rooms, gridSize, zoom, panOffset, isDark, state.units, state.roomNames, null, roomLabelPositions, state.roomLabelOffsets);
+      }
+
+      // Walls with measurement labels
+      drawWalls(ctx, state.walls, gridSize, zoom, panOffset, isDark, null, state.units, measureMode, state.furniture, rooms);
+
+      // Measurement indicator lines
+      drawMeasurementIndicatorLines(ctx, state.walls, rooms, gridSize, zoom, panOffset, measureMode);
+
+      // Wall segment measurements
+      drawWallSegmentMeasurements(ctx, state.walls, state.furniture, gridSize, zoom, panOffset, isDark, state.units, measureMode, rooms);
+
+      // Furniture (floor items, wall cupboards, doors/windows)
+      const floorFurniture = state.furniture.filter((f) => f.type !== "door" && f.type !== "door_double" && f.type !== "window" && f.type !== "bay_window" && !isWallCupboard(f.type));
+      drawFurniture(ctx, floorFurniture, gridSize, zoom, panOffset, isDark, null);
+      const wallCupboards = state.furniture.filter((f) => isWallCupboard(f.type));
+      drawFurniture(ctx, wallCupboards, gridSize, zoom, panOffset, isDark, null);
+      const doorWindowItems = state.furniture.filter((f) => f.type === "door" || f.type === "door_double" || f.type === "window" || f.type === "bay_window");
+      drawFurniture(ctx, doorWindowItems, gridSize, zoom, panOffset, isDark, null);
+
+      // Component labels with collision resolution
+      const componentLabelInfos = collectComponentLabelRects(ctx, state.furniture, gridSize, zoom, panOffset, isDark, null, state.units, state.walls, rooms);
+      const wallMeasurementRects = collectWallMeasurementLabelRects(state.walls, gridSize, zoom, panOffset, state.units, measureMode, state.furniture, rooms, ctx);
+      resolveAndDrawLabelCollisions(ctx, rooms, state.walls, componentLabelInfos, state.labels, gridSize, zoom, panOffset, isDark, state.roomNames, state.componentLabelsVisible, null, roomLabelPositions, [], wallMeasurementRects);
+
+      // Arrows
+      drawArrows(ctx, state.arrows, gridSize, zoom, panOffset, isDark, null);
+
+      // Attribution badge
+      const w = canvasW / exportScale;
+      const h = canvasH / exportScale;
+      const badgeText = "Made with freeroomplanner.com";
       const fontSize = Math.max(14, Math.round(h * 0.018));
       ctx.font = `500 ${fontSize}px 'General Sans', 'DM Sans', sans-serif`;
-      const metrics = ctx.measureText(text);
+      const metrics = ctx.measureText(badgeText);
       const textW = metrics.width;
       const padX = fontSize * 0.7;
       const padY = fontSize * 0.45;
@@ -345,7 +444,7 @@ export default function EditorCore({
       ctx.fillStyle = "#ffffff";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText(text, bx + boxW / 2, by + boxH / 2);
+      ctx.fillText(badgeText, bx + boxW / 2, by + boxH / 2);
 
       finalCanvas.toBlob((blob) => {
         if (!blob) return;
@@ -370,7 +469,7 @@ export default function EditorCore({
     } catch {
       showToast("Failed to save image");
     }
-  }, [state.roomName, showToast, onExport]);
+  }, [state, measureMode, showToast, onExport]);
 
   const handleLoadPlan = useCallback(() => {
     const input = document.createElement("input");
