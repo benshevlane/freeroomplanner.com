@@ -2187,19 +2187,31 @@ export function drawFurniture(
       ctx.fillStyle = isSelected ? SELECT_COLOR : (isDark ? WALL_COLOR_DARK : WALL_COLOR_LIGHT);
       ctx.fillRect(-w / 2, -h / 2, w, h);
     } else {
-      // Fill
-      ctx.fillStyle = isDark ? FURNITURE_FILL_DARK : FURNITURE_FILL_LIGHT;
-      ctx.fillRect(-w / 2, -h / 2, w, h);
+      // Types that draw their own shape (non-rectangular)
+      const customShapeTypes = new Set([
+        "toilet", "wc_wallhung", "wc_back_to_wall",
+        "corner_shower",
+        "bathtub", "freestanding_bath",
+        "basin",
+        "side_table",
+      ]);
+      const isCustomShape = customShapeTypes.has(item.type);
 
-      // Stroke
-      ctx.strokeStyle = isSelected ? SELECT_COLOR : (isDark ? FURNITURE_STROKE_DARK : FURNITURE_STROKE_LIGHT);
-      ctx.lineWidth = isSelected ? 2 : 1;
-      ctx.setLineDash(isSelected ? [] : [4, 2]);
-      ctx.strokeRect(-w / 2, -h / 2, w, h);
-      ctx.setLineDash([]);
+      if (!isCustomShape) {
+        // Fill
+        ctx.fillStyle = isDark ? FURNITURE_FILL_DARK : FURNITURE_FILL_LIGHT;
+        ctx.fillRect(-w / 2, -h / 2, w, h);
+
+        // Stroke
+        ctx.strokeStyle = isSelected ? SELECT_COLOR : (isDark ? FURNITURE_STROKE_DARK : FURNITURE_STROKE_LIGHT);
+        ctx.lineWidth = isSelected ? 2 : 1;
+        ctx.setLineDash(isSelected ? [] : [4, 2]);
+        ctx.strokeRect(-w / 2, -h / 2, w, h);
+        ctx.setLineDash([]);
+      }
 
       // Draw specific details based on type
-      drawFurnitureDetail(ctx, item.type, w, h, isDark);
+      drawFurnitureDetail(ctx, item.type, w, h, isDark, isSelected);
     }
 
     // Inline labels removed — dynamic component labels (pills) handle all labeling
@@ -2213,20 +2225,35 @@ function drawFurnitureDetail(
   type: string,
   w: number,
   h: number,
-  isDark: boolean
+  isDark: boolean,
+  isSelected: boolean = false
 ) {
   const stroke = isDark ? "#5a5957" : "#bab9b4";
+  const fill = isDark ? "#2a2926" : "#f5f4f2";
   ctx.strokeStyle = stroke;
   ctx.lineWidth = 1;
 
   switch (type) {
-    case "bathtub":
+    case "bathtub": {
+      // Rounded rectangle outer shape
+      const btRadius = Math.min(w, h) * 0.25;
+      ctx.fillStyle = fill;
       ctx.beginPath();
-      const rx = w * 0.42;
-      const ry = h * 0.4;
-      ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
+      ctx.roundRect(-w / 2, -h / 2, w, h, btRadius);
+      ctx.fill();
+      ctx.strokeStyle = isSelected ? SELECT_COLOR : stroke;
+      ctx.lineWidth = isSelected ? 2 : 1;
+      ctx.beginPath();
+      ctx.roundRect(-w / 2, -h / 2, w, h, btRadius);
+      ctx.stroke();
+      // Inner basin ellipse
+      ctx.strokeStyle = stroke;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, w * 0.42, h * 0.4, 0, 0, Math.PI * 2);
       ctx.stroke();
       break;
+    }
     case "shower":
       ctx.beginPath();
       ctx.arc(0, 0, Math.min(w, h) * 0.35, 0, Math.PI * 2);
@@ -2237,34 +2264,60 @@ function drawFurnitureDetail(
       ctx.fill();
       break;
     case "toilet": {
-      // Cistern rectangle at top
+      // Filled cistern rectangle at top
+      ctx.fillStyle = fill;
+      ctx.fillRect(-w * 0.4, -h / 2, w * 0.8, h * 0.22);
       ctx.fillStyle = stroke;
       ctx.globalAlpha = 0.12;
       ctx.fillRect(-w * 0.4, -h / 2, w * 0.8, h * 0.22);
       ctx.globalAlpha = 1;
+      ctx.strokeStyle = isSelected ? SELECT_COLOR : stroke;
+      ctx.lineWidth = isSelected ? 2 : 1;
       ctx.strokeRect(-w * 0.4, -h / 2, w * 0.8, h * 0.22);
-      // Rounder seat (circular)
+      // Filled oval seat
       const tSeatR = w * 0.38;
+      ctx.fillStyle = fill;
       ctx.beginPath();
-      ctx.arc(0, h * 0.1, tSeatR, 0, Math.PI * 2);
+      ctx.ellipse(0, h * 0.1, tSeatR, h * 0.36, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = isSelected ? SELECT_COLOR : stroke;
+      ctx.lineWidth = isSelected ? 2 : 1;
+      ctx.beginPath();
+      ctx.ellipse(0, h * 0.1, tSeatR, h * 0.36, 0, 0, Math.PI * 2);
       ctx.stroke();
       // Inner bowl
+      ctx.strokeStyle = stroke;
+      ctx.lineWidth = 1;
       ctx.fillStyle = stroke;
       ctx.globalAlpha = 0.06;
       ctx.beginPath();
-      ctx.arc(0, h * 0.1, tSeatR * 0.65, 0, Math.PI * 2);
+      ctx.ellipse(0, h * 0.1, tSeatR * 0.65, h * 0.24, 0, 0, Math.PI * 2);
       ctx.fill();
       ctx.globalAlpha = 1;
       ctx.beginPath();
-      ctx.arc(0, h * 0.1, tSeatR * 0.65, 0, Math.PI * 2);
+      ctx.ellipse(0, h * 0.1, tSeatR * 0.65, h * 0.24, 0, 0, Math.PI * 2);
       ctx.stroke();
       break;
     }
-    case "basin":
+    case "basin": {
+      // Filled ellipse shape
+      ctx.fillStyle = fill;
       ctx.beginPath();
-      ctx.ellipse(0, 0, w * 0.35, h * 0.3, 0, 0, Math.PI * 2);
+      ctx.ellipse(0, 0, w * 0.45, h * 0.42, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = isSelected ? SELECT_COLOR : stroke;
+      ctx.lineWidth = isSelected ? 2 : 1;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, w * 0.45, h * 0.42, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      // Inner bowl
+      ctx.strokeStyle = stroke;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, w * 0.3, h * 0.25, 0, 0, Math.PI * 2);
       ctx.stroke();
       break;
+    }
     case "bed_double":
     case "bed_king":
     case "bed_superking":
@@ -2632,15 +2685,25 @@ function drawFurnitureDetail(
       break;
     }
     case "side_table": {
-      // Circular top-down: outer circle + inner ring + center dot
+      // Filled circle shape
       const r = Math.min(w, h) / 2 - 2;
+      ctx.fillStyle = fill;
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = isSelected ? SELECT_COLOR : stroke;
+      ctx.lineWidth = isSelected ? 2 : 1;
       ctx.beginPath();
       ctx.arc(0, 0, r, 0, Math.PI * 2);
       ctx.stroke();
+      // Inner ring
+      ctx.strokeStyle = stroke;
+      ctx.lineWidth = 1;
       ctx.globalAlpha = 0.35;
       ctx.beginPath();
       ctx.arc(0, 0, r / 2, 0, Math.PI * 2);
       ctx.stroke();
+      // Center dot
       ctx.globalAlpha = 0.3;
       ctx.fillStyle = stroke;
       ctx.beginPath();
@@ -2809,10 +2872,18 @@ function drawFurnitureDetail(
       break;
     }
     case "freestanding_bath": {
-      // Outer ellipse (the tub rim)
+      // Filled outer ellipse (the tub body)
+      ctx.fillStyle = fill;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, w * 0.48, h * 0.46, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = isSelected ? SELECT_COLOR : stroke;
+      ctx.lineWidth = isSelected ? 2 : 1;
       ctx.beginPath();
       ctx.ellipse(0, 0, w * 0.48, h * 0.46, 0, 0, Math.PI * 2);
       ctx.stroke();
+      ctx.strokeStyle = stroke;
+      ctx.lineWidth = 1;
       // Inner ellipse rim
       ctx.globalAlpha = 0.5;
       ctx.beginPath();
@@ -2921,21 +2992,45 @@ function drawFurnitureDetail(
       break;
     }
     case "corner_shower": {
-      // Curved door arc from top-right to bottom-left
+      // Quarter-circle shape: two straight wall edges + curved front
+      // Fill
+      ctx.fillStyle = fill;
+      ctx.beginPath();
+      ctx.moveTo(-w / 2, -h / 2);
+      ctx.lineTo(w / 2, -h / 2);
+      ctx.arc(-w / 2, -h / 2, w, 0, Math.PI / 2);
+      ctx.lineTo(-w / 2, h / 2);
+      ctx.closePath();
+      // Clip the quarter-circle to the bounding box using a separate fill path
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(-w / 2, -h / 2, w, h);
+      ctx.clip();
+      // Draw the filled quarter-circle arc
+      ctx.fillStyle = fill;
+      ctx.beginPath();
+      ctx.moveTo(-w / 2, -h / 2);
+      ctx.lineTo(w / 2, -h / 2);
+      ctx.arc(-w / 2, -h / 2, Math.max(w, h), 0, Math.PI / 2);
+      ctx.closePath();
+      ctx.fill();
+      // Stroke the outline
+      ctx.strokeStyle = isSelected ? SELECT_COLOR : stroke;
+      ctx.lineWidth = isSelected ? 2 : 1;
+      // Draw wall edges
+      ctx.beginPath();
+      ctx.moveTo(-w / 2, h / 2);
+      ctx.lineTo(-w / 2, -h / 2);
+      ctx.lineTo(w / 2, -h / 2);
+      ctx.stroke();
+      // Draw curved front arc
       ctx.beginPath();
       ctx.arc(-w / 2, -h / 2, Math.min(w, h) * 0.96, 0, Math.PI / 2);
       ctx.stroke();
-      // Triangular tray fill
-      ctx.fillStyle = stroke;
-      ctx.globalAlpha = 0.06;
-      ctx.beginPath();
-      ctx.moveTo(-w / 2, -h / 2);
-      ctx.lineTo(w * 0.44, -h / 2);
-      ctx.quadraticCurveTo(w * 0.44, h * 0.44, -w / 2, h * 0.44);
-      ctx.closePath();
-      ctx.fill();
-      ctx.globalAlpha = 1;
-      // Shower head circle top-left
+      ctx.restore();
+      // Shower head circle near corner
+      ctx.strokeStyle = stroke;
+      ctx.lineWidth = 1;
       const csShR = Math.min(w, h) * 0.14;
       const csShX = -w * 0.24;
       const csShY = -h * 0.24;
@@ -2952,18 +3047,9 @@ function drawFurnitureDetail(
       ctx.beginPath();
       ctx.arc(csShX, csShY, csShR * 0.42, 0, Math.PI * 2);
       ctx.stroke();
-      // Spray dots
-      ctx.fillStyle = stroke;
-      ctx.globalAlpha = 0.5;
-      for (const [dx, dy] of [[-0.06, -0.06], [0, -0.08], [0.06, -0.06], [-0.08, 0], [0.08, 0], [-0.06, 0.06], [0.06, 0.06]]) {
-        ctx.beginPath();
-        ctx.arc(csShX + w * dx, csShY + h * dy, 1.5, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      ctx.globalAlpha = 1;
-      // Drain cross bottom-right
-      const csDx = w * 0.22;
-      const csDy = h * 0.22;
+      // Drain cross
+      const csDx = w * 0.15;
+      const csDy = h * 0.15;
       ctx.fillStyle = stroke;
       ctx.globalAlpha = 0.5;
       ctx.beginPath();
@@ -2993,46 +3079,6 @@ function drawFurnitureDetail(
       ctx.globalAlpha = 0.05;
       ctx.fillRect(-w / 2, -h / 2, w, h);
       ctx.globalAlpha = 1;
-      // Shower head circle top-right
-      const wiShX = w * 0.3;
-      const wiShY = -h * 0.26;
-      const wiShR = Math.min(w, h) * 0.16;
-      ctx.fillStyle = stroke;
-      ctx.globalAlpha = 0.08;
-      ctx.beginPath();
-      ctx.arc(wiShX, wiShY, wiShR, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.globalAlpha = 1;
-      ctx.beginPath();
-      ctx.arc(wiShX, wiShY, wiShR, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.arc(wiShX, wiShY, wiShR * 0.44, 0, Math.PI * 2);
-      ctx.stroke();
-      // Spray dots
-      ctx.fillStyle = stroke;
-      ctx.globalAlpha = 0.5;
-      for (const [dx, dy] of [[-0.05, -0.06], [0, -0.08], [0.05, -0.06], [-0.07, 0], [0.07, 0], [-0.05, 0.06], [0.05, 0.06]]) {
-        ctx.beginPath();
-        ctx.arc(wiShX + w * dx, wiShY + h * dy, 1.5, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      ctx.globalAlpha = 1;
-      // Drain cross bottom-left
-      const wiDx = -w * 0.3;
-      const wiDy = h * 0.26;
-      ctx.fillStyle = stroke;
-      ctx.globalAlpha = 0.5;
-      ctx.beginPath();
-      ctx.arc(wiDx, wiDy, w * 0.04, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.moveTo(wiDx - w * 0.03, wiDy);
-      ctx.lineTo(wiDx + w * 0.03, wiDy);
-      ctx.moveTo(wiDx, wiDy - h * 0.04);
-      ctx.lineTo(wiDx, wiDy + h * 0.04);
-      ctx.stroke();
-      ctx.globalAlpha = 1;
       break;
     }
     case "shower_screen": {
@@ -3045,49 +3091,69 @@ function drawFurnitureDetail(
       break;
     }
     case "wc_wallhung": {
-      // Cistern rectangle at top (~19% height)
+      // Filled cistern rectangle at top (~19% height)
+      ctx.fillStyle = fill;
+      ctx.fillRect(-w * 0.47, -h / 2, w * 0.94, h * 0.19);
       ctx.fillStyle = stroke;
       ctx.globalAlpha = 0.12;
       ctx.fillRect(-w * 0.47, -h / 2, w * 0.94, h * 0.19);
       ctx.globalAlpha = 1;
+      ctx.strokeStyle = isSelected ? SELECT_COLOR : stroke;
+      ctx.lineWidth = isSelected ? 2 : 1;
       ctx.strokeRect(-w * 0.47, -h / 2, w * 0.94, h * 0.19);
       // Flush button ellipse
+      ctx.strokeStyle = stroke;
+      ctx.lineWidth = 1;
       ctx.globalAlpha = 0.4;
       ctx.beginPath();
       ctx.ellipse(0, -h / 2 + h * 0.095, w * 0.15, h * 0.047, 0, 0, Math.PI * 2);
       ctx.stroke();
       ctx.globalAlpha = 1;
-      // Rounder seat (circular)
+      // Filled oval seat
       const wcwhSeatR = w * 0.4;
       const wcwhSeatY = -h / 2 + h * 0.21 + wcwhSeatR;
+      ctx.fillStyle = fill;
       ctx.beginPath();
-      ctx.arc(0, wcwhSeatY, wcwhSeatR, 0, Math.PI * 2);
+      ctx.ellipse(0, wcwhSeatY, wcwhSeatR, h * 0.36, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = isSelected ? SELECT_COLOR : stroke;
+      ctx.lineWidth = isSelected ? 2 : 1;
+      ctx.beginPath();
+      ctx.ellipse(0, wcwhSeatY, wcwhSeatR, h * 0.36, 0, 0, Math.PI * 2);
       ctx.stroke();
       // Flat top edge across cistern junction
+      ctx.strokeStyle = stroke;
+      ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(-w * 0.43, -h / 2 + h * 0.21);
       ctx.lineTo(w * 0.43, -h / 2 + h * 0.21);
       ctx.stroke();
-      // Inner bowl circle
+      // Inner bowl
       ctx.fillStyle = stroke;
       ctx.globalAlpha = 0.06;
       ctx.beginPath();
-      ctx.arc(0, wcwhSeatY, wcwhSeatR * 0.65, 0, Math.PI * 2);
+      ctx.ellipse(0, wcwhSeatY, wcwhSeatR * 0.65, h * 0.24, 0, 0, Math.PI * 2);
       ctx.fill();
       ctx.globalAlpha = 1;
       ctx.beginPath();
-      ctx.arc(0, wcwhSeatY, wcwhSeatR * 0.65, 0, Math.PI * 2);
+      ctx.ellipse(0, wcwhSeatY, wcwhSeatR * 0.65, h * 0.24, 0, 0, Math.PI * 2);
       ctx.stroke();
       break;
     }
     case "wc_back_to_wall": {
-      // Larger cistern at top (~24% height)
+      // Filled cistern at top (~24% height)
+      ctx.fillStyle = fill;
+      ctx.fillRect(-w * 0.47, -h / 2, w * 0.94, h * 0.24);
       ctx.fillStyle = stroke;
       ctx.globalAlpha = 0.15;
       ctx.fillRect(-w * 0.47, -h / 2, w * 0.94, h * 0.24);
       ctx.globalAlpha = 1;
+      ctx.strokeStyle = isSelected ? SELECT_COLOR : stroke;
+      ctx.lineWidth = isSelected ? 2 : 1;
       ctx.strokeRect(-w * 0.47, -h / 2, w * 0.94, h * 0.24);
       // Inner cistern rectangle
+      ctx.strokeStyle = stroke;
+      ctx.lineWidth = 1;
       ctx.globalAlpha = 0.3;
       ctx.strokeRect(-w * 0.39, -h / 2 + h * 0.04, w * 0.78, h * 0.16);
       ctx.globalAlpha = 1;
@@ -3097,26 +3163,34 @@ function drawFurnitureDetail(
       ctx.ellipse(0, -h / 2 + h * 0.12, w * 0.17, h * 0.045, 0, 0, Math.PI * 2);
       ctx.stroke();
       ctx.globalAlpha = 1;
-      // Rounder seat (circular)
+      // Filled oval seat
       const wcbwSeatR = w * 0.4;
       const wcbwSeatY = -h / 2 + h * 0.26 + wcbwSeatR;
+      ctx.fillStyle = fill;
       ctx.beginPath();
-      ctx.arc(0, wcbwSeatY, wcbwSeatR, 0, Math.PI * 2);
+      ctx.ellipse(0, wcbwSeatY, wcbwSeatR, h * 0.36, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = isSelected ? SELECT_COLOR : stroke;
+      ctx.lineWidth = isSelected ? 2 : 1;
+      ctx.beginPath();
+      ctx.ellipse(0, wcbwSeatY, wcbwSeatR, h * 0.36, 0, 0, Math.PI * 2);
       ctx.stroke();
       // Flat top edge across cistern junction
+      ctx.strokeStyle = stroke;
+      ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(-w * 0.43, -h / 2 + h * 0.26);
       ctx.lineTo(w * 0.43, -h / 2 + h * 0.26);
       ctx.stroke();
-      // Inner bowl circle
+      // Inner bowl
       ctx.fillStyle = stroke;
       ctx.globalAlpha = 0.06;
       ctx.beginPath();
-      ctx.arc(0, wcbwSeatY, wcbwSeatR * 0.65, 0, Math.PI * 2);
+      ctx.ellipse(0, wcbwSeatY, wcbwSeatR * 0.65, h * 0.24, 0, 0, Math.PI * 2);
       ctx.fill();
       ctx.globalAlpha = 1;
       ctx.beginPath();
-      ctx.arc(0, wcbwSeatY, wcbwSeatR * 0.65, 0, Math.PI * 2);
+      ctx.ellipse(0, wcbwSeatY, wcbwSeatR * 0.65, h * 0.24, 0, 0, Math.PI * 2);
       ctx.stroke();
       break;
     }

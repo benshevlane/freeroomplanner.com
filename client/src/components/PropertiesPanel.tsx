@@ -206,8 +206,8 @@ export default function PropertiesPanel({
     const isWallCup = isWallCupboard(selectedFurniture.type);
     const widthLabel = isStructural ? "Length:" : "Width:";
     const heightLabel = isStructural ? "Thickness:" : "Height:";
-    const minWidth = 20;
-    const minHeight = isStructural ? 5 : 20;
+    const minWidth = 2;
+    const minHeight = 2;
 
     return (
       <div className="p-4 space-y-3" data-testid="properties-furniture">

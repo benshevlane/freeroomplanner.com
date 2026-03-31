@@ -1218,10 +1218,9 @@ export default function FloorPlanCanvas({
         const dxCm = localDxPx / pxPerCm;
         const dyCm = localDyPx / pxPerCm;
 
-        // Doors/windows allow smaller height (thickness) than regular furniture
-        const isStructural = resizingItem && (resizingItem.type === "door" || resizingItem.type === "door_double" || resizingItem.type === "window" || resizingItem.type === "radiator" || resizingItem.type === "internal_wall");
-        const minW = 20;
-        const minH = isStructural ? 5 : 20;
+        // Low minimum so thin items (shower screen 4cm, drains, etc.) keep proportions
+        const minW = 2;
+        const minH = 2;
 
         let newW = resizeStart.itemW;
         let newH = resizeStart.itemH;
