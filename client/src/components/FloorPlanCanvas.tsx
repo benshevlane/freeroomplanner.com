@@ -17,6 +17,9 @@ import {
   collectDistanceMeasurementRects,
   drawEraserHighlight,
   drawSelectHoverHighlight,
+  hitTestAnyElement,
+  hoveredElementsEqual,
+  HoveredElement,
   collectComponentLabelRects,
   resolveAndDrawLabelCollisions,
   findParallelWallDiscrepancies,
@@ -147,7 +150,7 @@ export default function FloorPlanCanvas({
   const [resizeStart, setResizeStart] = useState<{ x: number; y: number; itemX: number; itemY: number; itemW: number; itemH: number } | null>(null);
   const [wallSnapPoint, setWallSnapPoint] = useState<Point | null>(null);
   const [eraserHoverId, setEraserHoverId] = useState<string | null>(null);
-  const [selectHoverId, setSelectHoverId] = useState<string | null>(null);
+  const [selectHoverElement, setSelectHoverElement] = useState<HoveredElement | null>(null);
   const [isRotating, setIsRotating] = useState(false);
   const [rotateStartAngle, setRotateStartAngle] = useState(0);
   const [rotateItemStartRot, setRotateItemStartRot] = useState(0);
@@ -156,6 +159,10 @@ export default function FloorPlanCanvas({
   const [draggingLabelId, setDraggingLabelId] = useState<string | null>(null);
   const [labelDragStart, setLabelDragStart] = useState<{ x: number; y: number; offsetX: number; offsetY: number }>({ x: 0, y: 0, offsetX: 0, offsetY: 0 });
   const componentLabelInfosRef = useRef<ComponentLabelInfo[]>([]);
+
+  // Cached render-loop data for hover detection
+  const detectedRoomsRef = useRef<import("../lib/room-detection").DetectedRoom[]>([]);
+  const roomLabelPositionsRef = useRef<Map<string, Point>>(new Map());
 
   // Label rotate/resize state
   const [isRotatingLabel, setIsRotatingLabel] = useState(false);
@@ -292,6 +299,9 @@ export default function FloorPlanCanvas({
     const roomLabelPositions = rooms.length > 0
       ? computeRoomLabelPositions(ctx, rooms, state.furniture, state.gridSize, state.zoom, state.roomNames, state.units)
       : new Map<string, Point>();
+    // Cache for hover detection in pointer events
+    detectedRoomsRef.current = rooms;
+    roomLabelPositionsRef.current = roomLabelPositions;
     if (rooms.length > 0) {
       drawRoomAreas(ctx, rooms, state.gridSize, state.zoom, state.panOffset, isDark, state.units, state.roomNames, selectedRoomKey, roomLabelPositions, state.roomLabelOffsets);
     }
@@ -533,9 +543,24 @@ export default function FloorPlanCanvas({
       drawEraserHighlight(ctx, eraserHoverId, state.walls, state.furniture, state.labels, state.gridSize, state.zoom, state.panOffset);
     }
 
-    // Select tool hover highlight
-    if (state.selectedTool === "select" && selectHoverId) {
-      drawSelectHoverHighlight(ctx, selectHoverId, state.furniture, state.gridSize, state.zoom, state.panOffset);
+    // Select tool hover highlight — unified across ALL interactive elements
+    if (state.selectedTool === "select" && selectHoverElement) {
+      drawSelectHoverHighlight(ctx, selectHoverElement, {
+        furniture: state.furniture,
+        walls: state.walls,
+        labels: state.labels,
+        arrows: state.arrows,
+        rooms,
+        roomNames: state.roomNames,
+        labelPositions: roomLabelPositions,
+        roomLabelOffsets: state.roomLabelOffsets,
+        componentLabelInfos,
+        gridSize: state.gridSize,
+        zoom: state.zoom,
+        panOffset: state.panOffset,
+        isDark,
+        units: state.units,
+      });
     }
 
     // Scale indicator
@@ -1448,16 +1473,37 @@ export default function FloorPlanCanvas({
         setEraserHoverId(null);
       }
 
-      // Select tool hover detection
+      // Select tool hover detection — unified across ALL interactive elements
       if (state.selectedTool === "select" && !isDragging && !isPanning && !isResizing && !isRotating) {
-        const hitFurn = hitTestFurniture(pos.x, pos.y, state.furniture, state.gridSize, state.zoom, state.panOffset);
-        const newHoverId = (hitFurn && hitFurn.id !== state.selectedItemId) ? hitFurn.id : null;
-        if (newHoverId !== selectHoverId) setSelectHoverId(newHoverId);
-      } else if (selectHoverId) {
-        setSelectHoverId(null);
+        const canvas = canvasRef.current;
+        const ctx = canvas?.getContext("2d");
+        const hit = hitTestAnyElement(pos.x, pos.y, {
+          furniture: state.furniture,
+          walls: state.walls,
+          labels: state.labels,
+          arrows: state.arrows,
+          rooms: detectedRoomsRef.current,
+          roomNames: state.roomNames,
+          labelPositions: roomLabelPositionsRef.current,
+          roomLabelOffsets: state.roomLabelOffsets,
+          componentLabelInfos: componentLabelInfosRef.current,
+          gridSize: state.gridSize,
+          zoom: state.zoom,
+          panOffset: state.panOffset,
+          ctx: ctx || undefined,
+          selectedItemId: state.selectedItemId,
+          isDark,
+          units: state.units,
+          measureMode,
+        });
+        if (!hoveredElementsEqual(selectHoverElement, hit)) {
+          setSelectHoverElement(hit);
+        }
+      } else if (selectHoverElement) {
+        setSelectHoverElement(null);
       }
     },
-    [state, isPanning, isDragging, isDraggingLabel, draggingLabelId, labelDragStart, isDraggingRoomLabel, draggingRoomKey, roomLabelDragStart, isDraggingWallLabel, draggingWallLabelId, isResizing, isRotating, rotateStartAngle, rotateItemStartRot, resizeStart, resizeCorner, dragStart, dragItemOffset, eraserHoverId, selectHoverId, arrowDraggingEndpoint, arrowBodyDragStart, wallDragStart, isRotatingLabel, rotatingLabelId, labelRotateStartAngle, labelRotateItemStartRot, isResizingLabel, resizingLabelId, labelResizeStart, getCanvasPos, onSetPan, onSetZoom, onMoveFurniture, onMoveWall, onMoveLabel, onUpdateFurniture, onUpdateArrow, onSetLabelOffset, onSetRoomLabelOffset, onUpdateWallLabelOffset, isDark, measureMode, onSelectItem]
+    [state, isPanning, isDragging, isDraggingLabel, draggingLabelId, labelDragStart, isDraggingRoomLabel, draggingRoomKey, roomLabelDragStart, isDraggingWallLabel, draggingWallLabelId, isResizing, isRotating, rotateStartAngle, rotateItemStartRot, resizeStart, resizeCorner, dragStart, dragItemOffset, eraserHoverId, selectHoverElement, arrowDraggingEndpoint, arrowBodyDragStart, wallDragStart, isRotatingLabel, rotatingLabelId, labelRotateStartAngle, labelRotateItemStartRot, isResizingLabel, resizingLabelId, labelResizeStart, getCanvasPos, onSetPan, onSetZoom, onMoveFurniture, onMoveWall, onMoveLabel, onUpdateFurniture, onUpdateArrow, onSetLabelOffset, onSetRoomLabelOffset, onUpdateWallLabelOffset, isDark, measureMode, onSelectItem]
   );
 
   const handlePointerUp = useCallback(
@@ -1982,18 +2028,8 @@ export default function FloorPlanCanvas({
     if (state.selectedTool === "select") {
       if (isDragging) return "grabbing";
       if (emptyCanvasDragStart.current) return "grabbing";
-      if (hoveredWallLabelIdRef.current) return "grab";
-      // Show pointer cursor when hovering over items, grab cursor on empty canvas
-      if (mousePos.x !== 0 || mousePos.y !== 0) {
-        const canvas = canvasRef.current;
-        const ctx = canvas?.getContext("2d");
-        if (canvas && ctx) {
-          const hoveredFurn = hitTestFurniture(mousePos.x, mousePos.y, state.furniture, state.gridSize, state.zoom, state.panOffset, ctx);
-          if (hoveredFurn) return "default";
-        }
-        const hoveredWall = hitTestWall(mousePos.x, mousePos.y, state.walls, state.gridSize, state.zoom, state.panOffset);
-        if (hoveredWall) return "default";
-      }
+      // Unified: ANY hovered element → pointer cursor, empty canvas → grab/pan
+      if (selectHoverElement) return "default";
       return "grab";
     }
     return "default";

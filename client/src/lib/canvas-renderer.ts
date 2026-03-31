@@ -1,6 +1,119 @@
 import { Wall, FurnitureItem, RoomLabel, Arrow, ArrowHeadStyle, Point, UnitSystem, MeasureMode, LabelColor, isWallCupboard } from "./types";
 import { DetectedRoom } from "./room-detection";
 
+// ==========================================
+// Unified Hover Element System
+// ==========================================
+
+/** Discriminated union representing any hoverable canvas element */
+export type HoveredElement =
+  | { kind: "furniture"; id: string }
+  | { kind: "wall"; id: string }
+  | { kind: "roomLabel"; roomKey: string }
+  | { kind: "label"; id: string }
+  | { kind: "arrow"; id: string }
+  | { kind: "wallLabel"; id: string }
+  | { kind: "componentLabel"; itemId: string };
+
+/** Compare two HoveredElement values for equality (avoids unnecessary re-renders) */
+export function hoveredElementsEqual(a: HoveredElement | null, b: HoveredElement | null): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  if (a.kind !== b.kind) return false;
+  switch (a.kind) {
+    case "furniture": return (b as typeof a).id === a.id;
+    case "wall": return (b as typeof a).id === a.id;
+    case "roomLabel": return (b as typeof a).roomKey === a.roomKey;
+    case "label": return (b as typeof a).id === a.id;
+    case "arrow": return (b as typeof a).id === a.id;
+    case "wallLabel": return (b as typeof a).id === a.id;
+    case "componentLabel": return (b as typeof a).itemId === a.itemId;
+  }
+}
+
+export interface HitTestAnyElementParams {
+  furniture: FurnitureItem[];
+  walls: Wall[];
+  labels: RoomLabel[];
+  arrows: Arrow[];
+  rooms: DetectedRoom[];
+  roomNames: Record<string, string>;
+  labelPositions: Map<string, Point>;
+  roomLabelOffsets: Record<string, Point>;
+  componentLabelInfos: ComponentLabelInfo[];
+  gridSize: number;
+  zoom: number;
+  panOffset: Point;
+  ctx?: CanvasRenderingContext2D;
+  selectedItemId?: string | null;
+  isDark?: boolean;
+  units?: UnitSystem;
+  measureMode?: MeasureMode;
+}
+
+/** Hit-test ALL interactive canvas elements in priority order (topmost first).
+ *  Returns a HoveredElement describing what the mouse is over, or null for empty canvas. */
+export function hitTestAnyElement(
+  screenX: number,
+  screenY: number,
+  params: HitTestAnyElementParams
+): HoveredElement | null {
+  const { furniture, walls, labels, arrows, rooms, roomNames, labelPositions,
+    roomLabelOffsets, componentLabelInfos, gridSize, zoom, panOffset, ctx,
+    selectedItemId, isDark, units, measureMode } = params;
+
+  // 1. Component labels (topmost interactive layer)
+  const hitCompLabel = hitTestComponentLabel(screenX, screenY, componentLabelInfos);
+  if (hitCompLabel && hitCompLabel.id !== selectedItemId) {
+    return { kind: "componentLabel", itemId: hitCompLabel.id };
+  }
+
+  // 2. Wall measurement labels
+  if (isDark !== undefined && units && measureMode) {
+    const hitWallLabel = hitTestWallMeasurementLabel(
+      screenX, screenY, walls, gridSize, zoom, panOffset,
+      isDark, units, measureMode, furniture, rooms
+    );
+    if (hitWallLabel) {
+      return { kind: "wallLabel", id: hitWallLabel.id };
+    }
+  }
+
+  // 3. Arrows
+  const hitArr = hitTestArrow(screenX, screenY, arrows, gridSize, zoom, panOffset);
+  if (hitArr) {
+    return { kind: "arrow", id: hitArr.id };
+  }
+
+  // 4. Freeform labels
+  if (ctx) {
+    const hitLbl = hitTestLabel(screenX, screenY, labels, gridSize, zoom, panOffset, ctx);
+    if (hitLbl && hitLbl.id !== selectedItemId) {
+      return { kind: "label", id: hitLbl.id };
+    }
+  }
+
+  // 5. Furniture (doors/windows/items)
+  const hitFurn = hitTestFurniture(screenX, screenY, furniture, gridSize, zoom, panOffset);
+  if (hitFurn && hitFurn.id !== selectedItemId) {
+    return { kind: "furniture", id: hitFurn.id };
+  }
+
+  // 6. Room labels (text in room center)
+  const hitRoom = hitTestRoomLabel(screenX, screenY, rooms, gridSize, zoom, panOffset, roomNames, labelPositions, roomLabelOffsets);
+  if (hitRoom) {
+    return { kind: "roomLabel", roomKey: hitRoom.roomKey };
+  }
+
+  // 7. Walls (lowest interactive layer)
+  const hitW = hitTestWall(screenX, screenY, walls, gridSize, zoom, panOffset);
+  if (hitW) {
+    return { kind: "wall", id: hitW.id };
+  }
+
+  return null;
+}
+
 const CONNECT_THRESHOLD_EXT = 15; // cm, same as wall snap threshold
 
 /** Detect how far to extend measurement at each wall endpoint in "full" mode.
@@ -5492,39 +5605,244 @@ export function drawComponentSnapIndicators(
 }
 
 /** Draw hover highlight on furniture when select tool is active */
+// Shared hover highlight style constants
+const HOVER_FILL = "rgba(1, 105, 111, 0.10)";
+const HOVER_STROKE = "rgba(1, 105, 111, 0.5)";
+const HOVER_LINE_WIDTH = 1.5;
+const HOVER_DASH = [4, 3];
+const HOVER_PAD = 3;
+
+export interface DrawSelectHoverParams {
+  furniture: FurnitureItem[];
+  walls: Wall[];
+  labels: RoomLabel[];
+  arrows: Arrow[];
+  rooms: DetectedRoom[];
+  roomNames: Record<string, string>;
+  labelPositions: Map<string, Point>;
+  roomLabelOffsets: Record<string, Point>;
+  componentLabelInfos: ComponentLabelInfo[];
+  gridSize: number;
+  zoom: number;
+  panOffset: Point;
+  isDark: boolean;
+  units: UnitSystem;
+}
+
+/** Draw hover highlight for ANY canvas element type */
 export function drawSelectHoverHighlight(
   ctx: CanvasRenderingContext2D,
-  hoveredId: string,
-  furniture: FurnitureItem[],
-  gridSize: number,
-  zoom: number,
-  panOffset: Point
+  hovered: HoveredElement,
+  params: DrawSelectHoverParams
 ) {
+  const { furniture, walls, labels, arrows, rooms, roomNames, labelPositions,
+    roomLabelOffsets, componentLabelInfos, gridSize, zoom, panOffset } = params;
   const pxPerCm = (gridSize * zoom) / 100;
-  const item = furniture.find((f) => f.id === hoveredId);
-  if (!item) return;
 
-  const x = item.x * pxPerCm + panOffset.x;
-  const y = item.y * pxPerCm + panOffset.y;
-  const w = item.width * pxPerCm;
-  const h = item.height * pxPerCm;
+  switch (hovered.kind) {
+    case "furniture": {
+      const item = furniture.find((f) => f.id === hovered.id);
+      if (!item) return;
+      const x = item.x * pxPerCm + panOffset.x;
+      const y = item.y * pxPerCm + panOffset.y;
+      const w = item.width * pxPerCm;
+      const h = item.height * pxPerCm;
+      ctx.save();
+      ctx.translate(x + w / 2, y + h / 2);
+      ctx.rotate((item.rotation * Math.PI) / 180);
+      ctx.fillStyle = HOVER_FILL;
+      ctx.fillRect(-w / 2 - HOVER_PAD, -h / 2 - HOVER_PAD, w + HOVER_PAD * 2, h + HOVER_PAD * 2);
+      ctx.strokeStyle = HOVER_STROKE;
+      ctx.lineWidth = HOVER_LINE_WIDTH;
+      ctx.setLineDash(HOVER_DASH);
+      ctx.strokeRect(-w / 2 - HOVER_PAD, -h / 2 - HOVER_PAD, w + HOVER_PAD * 2, h + HOVER_PAD * 2);
+      ctx.setLineDash([]);
+      ctx.restore();
+      break;
+    }
 
-  ctx.save();
-  ctx.translate(x + w / 2, y + h / 2);
-  ctx.rotate((item.rotation * Math.PI) / 180);
+    case "wall": {
+      const wall = walls.find((w) => w.id === hovered.id);
+      if (!wall) return;
+      const sx = wall.start.x * pxPerCm + panOffset.x;
+      const sy = wall.start.y * pxPerCm + panOffset.y;
+      const ex = wall.end.x * pxPerCm + panOffset.x;
+      const ey = wall.end.y * pxPerCm + panOffset.y;
+      ctx.save();
+      // Semi-transparent teal fill along wall
+      ctx.strokeStyle = HOVER_FILL;
+      ctx.lineWidth = wall.thickness * pxPerCm + 6;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(sx, sy);
+      ctx.lineTo(ex, ey);
+      ctx.stroke();
+      // Dashed teal outline
+      ctx.strokeStyle = HOVER_STROKE;
+      ctx.lineWidth = wall.thickness * pxPerCm + 6;
+      ctx.setLineDash(HOVER_DASH);
+      ctx.beginPath();
+      ctx.moveTo(sx, sy);
+      ctx.lineTo(ex, ey);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+      break;
+    }
 
-  // Subtle teal fill
-  ctx.fillStyle = "rgba(1, 105, 111, 0.10)";
-  ctx.fillRect(-w / 2 - 3, -h / 2 - 3, w + 6, h + 6);
+    case "roomLabel": {
+      const room = rooms.find((r) => getRoomKey(r) === hovered.roomKey);
+      if (!room) return;
+      const basePos = labelPositions.get(hovered.roomKey) || room.centroid;
+      const userOffset = roomLabelOffsets[hovered.roomKey];
+      const labelPos = userOffset
+        ? { x: basePos.x + userOffset.x, y: basePos.y + userOffset.y }
+        : basePos;
+      const cx = labelPos.x * pxPerCm + panOffset.x;
+      const cy = labelPos.y * pxPerCm + panOffset.y;
+      const roomName = roomNames[hovered.roomKey] || "Room";
+      const nameFontSize = Math.max(11, 14 * zoom);
+      const areaFontSize = Math.max(9, 11 * zoom);
+      const totalHeight = nameFontSize + areaFontSize + 8;
+      const estWidth = Math.max(roomName.length, 8) * nameFontSize * 0.55;
+      const pad = 6;
+      const rx = cx - estWidth / 2 - pad;
+      const ry = cy - totalHeight / 2 - pad;
+      const rw = estWidth + pad * 2;
+      const rh = totalHeight + pad * 2;
+      const radius = 4;
+      ctx.save();
+      ctx.fillStyle = HOVER_FILL;
+      ctx.beginPath();
+      ctx.moveTo(rx + radius, ry);
+      ctx.lineTo(rx + rw - radius, ry);
+      ctx.arcTo(rx + rw, ry, rx + rw, ry + radius, radius);
+      ctx.arcTo(rx + rw, ry + rh, rx + rw - radius, ry + rh, radius);
+      ctx.lineTo(rx + radius, ry + rh);
+      ctx.arcTo(rx, ry + rh, rx, ry + rh - radius, radius);
+      ctx.arcTo(rx, ry, rx + radius, ry, radius);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = HOVER_STROKE;
+      ctx.lineWidth = HOVER_LINE_WIDTH;
+      ctx.setLineDash(HOVER_DASH);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+      break;
+    }
 
-  // Dashed teal border
-  ctx.strokeStyle = "rgba(1, 105, 111, 0.5)";
-  ctx.lineWidth = 1.5;
-  ctx.setLineDash([4, 3]);
-  ctx.strokeRect(-w / 2 - 3, -h / 2 - 3, w + 6, h + 6);
-  ctx.setLineDash([]);
+    case "label": {
+      const label = labels.find((l) => l.id === hovered.id);
+      if (!label) return;
+      const lx = label.x * pxPerCm + panOffset.x;
+      const ly = label.y * pxPerCm + panOffset.y;
+      ctx.save();
+      ctx.font = `600 ${label.fontSize * zoom}px 'General Sans', 'DM Sans', sans-serif`;
+      const tw = ctx.measureText(label.text).width;
+      const th = label.fontSize * zoom;
+      const pad = 6;
+      const rx = lx - tw / 2 - pad;
+      const ry = ly - th / 2 - pad;
+      const rw = tw + pad * 2;
+      const rh = th + pad * 2;
+      const radius = 4;
+      ctx.fillStyle = HOVER_FILL;
+      ctx.beginPath();
+      ctx.moveTo(rx + radius, ry);
+      ctx.lineTo(rx + rw - radius, ry);
+      ctx.arcTo(rx + rw, ry, rx + rw, ry + radius, radius);
+      ctx.arcTo(rx + rw, ry + rh, rx + rw - radius, ry + rh, radius);
+      ctx.lineTo(rx + radius, ry + rh);
+      ctx.arcTo(rx, ry + rh, rx, ry + rh - radius, radius);
+      ctx.arcTo(rx, ry, rx + radius, ry, radius);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = HOVER_STROKE;
+      ctx.lineWidth = HOVER_LINE_WIDTH;
+      ctx.setLineDash(HOVER_DASH);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+      break;
+    }
 
-  ctx.restore();
+    case "arrow": {
+      const arrow = arrows.find((a) => a.id === hovered.id);
+      if (!arrow) return;
+      const sx = arrow.startX * pxPerCm + panOffset.x;
+      const sy = arrow.startY * pxPerCm + panOffset.y;
+      const ex = arrow.endX * pxPerCm + panOffset.x;
+      const ey = arrow.endY * pxPerCm + panOffset.y;
+      ctx.save();
+      // Semi-transparent teal along arrow line
+      ctx.strokeStyle = HOVER_FILL;
+      ctx.lineWidth = (arrow.strokeWidth * zoom) + 8;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(sx, sy);
+      ctx.lineTo(ex, ey);
+      ctx.stroke();
+      // Dashed teal outline
+      ctx.strokeStyle = HOVER_STROKE;
+      ctx.lineWidth = (arrow.strokeWidth * zoom) + 8;
+      ctx.setLineDash(HOVER_DASH);
+      ctx.beginPath();
+      ctx.moveTo(sx, sy);
+      ctx.lineTo(ex, ey);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+      break;
+    }
+
+    case "wallLabel": {
+      // Wall measurement labels already have their own hover visual via hoveredWallLabelIdRef;
+      // no additional highlight needed here since they change appearance when hovered.
+      break;
+    }
+
+    case "componentLabel": {
+      const info = componentLabelInfos.find((i) => i.item.id === hovered.itemId);
+      if (!info) return;
+      const lx = info.centerX;
+      const ly = info.labelY;
+      const halfW = info.pillW / 2;
+      const halfH = info.pillH / 2;
+      const pad = 4;
+      const rx = lx - halfW - pad;
+      const ry = ly - halfH - pad;
+      const rw = info.pillW + pad * 2;
+      const rh = info.pillH + pad * 2;
+      const radius = rh / 2;
+      ctx.save();
+      if (info.labelRotation) {
+        const rcx = lx;
+        const rcy = ly + info.pillH / 2 - 2;
+        ctx.translate(rcx, rcy);
+        ctx.rotate((info.labelRotation * Math.PI) / 180);
+        ctx.translate(-rcx, -rcy);
+      }
+      ctx.fillStyle = HOVER_FILL;
+      ctx.beginPath();
+      ctx.moveTo(rx + radius, ry);
+      ctx.lineTo(rx + rw - radius, ry);
+      ctx.arcTo(rx + rw, ry, rx + rw, ry + radius, radius);
+      ctx.arcTo(rx + rw, ry + rh, rx + rw - radius, ry + rh, radius);
+      ctx.lineTo(rx + radius, ry + rh);
+      ctx.arcTo(rx, ry + rh, rx, ry + rh - radius, radius);
+      ctx.arcTo(rx, ry, rx + radius, ry, radius);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = HOVER_STROKE;
+      ctx.lineWidth = HOVER_LINE_WIDTH;
+      ctx.setLineDash(HOVER_DASH);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+      break;
+    }
+  }
 }
 
 /** Draw eraser hover highlight on the item that will be deleted */
