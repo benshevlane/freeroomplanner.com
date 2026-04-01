@@ -1,9 +1,10 @@
 import express, { type Express, type Request, type Response, type NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { Resend } from "resend";
+import crypto from "crypto";
 import { storage } from "./storage";
 import { supabaseAdmin } from "./supabase";
-import { verifyPassword } from "./auth";
+import { hashPassword, verifyPassword } from "./auth";
 import { contactFormSchema, feedbackFormSchema, embedSignupNotificationSchema } from "../shared/email-schemas";
 
 function requireAdmin(req: Request, res: Response, next: NextFunction) {
@@ -170,6 +171,111 @@ export async function registerRoutes(
       res.clearCookie("connect.sid");
       return res.json({ ok: true });
     });
+  });
+
+  // Admin: forgot password — send reset email
+  app.post("/api/admin/forgot-password", async (req, res) => {
+    const { email } = req.body ?? {};
+    if (typeof email !== "string" || email.length === 0) {
+      return res.status(400).json({ error: "Email required" });
+    }
+
+    // Always return success to avoid leaking which emails exist
+    if (!supabaseAdmin) {
+      return res.json({ ok: true });
+    }
+
+    const { data: admin } = await supabaseAdmin
+      .from("admin_users")
+      .select("id, email")
+      .eq("email", email.toLowerCase())
+      .maybeSingle();
+
+    if (!admin) {
+      return res.json({ ok: true });
+    }
+
+    // Generate a secure token and set 1-hour expiry
+    const token = crypto.randomBytes(32).toString("hex");
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+
+    const { error: updateErr } = await supabaseAdmin
+      .from("admin_users")
+      .update({ reset_token: token, reset_token_expires_at: expiresAt })
+      .eq("id", admin.id);
+
+    if (updateErr) {
+      console.error("Failed to store reset token:", updateErr.message);
+      return res.json({ ok: true });
+    }
+
+    // Send reset email
+    if (process.env.RESEND_API_KEY) {
+      try {
+        const resend = new Resend(process.env.RESEND_API_KEY);
+        const baseUrl = `${req.protocol}://${req.get("host")}`;
+        const resetUrl = `${baseUrl}/admin?reset=${token}`;
+        await resend.emails.send({
+          from: process.env.EMAIL_FROM || "Free Room Planner <noreply@send.freeroomplanner.com>",
+          to: admin.email,
+          subject: "Reset your admin password",
+          html: `<h2>Password Reset</h2>
+<p>You requested a password reset for your Free Room Planner admin account.</p>
+<p><a href="${resetUrl}" style="display:inline-block;background:#3d8a7c;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;">Reset Password</a></p>
+<p>This link expires in 1 hour. If you didn't request this, you can safely ignore this email.</p>`,
+        });
+      } catch (err) {
+        console.error("Failed to send reset email:", err instanceof Error ? err.message : err);
+      }
+    }
+
+    return res.json({ ok: true });
+  });
+
+  // Admin: reset password with token
+  app.post("/api/admin/reset-password", async (req, res) => {
+    const { token, password } = req.body ?? {};
+    if (typeof token !== "string" || token.length === 0) {
+      return res.status(400).json({ error: "Token required" });
+    }
+    if (typeof password !== "string" || password.length < 8) {
+      return res.status(400).json({ error: "Password must be at least 8 characters" });
+    }
+
+    if (!supabaseAdmin) {
+      return res.status(500).json({ error: "Database not configured" });
+    }
+
+    const { data: admin, error: dbErr } = await supabaseAdmin
+      .from("admin_users")
+      .select("id, reset_token, reset_token_expires_at")
+      .eq("reset_token", token)
+      .maybeSingle();
+
+    if (dbErr || !admin) {
+      return res.status(400).json({ error: "Invalid or expired reset link" });
+    }
+
+    if (!admin.reset_token_expires_at || new Date(admin.reset_token_expires_at) < new Date()) {
+      return res.status(400).json({ error: "Invalid or expired reset link" });
+    }
+
+    const newHash = await hashPassword(password);
+    const { error: updateErr } = await supabaseAdmin
+      .from("admin_users")
+      .update({
+        password_hash: newHash,
+        reset_token: null,
+        reset_token_expires_at: null,
+      })
+      .eq("id", admin.id);
+
+    if (updateErr) {
+      console.error("Failed to update password:", updateErr.message);
+      return res.status(500).json({ error: "Failed to reset password" });
+    }
+
+    return res.json({ ok: true });
   });
 
   // Admin: embed users report
