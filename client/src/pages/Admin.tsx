@@ -16,11 +16,203 @@ interface EmbedPartner {
   plan_exported_count: number;
 }
 
+function ForgotPasswordForm({ onBack }: { onBack: () => void }) {
+  const [email, setEmail] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    try {
+      await apiRequest("POST", "/api/admin/forgot-password", { email });
+      setSent(true);
+    } catch {
+      setError("Something went wrong. Please try again.");
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div className="min-h-screen bg-[#faf8f4] text-[#1a1a18] flex items-center justify-center">
+      <div className="w-full max-w-sm px-5">
+        <div className="bg-white rounded-xl border border-[#e8e3d8] shadow-sm p-8">
+          <div className="flex justify-center mb-4">
+            <div className="w-12 h-12 rounded-full bg-[#e8f5f1] flex items-center justify-center">
+              <svg className="w-6 h-6 text-[#3d8a7c]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+            </div>
+          </div>
+
+          <h1 className="text-xl font-bold mb-1 text-center">Reset Password</h1>
+          <p className="text-[#6b6457] mb-6 text-center text-sm">
+            {sent ? "Check your email for a reset link." : "Enter your email to receive a reset link."}
+          </p>
+
+          {!sent ? (
+            <form onSubmit={handleSubmit} className="space-y-3">
+              <div>
+                <label htmlFor="reset-email" className="block text-sm font-medium text-[#6b6457] mb-1">Email</label>
+                <input
+                  id="reset-email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="admin@example.com"
+                  autoFocus
+                  autoComplete="email"
+                  className="w-full border border-[#d8d2c4] rounded-lg px-4 py-2.5 text-sm bg-white focus:outline-none focus:border-[#3d8a7c] transition-colors"
+                />
+              </div>
+              {error && <p className="text-red-600 text-sm">{error}</p>}
+              <button
+                type="submit"
+                disabled={loading || !email}
+                className="w-full bg-[#3d8a7c] text-white rounded-lg px-4 py-2.5 text-sm font-medium hover:bg-[#357a6e] disabled:opacity-50 transition-colors"
+              >
+                {loading ? "Sending..." : "Send reset link"}
+              </button>
+            </form>
+          ) : (
+            <p className="text-sm text-[#6b6457] text-center">
+              If an account exists with that email, you'll receive a password reset link shortly.
+            </p>
+          )}
+
+          <button
+            onClick={onBack}
+            className="w-full text-center mt-4 text-sm text-[#3d8a7c] hover:underline"
+          >
+            &larr; Back to login
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ResetPasswordForm({ token, onSuccess }: { token: string; onSuccess: () => void }) {
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters.");
+      return;
+    }
+    if (password !== confirm) {
+      setError("Passwords do not match.");
+      return;
+    }
+    setLoading(true);
+    try {
+      await apiRequest("POST", "/api/admin/reset-password", { token, password });
+      onSuccess();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes("expired") || msg.includes("Invalid")) {
+        setError("This reset link is invalid or has expired. Please request a new one.");
+      } else {
+        setError("Failed to reset password. Please try again.");
+      }
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div className="min-h-screen bg-[#faf8f4] text-[#1a1a18] flex items-center justify-center">
+      <div className="w-full max-w-sm px-5">
+        <div className="bg-white rounded-xl border border-[#e8e3d8] shadow-sm p-8">
+          <div className="flex justify-center mb-4">
+            <div className="w-12 h-12 rounded-full bg-[#e8f5f1] flex items-center justify-center">
+              <svg className="w-6 h-6 text-[#3d8a7c]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+              </svg>
+            </div>
+          </div>
+
+          <h1 className="text-xl font-bold mb-1 text-center">Set New Password</h1>
+          <p className="text-[#6b6457] mb-6 text-center text-sm">Enter your new password below.</p>
+
+          <form onSubmit={handleSubmit} className="space-y-3">
+            <div>
+              <label htmlFor="new-password" className="block text-sm font-medium text-[#6b6457] mb-1">New Password</label>
+              <input
+                id="new-password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Minimum 8 characters"
+                autoFocus
+                autoComplete="new-password"
+                className="w-full border border-[#d8d2c4] rounded-lg px-4 py-2.5 text-sm bg-white focus:outline-none focus:border-[#3d8a7c] transition-colors"
+              />
+            </div>
+            <div>
+              <label htmlFor="confirm-password" className="block text-sm font-medium text-[#6b6457] mb-1">Confirm Password</label>
+              <input
+                id="confirm-password"
+                type="password"
+                value={confirm}
+                onChange={(e) => setConfirm(e.target.value)}
+                placeholder="Confirm password"
+                autoComplete="new-password"
+                className="w-full border border-[#d8d2c4] rounded-lg px-4 py-2.5 text-sm bg-white focus:outline-none focus:border-[#3d8a7c] transition-colors"
+              />
+            </div>
+            {error && <p className="text-red-600 text-sm">{error}</p>}
+            <button
+              type="submit"
+              disabled={loading || !password || !confirm}
+              className="w-full bg-[#3d8a7c] text-white rounded-lg px-4 py-2.5 text-sm font-medium hover:bg-[#357a6e] disabled:opacity-50 transition-colors"
+            >
+              {loading ? "Resetting..." : "Reset password"}
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function LoginForm({ onSuccess }: { onSuccess: (email: string) => void }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showForgot, setShowForgot] = useState(false);
+  const [resetToken, setResetToken] = useState<string | null>(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("reset");
+  });
+  const [resetSuccess, setResetSuccess] = useState(false);
+
+  // Show reset password form if token is in URL
+  if (resetToken) {
+    return (
+      <ResetPasswordForm
+        token={resetToken}
+        onSuccess={() => {
+          setResetToken(null);
+          setResetSuccess(true);
+          // Clean up URL
+          window.history.replaceState({}, "", "/admin");
+        }}
+      />
+    );
+  }
+
+  if (showForgot) {
+    return <ForgotPasswordForm onBack={() => setShowForgot(false)} />;
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,6 +252,10 @@ function LoginForm({ onSuccess }: { onSuccess: (email: string) => void }) {
           <h1 className="text-xl font-bold mb-1 text-center">Admin Login</h1>
           <p className="text-[#6b6457] mb-6 text-center text-sm">Sign in to manage your site.</p>
 
+          {resetSuccess && (
+            <p className="text-[#3d8a7c] text-sm mb-4 text-center">Password reset successfully. Sign in with your new password.</p>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-3">
             <div>
               <label htmlFor="admin-email" className="block text-sm font-medium text-[#6b6457] mb-1">Email</label>
@@ -95,6 +291,13 @@ function LoginForm({ onSuccess }: { onSuccess: (email: string) => void }) {
               {loading ? "Signing in..." : "Sign in"}
             </button>
           </form>
+
+          <button
+            onClick={() => setShowForgot(true)}
+            className="w-full text-center mt-4 text-sm text-[#3d8a7c] hover:underline"
+          >
+            Forgot password?
+          </button>
         </div>
 
         <p className="text-center mt-6">
