@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback, useState } from "react";
+import { useRef, useEffect, useCallback, useState, useMemo } from "react";
 import { EditorState, Point, FurnitureTemplate, FurnitureItem, RoomLabel, TextBox, Arrow, UnitSystem, MeasureMode, EditorTool } from "../lib/types";
 import RichTextBoxComponent from "./RichTextBox";
 import {
@@ -262,18 +262,29 @@ export default function FloorPlanCanvas({
     const container = containerRef.current;
     if (!container) return;
 
-    const observer = new ResizeObserver(() => {
+    const setCanvasSize = () => {
       const canvas = canvasRef.current;
-      if (!canvas) return;
+      if (!canvas || !container) return;
       const dpr = window.devicePixelRatio || 1;
       canvas.width = container.clientWidth * dpr;
       canvas.height = container.clientHeight * dpr;
       canvas.style.width = `${container.clientWidth}px`;
       canvas.style.height = `${container.clientHeight}px`;
-    });
+    };
+
+    if (typeof ResizeObserver === "undefined") {
+      setCanvasSize();
+      window.addEventListener("resize", setCanvasSize);
+      return () => window.removeEventListener("resize", setCanvasSize);
+    }
+
+    const observer = new ResizeObserver(setCanvasSize);
     observer.observe(container);
     return () => observer.disconnect();
   }, []);
+
+  // Memoize room detection so DFS only reruns when walls change
+  const detectedRooms = useMemo(() => detectRooms(state.walls), [state.walls]);
 
   // Render loop
   useEffect(() => {
@@ -295,7 +306,7 @@ export default function FloorPlanCanvas({
     drawGrid(ctx, w, h, state.gridSize, state.zoom, state.panOffset, isDark);
 
     // Room areas with names
-    const rooms = detectRooms(state.walls);
+    const rooms = detectedRooms;
     const roomLabelPositions = rooms.length > 0
       ? computeRoomLabelPositions(ctx, rooms, state.furniture, state.gridSize, state.zoom, state.roomNames, state.units)
       : new Map<string, Point>();
@@ -797,7 +808,7 @@ export default function FloorPlanCanvas({
 
         // Try to hit test room labels for dragging
         {
-          const rooms = detectRooms(state.walls);
+          const rooms = detectedRoomsRef.current;
           if (rooms.length > 0) {
             const canvas = canvasRef.current;
             const ctx = canvas?.getContext("2d");
@@ -876,7 +887,7 @@ export default function FloorPlanCanvas({
 
         // Wall measurement label: check reset icon first, then label drag
         {
-          const wallLabelRooms = detectRooms(state.walls);
+          const wallLabelRooms = detectedRoomsRef.current;
           const resetHit = hitTestWallLabelResetIcon(
             pos.x, pos.y, state.walls, state.gridSize, state.zoom, state.panOffset,
             isDark, state.units, measureMode, state.furniture, wallLabelRooms
@@ -1435,7 +1446,7 @@ export default function FloorPlanCanvas({
 
       // Wall measurement label hover detection (select tool only, when not dragging)
       if (state.selectedTool === "select" && !isDragging && !isDraggingLabel && !isDraggingRoomLabel && !isDraggingWallLabel && !isResizing && !isRotating) {
-        const wallLabelRooms = detectRooms(state.walls);
+        const wallLabelRooms = detectedRoomsRef.current;
         const labelHit = hitTestWallMeasurementLabel(
           pos.x, pos.y, state.walls, state.gridSize, state.zoom, state.panOffset,
           isDark, state.units, measureMode, state.furniture, wallLabelRooms
@@ -1662,7 +1673,7 @@ export default function FloorPlanCanvas({
         const pos = { x: e.clientX - rect.left, y: e.clientY - rect.top };
 
         // Check room labels first
-        const rooms = detectRooms(state.walls);
+        const rooms = detectedRoomsRef.current;
         const roomLabelPos = rooms.length > 0
           ? computeRoomLabelPositions(ctx, rooms, state.furniture, state.gridSize, state.zoom, state.roomNames, state.units)
           : new Map<string, Point>();

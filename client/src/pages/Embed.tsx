@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { parseEmbedParams } from "../lib/embed-params";
 import EditorCore from "../components/EditorCore";
 import PoweredByBadge from "../components/PoweredByBadge";
+import { safeSessionGetItem, safeSessionSetItem } from "../lib/safe-storage";
 import { trackEvent } from "@/lib/analytics";
 import { trackEmbedEvent } from "@/lib/embed-analytics";
 import FreeRoomPlannerLogo from "@/components/FreeRoomPlannerLogo";
@@ -23,14 +24,14 @@ export default function Embed() {
     if (!params.partner) return true; // skip if no partner
     if (!params.embed) return true; // skip welcome on direct navigation
     if (params.type === "homepage") return true; // skip welcome for homepage embeds — the card CTA already serves as the intro
-    return sessionStorage.getItem(`frp-embed-started-${params.partner}`) === "1";
+    return safeSessionGetItem(`frp-embed-started-${params.partner}`) === "1";
   });
   const [welcomeFading, setWelcomeFading] = useState(false);
 
   const handleStart = useCallback(() => {
     setWelcomeFading(true);
     if (params.partner) {
-      sessionStorage.setItem(`frp-embed-started-${params.partner}`, "1");
+      safeSessionSetItem(`frp-embed-started-${params.partner}`, "1");
       trackEmbedEvent(params.partner, "embed_loaded");
     }
     // Signal parent page to expand iframe (homepage embed only)

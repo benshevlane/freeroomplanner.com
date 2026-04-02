@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { safeSetItem } from "../lib/safe-storage";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -54,7 +55,7 @@ export default function DesktopWizard({ open, onClose }: DesktopWizardProps) {
   const [step, setStep] = useState(0);
 
   const handleClose = () => {
-    localStorage.setItem(WIZARD_STORAGE_KEY, "1");
+    safeSetItem(WIZARD_STORAGE_KEY, "1");
     setStep(0);
     onClose();
   };

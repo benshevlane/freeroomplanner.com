@@ -10,6 +10,7 @@ import RoomGeneratorWizard from "../components/RoomGeneratorWizard";
 import { PerplexityAttribution } from "../components/PerplexityAttribution";
 import IntentCapture from "../components/IntentCapture";
 import { FurnitureItem } from "../lib/types";
+import { safeGetItem } from "../lib/safe-storage";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -34,7 +35,7 @@ export default function Editor() {
   });
   const isMobile = useIsMobile();
   const [showIntentCapture, setShowIntentCapture] = useState(() => {
-    return !localStorage.getItem("freeroomplanner-intent");
+    return !safeGetItem("freeroomplanner-intent");
   });
   const [isDark, setIsDark] = useState(() =>
     window.matchMedia("(prefers-color-scheme: dark)").matches
@@ -43,7 +44,7 @@ export default function Editor() {
   // Mobile onboarding wizard
   const [showMobileWizard, setShowMobileWizard] = useState(false);
   useEffect(() => {
-    if (isMobile && !localStorage.getItem("freeroomplanner-mobile-wizard-shown")) {
+    if (isMobile && !safeGetItem("freeroomplanner-mobile-wizard-shown")) {
       setShowMobileWizard(true);
     }
   }, [isMobile]);
@@ -51,7 +52,7 @@ export default function Editor() {
   // Desktop onboarding wizard
   const [showDesktopWizard, setShowDesktopWizard] = useState(false);
   useEffect(() => {
-    if (!isMobile && !localStorage.getItem("freeroomplanner-desktop-wizard-shown")) {
+    if (!isMobile && !safeGetItem("freeroomplanner-desktop-wizard-shown")) {
       setShowDesktopWizard(true);
     }
   }, [isMobile]);

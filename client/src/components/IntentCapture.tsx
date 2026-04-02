@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { safeSetItem } from "../lib/safe-storage";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface IntentOption {
@@ -29,7 +30,7 @@ export default function IntentCapture({ onComplete }: IntentCaptureProps) {
     setSelected(value);
 
     const data = { intent: value };
-    localStorage.setItem("freeroomplanner-intent", JSON.stringify(data));
+    safeSetItem("freeroomplanner-intent", JSON.stringify(data));
     console.log("[IntentCapture] Selected intent:", data);
 
     // Brief delay to show selection highlight, then transition out

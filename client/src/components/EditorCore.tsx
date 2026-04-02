@@ -27,6 +27,7 @@ import {
   collectDistanceMeasurementRects,
 } from "../lib/canvas-renderer";
 import { detectRooms } from "../lib/room-detection";
+import { safeGetItem, safeSetItem } from "../lib/safe-storage";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -81,14 +82,14 @@ export default function EditorCore({
   }, []);
 
   const [measureMode, setMeasureMode] = useState<MeasureMode>(() => {
-    const stored = localStorage.getItem("freeroomplanner-measure-mode");
+    const stored = safeGetItem("freeroomplanner-measure-mode");
     return (stored === "inside" || stored === "full") ? stored : "inside";
   });
 
   const toggleMeasureMode = useCallback(() => {
     setMeasureMode((prev) => {
       const next = prev === "full" ? "inside" : "full";
-      localStorage.setItem("freeroomplanner-measure-mode", next);
+      safeSetItem("freeroomplanner-measure-mode", next);
       return next;
     });
   }, []);
@@ -454,7 +455,7 @@ export default function EditorCore({
         URL.revokeObjectURL(url);
         showToast("Plan saved as PNG image");
         try {
-          const intent = localStorage.getItem("freeroomplanner-intent");
+          const intent = safeGetItem("freeroomplanner-intent");
           const planType = intent ? JSON.parse(intent)?.intent ?? "room" : "room";
           trackEvent('room_plan_saved', {
             plan_type: planType,
