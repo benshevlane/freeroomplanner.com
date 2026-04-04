@@ -5,6 +5,7 @@ import PoweredByBadge from "../components/PoweredByBadge";
 import { safeSessionGetItem, safeSessionSetItem } from "../lib/safe-storage";
 import { trackEvent } from "@/lib/analytics";
 import { trackEmbedEvent } from "@/lib/embed-analytics";
+import { safeMatchMediaMatches } from "../lib/safe-match-media";
 import FreeRoomPlannerLogo from "@/components/FreeRoomPlannerLogo";
 
 export default function Embed() {
@@ -16,7 +17,7 @@ export default function Embed() {
   const [isDark, setIsDark] = useState(() => {
     if (params.dark === true) return true;
     if (params.dark === false) return false;
-    return window.matchMedia("(prefers-color-scheme: dark)").matches;
+    return safeMatchMediaMatches("(prefers-color-scheme: dark)");
   });
 
   // Welcome screen state — show once per session; skip on direct navigation

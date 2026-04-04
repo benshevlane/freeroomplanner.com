@@ -20,7 +20,13 @@ export default class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
+    const ua = typeof navigator !== "undefined" ? navigator.userAgent : "unknown";
+    const hasMatchMedia = typeof window !== "undefined" && typeof window.matchMedia === "function";
+    const hasLocalStorage = (() => { try { return typeof localStorage !== "undefined"; } catch { return false; } })();
+
     console.error("[ErrorBoundary]", error, info.componentStack);
+    console.error("[ErrorBoundary] env:", { ua, hasMatchMedia, hasLocalStorage });
+
     this.setState({ errorInfo: info });
   }
 
@@ -45,6 +51,11 @@ export default class ErrorBoundary extends Component<Props, State> {
           >
             Reload
           </button>
+          {this.state.error && (
+            <p style={{ color: "#999", fontSize: 11, marginTop: 12, fontFamily: "monospace" }}>
+              {this.state.error.name}: {this.state.error.message}
+            </p>
+          )}
           {isDebug && this.state.error && (
             <pre style={{
               marginTop: 24,

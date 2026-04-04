@@ -4,6 +4,7 @@ import FreeRoomPlannerLogo from "@/components/FreeRoomPlannerLogo";
 import ContactFormDialog from "@/components/ContactFormDialog";
 import FeedbackFormDialog from "@/components/FeedbackFormDialog";
 import { useDocumentMeta } from "@/hooks/use-document-meta";
+import { safeMatchMediaMatches } from "../lib/safe-match-media";
 import { supabase } from "@/lib/supabase";
 
 const HERO_BUCKET = "hero-images";
@@ -92,7 +93,7 @@ export default function Landing() {
   const [feedbackOpen, setFeedbackOpen] = useState(false);
 
   useEffect(() => {
-    setIsDark(window.matchMedia("(prefers-color-scheme: dark)").matches);
+    setIsDark(safeMatchMediaMatches("(prefers-color-scheme: dark)"));
   }, []);
 
   useEffect(() => {

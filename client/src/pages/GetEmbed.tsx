@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useLocation } from "wouter";
 import { supabase } from "@/lib/supabase";
 import { useDocumentMeta } from "@/hooks/use-document-meta";
+import { safeMatchMediaMatches } from "../lib/safe-match-media";
 import FreeRoomPlannerLogo from "@/components/FreeRoomPlannerLogo";
 import {
   Accordion,
@@ -327,7 +328,7 @@ export default function GetEmbed() {
 
   // Dark mode
   useEffect(() => {
-    setIsDark(window.matchMedia("(prefers-color-scheme: dark)").matches);
+    setIsDark(safeMatchMediaMatches("(prefers-color-scheme: dark)"));
   }, []);
   useEffect(() => {
     document.documentElement.classList.toggle("dark", isDark);
