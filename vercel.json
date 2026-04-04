@@ -6,6 +6,16 @@
       "has": [{ "type": "host", "value": "www.freeroomplanner.com" }],
       "destination": "https://freeroomplanner.com/:path",
       "permanent": true
+    },
+    {
+      "source": "/for-businesses",
+      "destination": "/get-embed",
+      "permanent": true
+    },
+    {
+      "source": "/floor-plan",
+      "destination": "/floor-plan-maker",
+      "permanent": true
     }
   ],
   "buildCommand": "npx vite build && cp dist/public/index.html dist/public/app.html && cp dist/public/index.html dist/public/embed.html && cp dist/public/index.html dist/public/admin.html && cp dist/public/index.html dist/public/get-embed.html",
