@@ -6,17 +6,22 @@ interface Props {
 
 interface State {
   hasError: boolean;
+  error: Error | null;
+  errorInfo: ErrorInfo | null;
 }
 
-export default class ErrorBoundary extends Component<Props, State> {
-  state: State = { hasError: false };
+const isDebug = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("debug");
 
-  static getDerivedStateFromError(): State {
-    return { hasError: true };
+export default class ErrorBoundary extends Component<Props, State> {
+  state: State = { hasError: false, error: null, errorInfo: null };
+
+  static getDerivedStateFromError(error: Error): Partial<State> {
+    return { hasError: true, error };
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error("[ErrorBoundary]", error, info.componentStack);
+    this.setState({ errorInfo: info });
   }
 
   render() {
@@ -40,6 +45,30 @@ export default class ErrorBoundary extends Component<Props, State> {
           >
             Reload
           </button>
+          {isDebug && this.state.error && (
+            <pre style={{
+              marginTop: 24,
+              padding: 16,
+              background: "#f5f5f5",
+              borderRadius: 8,
+              fontSize: 12,
+              textAlign: "left",
+              overflow: "auto",
+              maxHeight: 300,
+              whiteSpace: "pre-wrap",
+              wordBreak: "break-word",
+            }}>
+              {this.state.error.message}
+              {"\n\n"}
+              {this.state.error.stack}
+              {this.state.errorInfo?.componentStack && (
+                <>
+                  {"\n\nComponent Stack:"}
+                  {this.state.errorInfo.componentStack}
+                </>
+              )}
+            </pre>
+          )}
         </div>
       );
     }

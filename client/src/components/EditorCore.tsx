@@ -7,7 +7,6 @@ import FurniturePanel from "./FurniturePanel";
 import PropertiesPanel from "./PropertiesPanel";
 import RoomTabs from "./RoomTabs";
 import { FurnitureTemplate, FurnitureItem, RoomLabel, TextBox, Arrow, Point, UnitSystem, MeasureMode, isWallCupboard } from "../lib/types";
-import html2canvas from "html2canvas";
 import { trackEvent } from "@/lib/analytics";
 import {
   drawGrid,
@@ -362,7 +361,8 @@ export default function EditorCore({
       const finalCanvas = document.createElement('canvas');
       finalCanvas.width = canvasW;
       finalCanvas.height = canvasH;
-      const ctx = finalCanvas.getContext('2d')!;
+      const ctx = finalCanvas.getContext('2d');
+      if (!ctx) throw new Error("Canvas 2D context unavailable — export not supported in this browser");
       ctx.scale(exportScale, exportScale);
 
       const gridSize = 100 * pxPerCm; // 1m = 100cm
