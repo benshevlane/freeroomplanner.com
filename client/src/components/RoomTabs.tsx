@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { RoomData } from "../lib/types";
-import { Plus, X } from "lucide-react";
+import { Plus, X, Pencil, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -19,6 +19,7 @@ interface RoomTabsProps {
   onAddRoom: () => void;
   onRenameRoom: (roomId: string, name: string) => void;
   onDeleteRoom: (roomId: string) => void;
+  onDuplicateRoom: (roomId: string) => void;
   onReorderRooms: (newOrder: string[]) => void;
 }
 
@@ -29,6 +30,7 @@ export default function RoomTabs({
   onSwitchRoom,
   onAddRoom,
   onRenameRoom,
+  onDuplicateRoom,
   onDeleteRoom,
   onReorderRooms,
 }: RoomTabsProps) {
@@ -165,18 +167,42 @@ export default function RoomTabs({
                   <span className="max-w-[120px] truncate">{room.name}</span>
                 )}
 
-                {/* Delete button — only show if more than 1 room */}
-                {roomOrder.length > 1 && editingId !== room.id && (
-                  <button
-                    className="opacity-0 group-hover:opacity-100 ml-1 p-0.5 rounded hover:bg-destructive/20 hover:text-destructive transition-opacity"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDelete(room.id);
-                    }}
-                    title="Delete room"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
+                {/* Tab action buttons — show on hover */}
+                {editingId !== room.id && (
+                  <>
+                    <button
+                      className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-muted transition-opacity"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        startEditing(room);
+                      }}
+                      title="Rename room"
+                    >
+                      <Pencil className="h-3 w-3" />
+                    </button>
+                    <button
+                      className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-muted transition-opacity"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDuplicateRoom(room.id);
+                      }}
+                      title="Duplicate room"
+                    >
+                      <Copy className="h-3 w-3" />
+                    </button>
+                    {roomOrder.length > 1 && (
+                      <button
+                        className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-destructive/20 hover:text-destructive transition-opacity"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(room.id);
+                        }}
+                        title="Delete room"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
             );

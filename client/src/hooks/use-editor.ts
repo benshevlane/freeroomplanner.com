@@ -717,6 +717,55 @@ export function useEditor(storageKey: string = DEFAULT_AUTOSAVE_KEY) {
     });
   }, []);
 
+  const duplicateRoom = useCallback((roomId?: string) => {
+    setState((s) => {
+      const syncedRooms = syncActiveRoomToRooms(s);
+      const sourceId = roomId ?? s.activeRoomId;
+      const sourceRoom = syncedRooms.find((r) => r.id === sourceId);
+      if (!sourceRoom) return s;
+
+      const newRoom: RoomData = {
+        id: generateId(),
+        name: `${sourceRoom.name} (copy)`,
+        walls: sourceRoom.walls.map((w) => ({ ...w, id: generateId(), start: { ...w.start }, end: { ...w.end } })),
+        furniture: sourceRoom.furniture.map((f) => ({ ...f, id: generateId(), labelOffset: f.labelOffset ? { ...f.labelOffset } : undefined })),
+        labels: sourceRoom.labels.map((l) => ({ ...l, id: generateId() })),
+        textBoxes: sourceRoom.textBoxes.map((t) => ({ ...t, id: generateId() })),
+        arrows: sourceRoom.arrows.map((a) => ({ ...a, id: generateId() })),
+        roomNames: { ...sourceRoom.roomNames },
+        roomLabelOffsets: Object.fromEntries(
+          Object.entries(sourceRoom.roomLabelOffsets).map(([k, v]) => [k, { ...v }])
+        ),
+        componentLabelsVisible: sourceRoom.componentLabelsVisible,
+      };
+
+      const newRooms = [...syncedRooms, newRoom];
+      const newOrder = [...s.roomOrder];
+      const sourceIdx = newOrder.indexOf(sourceId);
+      newOrder.splice(sourceIdx + 1, 0, newRoom.id);
+
+      return {
+        ...s,
+        rooms: newRooms,
+        activeRoomId: newRoom.id,
+        roomOrder: newOrder,
+        roomName: newRoom.name,
+        walls: newRoom.walls,
+        furniture: normalizeFurniture(newRoom.furniture),
+        labels: newRoom.labels,
+        textBoxes: newRoom.textBoxes,
+        arrows: newRoom.arrows,
+        roomNames: newRoom.roomNames,
+        roomLabelOffsets: newRoom.roomLabelOffsets,
+        componentLabelsVisible: newRoom.componentLabelsVisible,
+        selectedTool: "select" as EditorTool,
+        selectedItemId: null,
+        wallDrawing: null,
+        wallChainStart: null,
+      };
+    });
+  }, []);
+
   const reorderRooms = useCallback((newOrder: string[]) => {
     setState((s) => ({ ...s, roomOrder: newOrder }));
   }, []);
@@ -736,25 +785,90 @@ export function useEditor(storageKey: string = DEFAULT_AUTOSAVE_KEY) {
     };
   }, [state.roomName, state.walls, state.furniture, state.labels, state.textBoxes, state.arrows, state.roomNames, state.roomLabelOffsets, state.componentLabelsVisible]);
 
-  const importState = useCallback((plan: { version: number; roomName: string; walls: Wall[]; furniture: FurnitureItem[]; labels: RoomLabel[]; textBoxes?: TextBox[]; arrows?: Arrow[]; roomNames?: Record<string, string>; componentLabelsVisible?: boolean }) => {
-    pushUndo();
-    setState((s) => ({
-      ...s,
-      roomName: plan.roomName,
-      walls: plan.walls,
-      furniture: plan.furniture.map((f) => ({
-        ...f,
-        labelOffset: f.labelOffset ?? { x: 0, y: 0 },
-        labelInside: f.labelInside ?? LABEL_INSIDE_TYPES.has(f.type),
+  const exportAllRooms = useCallback(() => {
+    const syncedRooms = syncActiveRoomToRooms(state);
+    return {
+      version: 2,
+      units: state.units,
+      tabs: syncedRooms.map((r) => ({
+        name: r.name,
+        state: {
+          version: 1,
+          roomName: r.name,
+          walls: r.walls,
+          furniture: r.furniture,
+          labels: r.labels,
+          textBoxes: r.textBoxes,
+          arrows: r.arrows,
+          roomNames: r.roomNames,
+          roomLabelOffsets: r.roomLabelOffsets,
+          componentLabelsVisible: r.componentLabelsVisible,
+        },
       })),
-      labels: plan.labels,
-      textBoxes: plan.textBoxes || [],
-      arrows: plan.arrows || [],
-      roomNames: plan.roomNames || {},
-      componentLabelsVisible: plan.componentLabelsVisible ?? true,
-      selectedItemId: null,
-      wallDrawing: null,
-    }));
+    };
+  }, [state]);
+
+  const importState = useCallback((plan: any) => {
+    // Multi-tab import: { version: 2, tabs: [{ name, state }] }
+    if (plan.version === 2 && Array.isArray(plan.tabs) && plan.tabs.length > 0) {
+      const rooms: RoomData[] = plan.tabs.map((tab: any) => {
+        const s = tab.state || {};
+        return {
+          id: generateId(),
+          name: tab.name || s.roomName || "Room",
+          walls: normalizeWalls(s.walls || []),
+          furniture: normalizeFurniture(s.furniture || []),
+          labels: s.labels || [],
+          textBoxes: s.textBoxes || [],
+          arrows: s.arrows || [],
+          roomNames: s.roomNames || {},
+          roomLabelOffsets: s.roomLabelOffsets || {},
+          componentLabelsVisible: s.componentLabelsVisible ?? true,
+        };
+      });
+      const activeRoom = rooms[0];
+      const roomOrder = rooms.map((r) => r.id);
+      setState((s) => ({
+        ...s,
+        rooms,
+        activeRoomId: activeRoom.id,
+        roomOrder,
+        roomName: activeRoom.name,
+        walls: activeRoom.walls,
+        furniture: activeRoom.furniture,
+        labels: activeRoom.labels,
+        textBoxes: activeRoom.textBoxes,
+        arrows: activeRoom.arrows,
+        roomNames: activeRoom.roomNames,
+        roomLabelOffsets: activeRoom.roomLabelOffsets,
+        componentLabelsVisible: activeRoom.componentLabelsVisible,
+        units: plan.units || s.units,
+        selectedTool: roomHasContent(activeRoom) ? "select" as EditorTool : "wall" as EditorTool,
+        selectedItemId: null,
+        wallDrawing: null,
+        wallChainStart: null,
+      }));
+      return;
+    }
+
+    // Single-room v1 import
+    if (plan.version && plan.walls && plan.furniture) {
+      pushUndo();
+      setState((s) => ({
+        ...s,
+        roomName: plan.roomName || s.roomName,
+        walls: normalizeWalls(plan.walls),
+        furniture: normalizeFurniture(plan.furniture),
+        labels: plan.labels || [],
+        textBoxes: plan.textBoxes || [],
+        arrows: plan.arrows || [],
+        roomNames: plan.roomNames || {},
+        roomLabelOffsets: plan.roomLabelOffsets || {},
+        componentLabelsVisible: plan.componentLabelsVisible ?? true,
+        selectedItemId: null,
+        wallDrawing: null,
+      }));
+    }
   }, [pushUndo]);
 
   return {
@@ -795,6 +909,7 @@ export function useEditor(storageKey: string = DEFAULT_AUTOSAVE_KEY) {
     removeArrow,
     setUnits,
     exportState,
+    exportAllRooms,
     importState,
     splitWallAndConnect,
     setRoomNameForRoom,
@@ -803,6 +918,7 @@ export function useEditor(storageKey: string = DEFAULT_AUTOSAVE_KEY) {
     updateWallLabelOffset,
     // Room tab management
     addRoom,
+    duplicateRoom,
     switchRoom,
     renameRoom,
     deleteRoom,

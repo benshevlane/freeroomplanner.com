@@ -470,6 +470,38 @@ export default function EditorCore({
     }
   }, [state, measureMode, showToast, onExport]);
 
+  const handleSaveJSON = useCallback(() => {
+    try {
+      const data = editor.exportState();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${state.roomName.replace(/[^a-zA-Z0-9]/g, "_").replace(/_+/g, "-").toLowerCase()}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast("Room saved as JSON");
+    } catch {
+      showToast("Failed to save JSON");
+    }
+  }, [editor, state.roomName, showToast]);
+
+  const handleSaveAllJSON = useCallback(() => {
+    try {
+      const data = editor.exportAllRooms();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "floor-plan.json";
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast(`Saved all ${data.tabs.length} rooms as JSON`);
+    } catch {
+      showToast("Failed to save JSON");
+    }
+  }, [editor, showToast]);
+
   const handleLoadPlan = useCallback(() => {
     const input = document.createElement("input");
     input.type = "file";
@@ -481,15 +513,23 @@ export default function EditorCore({
       reader.onload = (ev) => {
         try {
           const plan = JSON.parse(ev.target?.result as string);
+          // Multi-tab format: { version: 2, tabs: [...] }
+          if (plan.version === 2 && Array.isArray(plan.tabs)) {
+            editor.importState(plan);
+            showToast(`Loaded ${plan.tabs.length} rooms`);
+            return;
+          }
+          // Single-room v1 format
           if (plan.version && plan.walls && plan.furniture) {
             editor.importState(plan);
+            showToast("Plan loaded");
           }
         } catch {}
       };
       reader.readAsText(file);
     };
     input.click();
-  }, [editor]);
+  }, [editor, showToast]);
 
   const handleSelectFurniture = useCallback(
     (template: FurnitureTemplate) => {
@@ -542,6 +582,8 @@ export default function EditorCore({
           hasSelection={hasSelection}
           selectionIsFurniture={!!selectedFurniture}
           onSavePlan={handleSavePlan}
+          onSaveJSON={handleSaveJSON}
+          onSaveAllJSON={handleSaveAllJSON}
           onLoadPlan={handleLoadPlan}
           onClearAll={() => setShowClearDialog(true)}
           zoom={state.zoom}
@@ -566,6 +608,7 @@ export default function EditorCore({
         onSwitchRoom={editor.switchRoom}
         onAddRoom={editor.addRoom}
         onRenameRoom={editor.renameRoom}
+        onDuplicateRoom={editor.duplicateRoom}
         onDeleteRoom={editor.deleteRoom}
         onReorderRooms={editor.reorderRooms}
       />

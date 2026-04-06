@@ -23,6 +23,8 @@ import {
   Trash2,
   Trash,
   Image,
+  Download,
+  FileDown,
   FolderOpen,
   MoreHorizontal,
   LayoutList,
@@ -45,6 +47,8 @@ interface EditorToolbarProps {
   hasSelection: boolean;
   selectionIsFurniture: boolean;
   onSavePlan: () => void;
+  onSaveJSON: () => void;
+  onSaveAllJSON: () => void;
   onLoadPlan: () => void;
   onClearAll: () => void;
   zoom: number;
@@ -81,6 +85,8 @@ export default function EditorToolbar({
   hasSelection,
   selectionIsFurniture,
   onSavePlan,
+  onSaveJSON,
+  onSaveAllJSON,
   onLoadPlan,
   onClearAll,
   zoom,
@@ -182,7 +188,15 @@ export default function EditorToolbar({
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={onSavePlan}>
                 <Image className="h-4 w-4 mr-2" />
-                Save Image
+                Save Image (PNG)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onSaveJSON}>
+                <FileDown className="h-4 w-4 mr-2" />
+                Save Room (JSON)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onSaveAllJSON}>
+                <Download className="h-4 w-4 mr-2" />
+                Save All Rooms (JSON)
               </DropdownMenuItem>
               <DropdownMenuItem onClick={onLoadPlan}>
                 <FolderOpen className="h-4 w-4 mr-2" />
@@ -352,15 +366,33 @@ export default function EditorToolbar({
           </TooltipTrigger>
           <TooltipContent><p>Clear all items</p></TooltipContent>
         </Tooltip>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button size="sm" variant="ghost" onClick={onSavePlan} data-testid="btn-save-plan">
-              <Image className="h-4 w-4 mr-1" />
-              Save Image
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent><p>Save as PNG image</p></TooltipContent>
-        </Tooltip>
+        <DropdownMenu>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm" variant="ghost" data-testid="btn-save-plan">
+                  <Download className="h-4 w-4 mr-1" />
+                  Save
+                </Button>
+              </DropdownMenuTrigger>
+            </TooltipTrigger>
+            <TooltipContent><p>Save options</p></TooltipContent>
+          </Tooltip>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={onSavePlan}>
+              <Image className="h-4 w-4 mr-2" />
+              Save Image (PNG)
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={onSaveJSON}>
+              <FileDown className="h-4 w-4 mr-2" />
+              Save Room (JSON)
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={onSaveAllJSON}>
+              <Download className="h-4 w-4 mr-2" />
+              Save All Rooms (JSON)
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
