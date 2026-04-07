@@ -664,6 +664,7 @@ export default function EditorCore({
                       onUpdateArrow={editor.updateArrow}
                       onNudge={handleNudgeFurniture}
                       units={state.units}
+                      measureMode={measureMode}
                     />
                   </ScrollArea>
                 </div>
@@ -735,6 +736,7 @@ export default function EditorCore({
                 onUpdateArrow={editor.updateArrow}
                 onNudge={handleNudgeFurniture}
                 units={state.units}
+                measureMode={measureMode}
               />
             </ScrollArea>
 

@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { Wall, WallType, FurnitureItem, RoomLabel, TextBox, Arrow, ArrowStyle, ArrowHeadStyle, LabelSize, LabelColor, UnitSystem, isWallCupboard, cmToDisplay, displayToCm, dimensionSuffix, FURNITURE_LIBRARY } from "../lib/types";
+import { Wall, WallType, FurnitureItem, RoomLabel, TextBox, Arrow, ArrowStyle, ArrowHeadStyle, LabelSize, LabelColor, UnitSystem, MeasureMode, DEFAULT_WALL_THICKNESS, isWallCupboard, cmToDisplay, displayToCm, dimensionSuffix, FURNITURE_LIBRARY } from "../lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
@@ -23,6 +23,7 @@ interface PropertiesPanelProps {
   onUpdateArrow?: (id: string, updates: Partial<Arrow>) => void;
   onNudge?: (dx: number, dy: number) => void;
   units: UnitSystem;
+  measureMode?: MeasureMode;
 }
 
 /** Format a cm value for display in the selected units */
@@ -72,6 +73,7 @@ export default function PropertiesPanel({
   onUpdateArrow,
   onNudge,
   units,
+  measureMode = "full",
 }: PropertiesPanelProps) {
   if (!selectedWall && !selectedFurniture && !selectedLabel && !selectedTextBox && !selectedArrow) {
     return (
@@ -94,22 +96,34 @@ export default function PropertiesPanel({
     const dy = selectedWall.end.y - selectedWall.start.y;
     const lengthCm = Math.sqrt(dx * dx + dy * dy);
 
+    // Inside vs full (outside) display: mirrors canvas-renderer logic
+    const wallThickness = selectedWall.thickness || DEFAULT_WALL_THICKNESS;
+    const isInside = measureMode === "inside";
+    const displayLengthCm = isInside
+      ? Math.max(0, lengthCm - wallThickness)
+      : lengthCm;
+
     const commitLength = (val: string) => {
       setEditingLength(false);
       if (!onUpdateWall) return;
       const parsed = parseFloat(val.replace(/m$/i, ""));
       if (isNaN(parsed)) return;
-      const newLengthCm = Math.max(10, parsed * 100); // min 0.10m = 10cm
-      if (Math.abs(newLengthCm - lengthCm) < 0.01) return;
-      const len = Math.sqrt(dx * dx + dy * dy);
+      // Interpret entered value in the currently active mode, then back-convert to full length
+      const enteredCm = Math.max(10, parsed * 100); // min 0.10m = 10cm
+      const newFullCm = isInside ? enteredCm + wallThickness : enteredCm;
+      if (Math.abs(newFullCm - lengthCm) < 0.01) return;
+      const len = lengthCm;
       if (len < 0.01) return;
-      const dirX = dx / len;
-      const dirY = dy / len;
+      // Lock the angle and shift only the far endpoint, keeping start fixed.
+      // Snap start to integer cm so the resulting wall has clean baseline coordinates.
+      const angle = Math.atan2(dy, dx);
+      const startX = Math.round(selectedWall.start.x);
+      const startY = Math.round(selectedWall.start.y);
+      const newEndX = Math.round(startX + newFullCm * Math.cos(angle));
+      const newEndY = Math.round(startY + newFullCm * Math.sin(angle));
       onUpdateWall(selectedWall.id, {
-        end: {
-          x: Math.round(selectedWall.start.x + dirX * newLengthCm),
-          y: Math.round(selectedWall.start.y + dirY * newLengthCm),
-        },
+        start: { x: startX, y: startY },
+        end: { x: newEndX, y: newEndY },
       });
     };
 
@@ -129,7 +143,7 @@ export default function PropertiesPanel({
         <div className="space-y-2 text-sm">
           <div className="flex items-center gap-2">
             <Ruler className="h-3.5 w-3.5 text-muted-foreground" />
-            <span className="text-muted-foreground">Length:</span>
+            <span className="text-muted-foreground">Length ({isInside ? "inside" : "outside"}):</span>
             {editingLength ? (
               <input
                 ref={lengthRef}
@@ -144,9 +158,9 @@ export default function PropertiesPanel({
             ) : (
               <span
                 className="font-medium cursor-pointer hover:border-b hover:border-teal-500/50 transition-colors"
-                onClick={() => { setLengthInput((lengthCm / 100).toFixed(2)); setEditingLength(true); }}
+                onClick={() => { setLengthInput((displayLengthCm / 100).toFixed(2)); setEditingLength(true); }}
               >
-                {formatDimension(lengthCm, units)}
+                {formatDimension(displayLengthCm, units)}
               </span>
             )}
           </div>

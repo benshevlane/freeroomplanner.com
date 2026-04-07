@@ -1355,10 +1355,10 @@ export default function FloorPlanCanvas({
         const newStartY = Math.round(wallDragStart.startY + wdy);
         const snappedDx = newStartX - wallDragStart.startX;
         const snappedDy = newStartY - wallDragStart.startY;
-        // Move the dragged wall
+        // Move the dragged wall (snap all endpoints to 1cm increments)
         onMoveWall(wallDragStart.id, {
-          start: { x: wallDragStart.startX + snappedDx, y: wallDragStart.startY + snappedDy },
-          end: { x: wallDragStart.endX + snappedDx, y: wallDragStart.endY + snappedDy },
+          start: { x: Math.round(wallDragStart.startX + snappedDx), y: Math.round(wallDragStart.startY + snappedDy) },
+          end: { x: Math.round(wallDragStart.endX + snappedDx), y: Math.round(wallDragStart.endY + snappedDy) },
         });
         // Stretch connected walls to maintain connectivity
         const CONNECT_THRESH = 15;
@@ -1369,14 +1369,14 @@ export default function FloorPlanCanvas({
           const updates: Partial<import("../lib/types").Wall> = {};
           // Check if this wall's start connects to the dragged wall's original start or end
           if (Math.abs(w.start.x - origStart.x) < CONNECT_THRESH && Math.abs(w.start.y - origStart.y) < CONNECT_THRESH) {
-            updates.start = { x: origStart.x + snappedDx, y: origStart.y + snappedDy };
+            updates.start = { x: Math.round(origStart.x + snappedDx), y: Math.round(origStart.y + snappedDy) };
           } else if (Math.abs(w.start.x - origEnd.x) < CONNECT_THRESH && Math.abs(w.start.y - origEnd.y) < CONNECT_THRESH) {
-            updates.start = { x: origEnd.x + snappedDx, y: origEnd.y + snappedDy };
+            updates.start = { x: Math.round(origEnd.x + snappedDx), y: Math.round(origEnd.y + snappedDy) };
           }
           if (Math.abs(w.end.x - origStart.x) < CONNECT_THRESH && Math.abs(w.end.y - origStart.y) < CONNECT_THRESH) {
-            updates.end = { x: origStart.x + snappedDx, y: origStart.y + snappedDy };
+            updates.end = { x: Math.round(origStart.x + snappedDx), y: Math.round(origStart.y + snappedDy) };
           } else if (Math.abs(w.end.x - origEnd.x) < CONNECT_THRESH && Math.abs(w.end.y - origEnd.y) < CONNECT_THRESH) {
-            updates.end = { x: origEnd.x + snappedDx, y: origEnd.y + snappedDy };
+            updates.end = { x: Math.round(origEnd.x + snappedDx), y: Math.round(origEnd.y + snappedDy) };
           }
           if (updates.start || updates.end) {
             onMoveWall(w.id, updates);
