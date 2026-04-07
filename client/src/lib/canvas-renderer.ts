@@ -593,6 +593,41 @@ function findCollinearGroups(walls: Wall[]): Map<string, { totalLengthCm: number
   return groups;
 }
 
+// Compute the convex hull of a set of 2D points using Andrew's monotone chain.
+// Returns hull vertices in counter-clockwise order. Used to fill wall junctions
+// with an angle-aware polygon so diagonal walls have clean corners.
+function convexHull(points: { x: number; y: number }[]): { x: number; y: number }[] {
+  if (points.length <= 2) return points.slice();
+
+  const sorted = points.slice().sort((a, b) => (a.x - b.x) || (a.y - b.y));
+  const cross = (
+    o: { x: number; y: number },
+    a: { x: number; y: number },
+    b: { x: number; y: number }
+  ) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+
+  const lower: { x: number; y: number }[] = [];
+  for (const p of sorted) {
+    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) {
+      lower.pop();
+    }
+    lower.push(p);
+  }
+
+  const upper: { x: number; y: number }[] = [];
+  for (let i = sorted.length - 1; i >= 0; i--) {
+    const p = sorted[i];
+    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) {
+      upper.pop();
+    }
+    upper.push(p);
+  }
+
+  lower.pop();
+  upper.pop();
+  return lower.concat(upper);
+}
+
 export function drawWalls(
   ctx: CanvasRenderingContext2D,
   walls: Wall[],
@@ -647,33 +682,68 @@ export function drawWalls(
     ctx.fill();
   });
 
-  // Second pass: fill junction squares where walls meet (sharp corners)
+  // Second pass: fill junction polygons where walls meet (angle-aware corners)
   const CONNECT_THRESHOLD = 15; // cm, same as wall snap threshold
-  const endpointMap = new Map<string, { x: number; y: number; thickness: number; wallId: string }[]>();
+  const endpointMap = new Map<
+    string,
+    { x: number; y: number; thickness: number; wallId: string; dx: number; dy: number }[]
+  >();
   walls.forEach((wall) => {
+    // Direction is computed FROM each endpoint TOWARD the other end of the wall,
+    // so the perpendicular normal at the junction can be derived consistently.
     const points = [
-      { x: wall.start.x, y: wall.start.y },
-      { x: wall.end.x, y: wall.end.y },
+      { x: wall.start.x, y: wall.start.y, dx: wall.end.x - wall.start.x, dy: wall.end.y - wall.start.y },
+      { x: wall.end.x, y: wall.end.y, dx: wall.start.x - wall.end.x, dy: wall.start.y - wall.end.y },
     ];
     points.forEach((pt) => {
       const key = `${Math.round(pt.x / CONNECT_THRESHOLD) * CONNECT_THRESHOLD},${Math.round(pt.y / CONNECT_THRESHOLD) * CONNECT_THRESHOLD}`;
       if (!endpointMap.has(key)) endpointMap.set(key, []);
-      endpointMap.get(key)!.push({ ...pt, thickness: wall.thickness || DEFAULT_WALL_THICKNESS, wallId: wall.id });
+      endpointMap.get(key)!.push({
+        x: pt.x,
+        y: pt.y,
+        dx: pt.dx,
+        dy: pt.dy,
+        thickness: wall.thickness || DEFAULT_WALL_THICKNESS,
+        wallId: wall.id,
+      });
     });
   });
   endpointMap.forEach((endpoints) => {
     if (endpoints.length < 2) return;
-    // Draw a filled square at the junction for sharp corners
-    const avgX = endpoints.reduce((s, e) => s + e.x, 0) / endpoints.length;
-    const avgY = endpoints.reduce((s, e) => s + e.y, 0) / endpoints.length;
-    const maxThick = Math.max(...endpoints.map((e) => e.thickness));
-    const halfThick = (maxThick * pxPerCm) / 2;
-    const px = avgX * pxPerCm + panOffset.x;
-    const py = avgY * pxPerCm + panOffset.y;
+
+    // Collect the actual wall-rectangle corner points contributed by each wall
+    // at this junction. Each wall contributes 2 points (one on each side of the
+    // wall centerline). The convex hull of these points fills the junction gap
+    // exactly, regardless of wall angles — replacing the previous axis-aligned
+    // square that produced triangular artifacts on diagonal walls.
+    const cornerPoints: { x: number; y: number }[] = [];
+    for (const ep of endpoints) {
+      const len = Math.sqrt(ep.dx * ep.dx + ep.dy * ep.dy);
+      if (len < 0.01) continue;
+      const halfThick = (ep.thickness * pxPerCm) / 2;
+      // Same perpendicular formula used for the wall rectangles in pass 1.
+      const nx = (-ep.dy / len) * halfThick;
+      const ny = (ep.dx / len) * halfThick;
+      const px = ep.x * pxPerCm + panOffset.x;
+      const py = ep.y * pxPerCm + panOffset.y;
+      cornerPoints.push({ x: px + nx, y: py + ny });
+      cornerPoints.push({ x: px - nx, y: py - ny });
+    }
+
+    if (cornerPoints.length < 3) return;
+
+    const hull = convexHull(cornerPoints);
+    if (hull.length < 3) return;
 
     const hasSelected = endpoints.some((e) => e.wallId === selectedId);
     ctx.fillStyle = hasSelected ? SELECT_COLOR : (isDark ? WALL_COLOR_DARK : WALL_COLOR_LIGHT);
-    ctx.fillRect(px - halfThick, py - halfThick, halfThick * 2, halfThick * 2);
+    ctx.beginPath();
+    ctx.moveTo(hull[0].x, hull[0].y);
+    for (let i = 1; i < hull.length; i++) {
+      ctx.lineTo(hull[i].x, hull[i].y);
+    }
+    ctx.closePath();
+    ctx.fill();
   });
 
   // Third pass: draw small circle caps at free (unconnected) wall endpoints
