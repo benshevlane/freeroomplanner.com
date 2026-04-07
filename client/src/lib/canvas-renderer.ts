@@ -1519,6 +1519,99 @@ export function drawMeasurementIndicatorLines(
   }
 }
 
+/** Draw a green "W × D" cavity dimension label centered in each detected room.
+ *  Only renders when measureMode === "inside". The width and depth are computed
+ *  from the inner-face polygon (each room edge offset inward by halfThickness
+ *  along its room-interior normal), matching the geometry of the green
+ *  inside-measurement lines.
+ */
+export function drawRoomCavityLabels(
+  ctx: CanvasRenderingContext2D,
+  walls: Wall[],
+  rooms: DetectedRoom[],
+  gridSize: number,
+  zoom: number,
+  panOffset: Point,
+  isDark: boolean,
+  units: UnitSystem,
+  measureMode: MeasureMode
+) {
+  if (measureMode !== "inside") return;
+  if (rooms.length === 0 || walls.length === 0) return;
+  const pxPerCm = (gridSize * zoom) / 100;
+  const INDICATOR_COLOR = isDark ? "#3ddc81" : "#2ecc71";
+
+  for (const room of rooms) {
+    const verts = room.vertices;
+    if (verts.length < 3) continue;
+
+    // For each consecutive vertex pair, find the matching wall and offset the
+    // edge inward by halfThickness along the room-interior normal.
+    const innerPoints: Point[] = [];
+    for (let i = 0; i < verts.length; i++) {
+      const a = verts[i];
+      const b = verts[(i + 1) % verts.length];
+
+      // Find the wall whose endpoints best match (a, b) in either direction.
+      let matchWall: Wall | null = null;
+      for (const w of walls) {
+        const ab = (Math.abs(w.start.x - a.x) < 15 && Math.abs(w.start.y - a.y) < 15
+          && Math.abs(w.end.x - b.x) < 15 && Math.abs(w.end.y - b.y) < 15);
+        const ba = (Math.abs(w.start.x - b.x) < 15 && Math.abs(w.start.y - b.y) < 15
+          && Math.abs(w.end.x - a.x) < 15 && Math.abs(w.end.y - a.y) < 15);
+        if (ab || ba) { matchWall = w; break; }
+      }
+
+      const halfThickness = ((matchWall?.thickness) || DEFAULT_WALL_THICKNESS) / 2;
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const len = Math.sqrt(dx * dx + dy * dy);
+      if (len < 1) continue;
+      const insideNormal = computeInsideNormal({ start: a, end: b }, verts);
+      if (!insideNormal) continue;
+
+      // Inset endpoints (offset inward + shortened by halfThickness at each end)
+      const udx = dx / len;
+      const udy = dy / len;
+      innerPoints.push({
+        x: a.x + udx * halfThickness + insideNormal.nx * halfThickness,
+        y: a.y + udy * halfThickness + insideNormal.ny * halfThickness,
+      });
+      innerPoints.push({
+        x: b.x - udx * halfThickness + insideNormal.nx * halfThickness,
+        y: b.y - udy * halfThickness + insideNormal.ny * halfThickness,
+      });
+    }
+    if (innerPoints.length === 0) continue;
+
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (const p of innerPoints) {
+      if (p.x < minX) minX = p.x;
+      if (p.x > maxX) maxX = p.x;
+      if (p.y < minY) minY = p.y;
+      if (p.y > maxY) maxY = p.y;
+    }
+    const cavityW = Math.max(0, maxX - minX);
+    const cavityD = Math.max(0, maxY - minY);
+    if (cavityW < 5 || cavityD < 5) continue;
+
+    const text = `${formatLength(cavityW, units)} × ${formatLength(cavityD, units)}`;
+
+    // Position: room centroid, nudged slightly downward so it sits below the
+    // existing room name + area label drawn by drawRoomAreas.
+    const cx = room.centroid.x * pxPerCm + panOffset.x;
+    const cy = room.centroid.y * pxPerCm + panOffset.y;
+    const fontSize = Math.max(9, 11 * zoom);
+    const verticalOffset = fontSize * 1.6; // below name+area block
+
+    ctx.font = `500 ${fontSize}px 'General Sans', 'DM Sans', sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = INDICATOR_COLOR;
+    ctx.fillText(text, cx, cy + verticalOffset);
+  }
+}
+
 /**
  * Find doors/windows on a wall and return their positions as fractions [0..1]
  * along the wall length, so we can avoid placing the label on top of them.
@@ -4282,6 +4375,127 @@ export function snapToWallBody(
     if (dist < closestDist) {
       closestDist = dist;
       closest = closestOnWall;
+      closestWallId = wall.id;
+    }
+  }
+
+  if (closest && closestWallId) {
+    return { snapped: { x: closest.x, y: closest.y }, didSnap: true, wallId: closestWallId };
+  }
+  return { snapped: point, didSnap: false, wallId: null };
+}
+
+/** Snap to the inner face of a wall (the green inside-measurement line).
+ *  Each wall is offset inward by halfThickness along its room-interior normal,
+ *  matching the geometry rendered by drawMeasurementIndicatorLines() in "inside" mode.
+ *  Used as the primary snap target when measureMode === "inside" so that newly
+ *  drawn walls can be butted flush against the interior surface of an existing wall.
+ */
+export function snapToWallInnerFace(
+  point: Point,
+  walls: Wall[],
+  rooms: DetectedRoom[],
+  threshold: number = 15
+): { snapped: Point; didSnap: boolean; wallId: string | null } {
+  if (walls.length === 0) {
+    return { snapped: point, didSnap: false, wallId: null };
+  }
+
+  // Compute fallback centroid for walls not in any detected room (mirrors
+  // drawMeasurementIndicatorLines fallback logic at L1413-1424).
+  let fallbackCenter = { x: 0, y: 0 };
+  let pointCount = 0;
+  for (const wall of walls) {
+    fallbackCenter.x += wall.start.x + wall.end.x;
+    fallbackCenter.y += wall.start.y + wall.end.y;
+    pointCount += 2;
+  }
+  if (pointCount > 0) {
+    fallbackCenter.x /= pointCount;
+    fallbackCenter.y /= pointCount;
+  }
+
+  let closest: Point | null = null;
+  let closestDist = threshold;
+  let closestWallId: string | null = null;
+
+  for (const wall of walls) {
+    const dx = wall.end.x - wall.start.x;
+    const dy = wall.end.y - wall.start.y;
+    const lenSq = dx * dx + dy * dy;
+    if (lenSq < 100) continue; // skip very short walls (< 10cm), same as indicator render
+    const len = Math.sqrt(lenSq);
+
+    // Left-hand perpendicular
+    const nx = -dy / len;
+    const ny = dx / len;
+
+    // Determine inside normal — prefer the largest enclosing room (matches
+    // drawMeasurementIndicatorLines behavior for nested rooms).
+    let insideNx = nx;
+    let insideNy = ny;
+    let bestRoom: DetectedRoom | null = null;
+    for (const room of rooms) {
+      const hasStart = room.vertices.some(v =>
+        Math.sqrt((v.x - wall.start.x) ** 2 + (v.y - wall.start.y) ** 2) < 15
+      );
+      const hasEnd = room.vertices.some(v =>
+        Math.sqrt((v.x - wall.end.x) ** 2 + (v.y - wall.end.y) ** 2) < 15
+      );
+      if (hasStart && hasEnd) {
+        if (!bestRoom || room.area > bestRoom.area) bestRoom = room;
+      }
+    }
+
+    let foundRoom = false;
+    if (bestRoom) {
+      const insideNormal = computeInsideNormal(wall, bestRoom.vertices);
+      if (insideNormal) {
+        insideNx = insideNormal.nx;
+        insideNy = insideNormal.ny;
+        foundRoom = true;
+      }
+    }
+    if (!foundRoom) {
+      const wallMidX = (wall.start.x + wall.end.x) / 2;
+      const wallMidY = (wall.start.y + wall.end.y) / 2;
+      const toCentroidX = fallbackCenter.x - wallMidX;
+      const toCentroidY = fallbackCenter.y - wallMidY;
+      if (toCentroidX * nx + toCentroidY * ny < 0) {
+        insideNx = -nx;
+        insideNy = -ny;
+      }
+    }
+
+    // Inset segment endpoints in world cm: offset by halfThickness inward,
+    // and shorten by halfThickness at each end (matches indicator line geometry).
+    const halfThickness = (wall.thickness || DEFAULT_WALL_THICKNESS) / 2;
+    const udx = dx / len;
+    const udy = dy / len;
+    const innerStart = {
+      x: wall.start.x + udx * halfThickness + insideNx * halfThickness,
+      y: wall.start.y + udy * halfThickness + insideNy * halfThickness,
+    };
+    const innerEnd = {
+      x: wall.end.x - udx * halfThickness + insideNx * halfThickness,
+      y: wall.end.y - udy * halfThickness + insideNy * halfThickness,
+    };
+
+    // Project point onto the inset segment, clamped to [0, 1].
+    const segDx = innerEnd.x - innerStart.x;
+    const segDy = innerEnd.y - innerStart.y;
+    const segLenSq = segDx * segDx + segDy * segDy;
+    if (segLenSq < 1) continue;
+    const t = Math.max(0, Math.min(1,
+      ((point.x - innerStart.x) * segDx + (point.y - innerStart.y) * segDy) / segLenSq
+    ));
+    const projX = innerStart.x + t * segDx;
+    const projY = innerStart.y + t * segDy;
+    const dist = Math.sqrt((point.x - projX) ** 2 + (point.y - projY) ** 2);
+
+    if (dist < closestDist) {
+      closestDist = dist;
+      closest = { x: projX, y: projY };
       closestWallId = wall.id;
     }
   }

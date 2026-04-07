@@ -13,6 +13,7 @@ import {
   drawWalls,
   drawWallSegmentMeasurements,
   drawMeasurementIndicatorLines,
+  drawRoomCavityLabels,
   drawFurniture,
   drawRoomAreas,
   drawLabels,
@@ -403,6 +404,9 @@ export default function EditorCore({
 
       // Measurement indicator lines
       drawMeasurementIndicatorLines(ctx, state.walls, rooms, gridSize, zoom, panOffset, measureMode);
+
+      // Inside-mode cavity W × D label per detected room
+      drawRoomCavityLabels(ctx, state.walls, rooms, gridSize, zoom, panOffset, isDark, state.units, measureMode);
 
       // Wall segment measurements
       drawWallSegmentMeasurements(ctx, state.walls, state.furniture, gridSize, zoom, panOffset, isDark, state.units, measureMode, rooms);

@@ -6,6 +6,7 @@ import {
   drawWalls,
   drawWallSegmentMeasurements,
   drawMeasurementIndicatorLines,
+  drawRoomCavityLabels,
   collectWallMeasurementLabelRects,
   drawFurniture,
   drawWallPreview,
@@ -37,6 +38,7 @@ import {
   snapToWallEndpoints,
   snapToChainStart,
   snapToWallBody,
+  snapToWallInnerFace,
   snapFurnitureToWalls,
   snapFurnitureToNearest,
   SnappedWallEdge,
@@ -323,6 +325,9 @@ export default function FloorPlanCanvas({
     // Measurement indicator lines (on top of walls, below labels/furniture)
     drawMeasurementIndicatorLines(ctx, state.walls, rooms, state.gridSize, state.zoom, state.panOffset, measureMode);
 
+    // Inside-mode cavity W × D label per detected room
+    drawRoomCavityLabels(ctx, state.walls, rooms, state.gridSize, state.zoom, state.panOffset, isDark, state.units, measureMode);
+
     // Parallel wall discrepancy detection
     const flaggedWalls = findParallelWallDiscrepancies(state.walls);
 
@@ -335,6 +340,16 @@ export default function FloorPlanCanvas({
     if (state.wallDrawing && state.selectedTool === "wall") {
       const worldMouse = screenToWorld(mousePos.x, mousePos.y, state.gridSize, state.zoom, state.panOffset);
       const gridSnapped = snapToGrid(worldMouse, 1);
+      // Inner-face snap (primary target when inside-measurement mode is active)
+      let innerFaceSnap = false;
+      let innerFaceSnapped: Point = worldMouse;
+      if (measureMode === "inside") {
+        const r = snapToWallInnerFace(worldMouse, state.walls, rooms, 15);
+        if (r.didSnap) {
+          innerFaceSnapped = r.snapped;
+          innerFaceSnap = true;
+        }
+      }
       // Check snap against raw world position for accurate distance
       let { snapped: wallSnapped, didSnap: epSnap } = snapToWallEndpoints(worldMouse, state.walls, 15);
       // Chain-start closure in preview
@@ -346,8 +361,12 @@ export default function FloorPlanCanvas({
         }
       }
       const { snapped: bodySnapped, didSnap: bodySnap } = snapToWallBody(worldMouse, state.walls, 15);
-      const didSnap = epSnap || bodySnap;
-      let finalPoint = epSnap ? wallSnapped : (bodySnap ? bodySnapped : gridSnapped);
+      const didSnap = innerFaceSnap || epSnap || bodySnap;
+      let finalPoint = innerFaceSnap
+        ? innerFaceSnapped
+        : epSnap
+          ? wallSnapped
+          : (bodySnap ? bodySnapped : gridSnapped);
 
       // Angle snapping (15° increments, strong snap) — skip if already snapped to endpoint
       let angleDeg: number | undefined;
@@ -935,6 +954,18 @@ export default function FloorPlanCanvas({
       } else if (state.selectedTool === "wall") {
         const world = screenToWorld(pos.x, pos.y, state.gridSize, state.zoom, state.panOffset);
         const gridSnapped = snapToGrid(world, 1);
+        // Inner-face snap (primary target when inside-measurement mode is active).
+        // Snaps to the green inside-measurement line of nearby walls so a new wall
+        // can be butted flush against the interior surface of an existing wall.
+        let innerFaceSnap = false;
+        let innerFaceSnapped: Point = world;
+        if (measureMode === "inside") {
+          const r = snapToWallInnerFace(world, state.walls, detectedRoomsRef.current, 15);
+          if (r.didSnap) {
+            innerFaceSnapped = r.snapped;
+            innerFaceSnap = true;
+          }
+        }
         // Check endpoint snap against RAW world position (not grid-snapped)
         // so that the threshold accurately reflects cursor distance
         let { snapped: wallSnapped, didSnap: endpointSnap } = snapToWallEndpoints(world, state.walls, 15);
@@ -949,8 +980,12 @@ export default function FloorPlanCanvas({
         // Also check wall body snap (for mid-wall connections)
         const { snapped: bodySnapped, didSnap: bodySnap, wallId: bodyWallId } = snapToWallBody(world, state.walls, 15);
 
-        const didSnap = endpointSnap || bodySnap;
-        let finalPoint = endpointSnap ? wallSnapped : (bodySnap ? bodySnapped : gridSnapped);
+        const didSnap = innerFaceSnap || endpointSnap || bodySnap;
+        let finalPoint = innerFaceSnap
+          ? innerFaceSnapped
+          : endpointSnap
+            ? wallSnapped
+            : (bodySnap ? bodySnapped : gridSnapped);
 
         // Apply angle snapping when actively drawing (skip if snapped)
         const currentWallDrawing = wallDrawingRef.current;
@@ -966,15 +1001,17 @@ export default function FloorPlanCanvas({
             // Touch: defer wall commit to pointerUp so user can drag to adjust
             wallPendingCommitRef.current = true;
           } else {
-            // Mouse: commit immediately (unchanged desktop behavior)
-            if (bodySnap && !endpointSnap && bodyWallId) {
+            // Mouse: commit immediately (unchanged desktop behavior).
+            // Inner-face snap takes precedence over body snap so we don't split
+            // the reference wall — the new wall just butts flush against its inside face.
+            if (bodySnap && !endpointSnap && !innerFaceSnap && bodyWallId) {
               onSplitWallAndConnect(bodyWallId, finalPoint, currentWallDrawing.start);
               onSetWallDrawing(null);
               wallDrawingRef.current = null;
             } else {
               onAddWall(currentWallDrawing.start, finalPoint);
 
-              if (endpointSnap) {
+              if (endpointSnap || innerFaceSnap) {
                 onSetWallDrawing(null);
                 wallDrawingRef.current = null;
               } else {
@@ -1351,8 +1388,42 @@ export default function FloorPlanCanvas({
         let wdy = world.y - wallDragStart.mouseWorldY;
         if (wallDragStart.constraintAxis === "y") { wdx = 0; }
         else { wdy = 0; }
-        const newStartX = Math.round(wallDragStart.startX + wdx);
-        const newStartY = Math.round(wallDragStart.startY + wdy);
+        let newStartX = Math.round(wallDragStart.startX + wdx);
+        let newStartY = Math.round(wallDragStart.startY + wdy);
+        // Inner-face snap: when inside-measurement mode is active, snap the dragged
+        // wall's endpoint to the inner face of any other nearby wall along the
+        // constraint axis. Pick the smaller snap delta across both endpoints.
+        if (measureMode === "inside") {
+          const otherWalls = state.walls.filter(w => w.id !== wallDragStart.id);
+          if (otherWalls.length > 0) {
+            const movedStart = { x: newStartX, y: newStartY };
+            const movedEnd = {
+              x: Math.round(wallDragStart.endX + (newStartX - wallDragStart.startX)),
+              y: Math.round(wallDragStart.endY + (newStartY - wallDragStart.startY)),
+            };
+            const candidates: { delta: number; absDelta: number }[] = [];
+            for (const ep of [movedStart, movedEnd]) {
+              const r = snapToWallInnerFace(ep, otherWalls, detectedRoomsRef.current, 15);
+              if (r.didSnap) {
+                const d = wallDragStart.constraintAxis === "y"
+                  ? r.snapped.y - ep.y
+                  : r.snapped.x - ep.x;
+                if (Math.abs(d) <= 15) {
+                  candidates.push({ delta: d, absDelta: Math.abs(d) });
+                }
+              }
+            }
+            if (candidates.length > 0) {
+              candidates.sort((a, b) => a.absDelta - b.absDelta);
+              const chosen = Math.round(candidates[0].delta);
+              if (wallDragStart.constraintAxis === "y") {
+                newStartY += chosen;
+              } else {
+                newStartX += chosen;
+              }
+            }
+          }
+        }
         const snappedDx = newStartX - wallDragStart.startX;
         const snappedDy = newStartY - wallDragStart.startY;
         // Move the dragged wall (snap all endpoints to 1cm increments)
@@ -1426,21 +1497,31 @@ export default function FloorPlanCanvas({
       // Update wall snap indicator (check raw world position for accurate snap distance)
       if (state.selectedTool === "wall") {
         const world = screenToWorld(pos.x, pos.y, state.gridSize, state.zoom, state.panOffset);
-        const { snapped: epSnapped, didSnap: epSnap } = snapToWallEndpoints(world, state.walls, 15);
-        if (epSnap) {
-          setWallSnapPoint(epSnapped);
-        } else if (state.wallChainStart && state.wallDrawing && state.walls.length >= 2) {
-          // Chain-start closure indicator
-          const csResult = snapToChainStart(world, state.wallChainStart, 15, state.gridSize, state.zoom);
-          if (csResult.didSnap) {
-            setWallSnapPoint(csResult.snapped);
+        // Inner-face snap takes priority when inside-measurement mode is active
+        let innerFaceHit: Point | null = null;
+        if (measureMode === "inside") {
+          const r = snapToWallInnerFace(world, state.walls, detectedRoomsRef.current, 15);
+          if (r.didSnap) innerFaceHit = r.snapped;
+        }
+        if (innerFaceHit) {
+          setWallSnapPoint(innerFaceHit);
+        } else {
+          const { snapped: epSnapped, didSnap: epSnap } = snapToWallEndpoints(world, state.walls, 15);
+          if (epSnap) {
+            setWallSnapPoint(epSnapped);
+          } else if (state.wallChainStart && state.wallDrawing && state.walls.length >= 2) {
+            // Chain-start closure indicator
+            const csResult = snapToChainStart(world, state.wallChainStart, 15, state.gridSize, state.zoom);
+            if (csResult.didSnap) {
+              setWallSnapPoint(csResult.snapped);
+            } else {
+              const { snapped: bodySnapped, didSnap: bodySnap } = snapToWallBody(world, state.walls, 15);
+              setWallSnapPoint(bodySnap ? bodySnapped : null);
+            }
           } else {
             const { snapped: bodySnapped, didSnap: bodySnap } = snapToWallBody(world, state.walls, 15);
             setWallSnapPoint(bodySnap ? bodySnapped : null);
           }
-        } else {
-          const { snapped: bodySnapped, didSnap: bodySnap } = snapToWallBody(world, state.walls, 15);
-          setWallSnapPoint(bodySnap ? bodySnapped : null);
         }
       }
 
@@ -1540,6 +1621,16 @@ export default function FloorPlanCanvas({
           const pos = getCanvasPos(e);
           const world = screenToWorld(pos.x, pos.y, state.gridSize, state.zoom, state.panOffset);
           const gridSnapped = snapToGrid(world, 1);
+          // Inner-face snap (primary target when inside-measurement mode is active)
+          let innerFaceSnap = false;
+          let innerFaceSnapped: Point = world;
+          if (measureMode === "inside") {
+            const r = snapToWallInnerFace(world, state.walls, detectedRoomsRef.current, 15);
+            if (r.didSnap) {
+              innerFaceSnapped = r.snapped;
+              innerFaceSnap = true;
+            }
+          }
           let { snapped: wallSnapped, didSnap: endpointSnap } = snapToWallEndpoints(world, state.walls, 15);
           // Chain-start closure: screen-space-aware snap to first point of the chain
           if (!endpointSnap && state.wallChainStart && state.walls.length >= 2) {
@@ -1550,8 +1641,12 @@ export default function FloorPlanCanvas({
             }
           }
           const { snapped: bodySnapped, didSnap: bodySnap, wallId: bodyWallId } = snapToWallBody(world, state.walls, 15);
-          const didSnap = endpointSnap || bodySnap;
-          let finalPoint = endpointSnap ? wallSnapped : (bodySnap ? bodySnapped : gridSnapped);
+          const didSnap = innerFaceSnap || endpointSnap || bodySnap;
+          let finalPoint = innerFaceSnap
+            ? innerFaceSnapped
+            : endpointSnap
+              ? wallSnapped
+              : (bodySnap ? bodySnapped : gridSnapped);
 
           if (!didSnap) {
             const angleResult = snapAngle(currentWallDrawing.start, finalPoint, 15, 5);
@@ -1566,13 +1661,13 @@ export default function FloorPlanCanvas({
             return;
           }
 
-          if (bodySnap && !endpointSnap && bodyWallId) {
+          if (bodySnap && !endpointSnap && !innerFaceSnap && bodyWallId) {
             onSplitWallAndConnect(bodyWallId, finalPoint, currentWallDrawing.start);
             onSetWallDrawing(null);
             wallDrawingRef.current = null;
           } else {
             onAddWall(currentWallDrawing.start, finalPoint);
-            if (endpointSnap) {
+            if (endpointSnap || innerFaceSnap) {
               onSetWallDrawing(null);
               wallDrawingRef.current = null;
             } else {
