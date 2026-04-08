@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { EditorState, RoomData, Wall, FurnitureItem, RoomLabel, TextBox, Arrow, Point, EditorTool, FurnitureTemplate, UnitSystem, DEFAULT_TEXT_BOX, DEFAULT_ARROW, FURNITURE_LIBRARY, DEFAULT_WALL_THICKNESS } from "../lib/types";
+import { snapToGrid } from "../lib/canvas-renderer";
 
 const DEFAULT_AUTOSAVE_KEY = "freeroomplanner-autosave";
 
@@ -272,10 +273,12 @@ export function useEditor(storageKey: string = DEFAULT_AUTOSAVE_KEY) {
 
   const addWall = useCallback((start: Point, end: Point) => {
     pushUndo();
+    // Defensive: grid-snap both endpoints to 1 cm so that chained walls
+    // cannot inherit sub-grid drift from body/inner-face projections.
     const wall: Wall = {
       id: generateId(),
-      start,
-      end,
+      start: snapToGrid(start, 1),
+      end: snapToGrid(end, 1),
       thickness: DEFAULT_WALL_THICKNESS,
     };
     setState((s) => ({ ...s, walls: [...s.walls, wall] }));

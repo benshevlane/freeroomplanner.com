@@ -992,9 +992,12 @@ export default function FloorPlanCanvas({
         if (currentWallDrawing && !didSnap) {
           const angleResult = snapAngle(currentWallDrawing.start, finalPoint, 90, 15);
           finalPoint = angleResult.snapped;
-          // Apply grid snap to the angle-snapped point
-          finalPoint = snapToGrid(finalPoint, 1);
         }
+        // Unconditional grid-snap: body/inner-face snaps return floating-point
+        // projections along the target wall. Without rounding here, the drifted
+        // endpoint becomes the next chain's start and prevents perpendicular
+        // walls from locking to exactly 90°.
+        finalPoint = snapToGrid(finalPoint, 1);
 
         if (currentWallDrawing) {
           if (e.pointerType === "touch") {
@@ -1651,8 +1654,11 @@ export default function FloorPlanCanvas({
           if (!didSnap) {
             const angleResult = snapAngle(currentWallDrawing.start, finalPoint, 90, 15);
             finalPoint = angleResult.snapped;
-            finalPoint = snapToGrid(finalPoint, 1);
           }
+          // Unconditional grid-snap: same rationale as handlePointerDown —
+          // body/inner-face snaps return floating-point projections that
+          // would otherwise drift into the next chain's start point.
+          finalPoint = snapToGrid(finalPoint, 1);
 
           // Skip near-zero-length walls (accidental double-tap)
           const dx = finalPoint.x - currentWallDrawing.start.x;
