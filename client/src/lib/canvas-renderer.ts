@@ -628,6 +628,16 @@ function convexHull(points: { x: number; y: number }[]): { x: number; y: number 
   return lower.concat(upper);
 }
 
+/**
+ * Font size for a wall dimension label, scaled down for short walls so they
+ * stay readable and don't crowd neighbouring labels. Length is in centimetres.
+ */
+function getWallLabelFontSize(displayLengthCm: number, zoom: number): number {
+  if (displayLengthCm < 20) return Math.max(8, 8 * zoom);   // < 0.20 m
+  if (displayLengthCm < 50) return Math.max(9, 10 * zoom);  // 0.20 – 0.50 m
+  return Math.max(11, 12 * zoom);                            // default (> 0.50 m)
+}
+
 export function drawWalls(
   ctx: CanvasRenderingContext2D,
   walls: Wall[],
@@ -799,7 +809,11 @@ export function drawWalls(
   // Identify doors/windows for occupant checks
   const doorsWindows = furniture.filter((f) => f.type === "door" || f.type === "door_double" || f.type === "window");
 
-  // Draw individual labels for non-merged walls (skip if wall has door/window occupants — total shown separately)
+  // Collect label positions first (two-pass), then collision-resolve so that
+  // adjacent short-wall labels don't overlap, then render.
+  const labelInfos: { pos: WallLabelPositionResult; wall?: Wall }[] = [];
+
+  // Individual labels for non-merged walls (skip if wall has door/window occupants — total shown separately)
   walls.forEach((wall) => {
     if (mergedWallIds.has(wall.id)) return; // will be labeled by group
 
@@ -828,10 +842,14 @@ export function drawWalls(
     const displayLengthCm = measureMode === "inside"
       ? Math.max(0, lengthCm - wallThick)
       : lengthCm + startExtension + endExtension;
-    drawWallDimensionLabel(ctx, sx, sy, ex, ey, displayLengthCm, (wall.thickness || DEFAULT_WALL_THICKNESS) * pxPerCm, zoom, isDark, units, wall, furniture, gridSize, panOffset, rooms, walls, measureMode, hoveredWallLabelId);
+    const pos = computeWallLabelPosition(
+      sx, sy, ex, ey, displayLengthCm, wallThick * pxPerCm, zoom,
+      units, wall, furniture, gridSize, panOffset, rooms, walls, measureMode, ctx
+    );
+    if (pos) labelInfos.push({ pos, wall });
   });
 
-  // Draw merged labels for collinear groups (skip if group has door/window occupants)
+  // Merged labels for collinear groups (skip if group has door/window occupants)
   for (const group of collinearGroups.values()) {
     const representativeWallForThickness = walls.find((w) => group.wallIds.has(w.id));
     const thickness = representativeWallForThickness?.thickness ?? DEFAULT_WALL_THICKNESS;
@@ -859,7 +877,73 @@ export function drawWalls(
     // Find the actual wall for collision detection
     const groupWallIds = group.wallIds;
     const representativeWall = walls.find((w) => groupWallIds.has(w.id)) || walls[0];
-    drawWallDimensionLabel(ctx, sx, sy, ex, ey, displayLengthCm, thickness * pxPerCm, zoom, isDark, units, representativeWall, furniture, gridSize, panOffset, rooms, walls, measureMode, hoveredWallLabelId);
+    const pos = computeWallLabelPosition(
+      sx, sy, ex, ey, displayLengthCm, thickness * pxPerCm, zoom,
+      units, representativeWall, furniture, gridSize, panOffset, rooms, walls, measureMode, ctx
+    );
+    if (pos) labelInfos.push({ pos, wall: representativeWall });
+  }
+
+  // Resolve label-vs-label collisions by iteratively increasing the perpendicular
+  // offset of overlapping labels. Short-wall labels on a corner (e.g. 0.04m + 0.16m)
+  // would otherwise stack on top of each other.
+  resolveWallLabelCollisions(labelInfos.map(({ pos }) => pos));
+
+  // Draw each label at its resolved position.
+  for (const { pos, wall } of labelInfos) {
+    drawWallDimensionLabelAtPosition(ctx, pos, isDark, wall, hoveredWallLabelId);
+  }
+}
+
+/** Axis-aligned bounding box of a (possibly rotated) wall label in screen space. */
+function wallLabelAabb(pos: WallLabelPositionResult): { left: number; right: number; top: number; bottom: number } {
+  const halfW = pos.textWidth / 2 + pos.pad;
+  const halfH = pos.baseFontSize / 2 + pos.pad;
+  const cosT = Math.abs(Math.cos(pos.textAngle));
+  const sinT = Math.abs(Math.sin(pos.textAngle));
+  // Tight AABB of the rotated rect
+  const aHalfW = halfW * cosT + halfH * sinT;
+  const aHalfH = halfW * sinT + halfH * cosT;
+  return {
+    left: pos.finalX - aHalfW,
+    right: pos.finalX + aHalfW,
+    top: pos.finalY - aHalfH,
+    bottom: pos.finalY + aHalfH,
+  };
+}
+
+/** Move a label further from its wall by `stepPx`, preserving direction. */
+function shiftWallLabelPerpendicular(pos: WallLabelPositionResult, stepPx: number): void {
+  const sign = pos.perpOffsetPx >= 0 ? 1 : -1;
+  pos.perpOffsetPx += sign * stepPx;
+  const mx = pos.wallStartScreen.x + (pos.wallEndScreen.x - pos.wallStartScreen.x) * pos.labelFrac;
+  const my = pos.wallStartScreen.y + (pos.wallEndScreen.y - pos.wallStartScreen.y) * pos.labelFrac;
+  pos.finalX = mx + pos.insideNormX * pos.perpOffsetPx;
+  pos.finalY = my + pos.insideNormY * pos.perpOffsetPx;
+}
+
+/** Iteratively push overlapping wall labels further perpendicular until clear. */
+function resolveWallLabelCollisions(positions: WallLabelPositionResult[]): void {
+  if (positions.length < 2) return;
+  const STEP_PX = 8;
+  const MAX_ITER = 10;
+  for (let iter = 0; iter < MAX_ITER; iter++) {
+    let moved = false;
+    for (let i = 0; i < positions.length; i++) {
+      for (let j = i + 1; j < positions.length; j++) {
+        const a = wallLabelAabb(positions[i]);
+        const b = wallLabelAabb(positions[j]);
+        const overlaps =
+          a.left < b.right && a.right > b.left &&
+          a.top < b.bottom && a.bottom > b.top;
+        if (overlaps) {
+          shiftWallLabelPerpendicular(positions[i], STEP_PX);
+          shiftWallLabelPerpendicular(positions[j], STEP_PX);
+          moved = true;
+        }
+      }
+    }
+    if (!moved) break;
   }
 }
 
@@ -931,13 +1015,8 @@ function drawTotalWallDimensionLine(
   ctx.stroke();
 
   // Label
-  let text = formatLength(displayLengthCm, units);
-  if (measureMode === "full") {
-    text += " (outside wall)";
-  } else {
-    text += " (inside wall)";
-  }
-  const baseFontSize = Math.max(10, 11 * zoom);
+  const text = formatLength(displayLengthCm, units);
+  const baseFontSize = getWallLabelFontSize(displayLengthCm, zoom);
   ctx.font = `600 ${baseFontSize}px 'General Sans', 'DM Sans', sans-serif`;
   const textW = ctx.measureText(text).width;
   const pad = 3;
@@ -1140,7 +1219,7 @@ export function drawWallSegmentMeasurements(
 
     // Label
     const text = formatLength(distCm, units);
-    const baseFontSize = Math.max(10, 11 * zoom);
+    const baseFontSize = getWallLabelFontSize(distCm, zoom);
     ctx.font = `500 ${baseFontSize}px 'General Sans', 'DM Sans', sans-serif`;
     const textW = ctx.measureText(text).width;
     const pad = 3;
@@ -1936,14 +2015,8 @@ function computeWallLabelPosition(
   const angle = Math.atan2(ey - sy, ex - sx);
   const wallLengthPx = Math.sqrt((ex - sx) ** 2 + (ey - sy) ** 2);
 
-  const baseFontSize = Math.max(11, 12 * zoom);
-  let text = formatLength(lengthCm, units);
-  // Add measurement mode suffix
-  if (measureMode === "full") {
-    text += " (outside wall)";
-  } else {
-    text += " (inside wall)";
-  }
+  const baseFontSize = getWallLabelFontSize(lengthCm, zoom);
+  const text = formatLength(lengthCm, units);
 
   // Measure text width — use ctx if available, else estimate
   let textWidth: number;
@@ -2212,17 +2285,30 @@ function drawWallDimensionLabel(
     units, wall, furniture, gridSize, panOffset, rooms, allWalls, measureMode, ctx
   );
   if (!pos) return;
+  drawWallDimensionLabelAtPosition(ctx, pos, isDark, wall, hoveredWallLabelId);
+}
 
+/** Render a wall dimension label from a pre-computed position.
+ *  Used by drawWalls so that wall labels can be collision-resolved against
+ *  each other before rendering. */
+function drawWallDimensionLabelAtPosition(
+  ctx: CanvasRenderingContext2D,
+  pos: WallLabelPositionResult,
+  isDark: boolean,
+  wall?: Wall,
+  hoveredWallLabelId?: string | null
+) {
   const { finalX, finalY, textAngle, textWidth, baseFontSize, text, pad,
-          labelFrac, defaultFrac, insideNormX, insideNormY, perpOffsetPx } = pos;
+          labelFrac, defaultFrac, insideNormX, insideNormY, perpOffsetPx,
+          wallStartScreen, wallEndScreen } = pos;
 
   const isHovered = wall?.id != null && hoveredWallLabelId === wall.id;
   const isPinned = wall?.measurementLabelPinned === true;
 
   // Draw leader line when label moved from default/pinned position
   if (Math.abs(labelFrac - defaultFrac) > 0.02) {
-    const midX = sx + (ex - sx) * defaultFrac;
-    const midY = sy + (ey - sy) * defaultFrac;
+    const midX = wallStartScreen.x + (wallEndScreen.x - wallStartScreen.x) * defaultFrac;
+    const midY = wallStartScreen.y + (wallEndScreen.y - wallStartScreen.y) * defaultFrac;
     const midLabelX = midX + insideNormX * perpOffsetPx;
     const midLabelY = midY + insideNormY * perpOffsetPx;
 
@@ -4206,7 +4292,9 @@ export function snapAngle(
   const dx = end.x - start.x;
   const dy = end.y - start.y;
   const len = Math.sqrt(dx * dx + dy * dy);
-  if (len < 1) return { snapped: end, angle: 0, didSnap: false };
+  // Only gate at sub-millimetre drags to avoid atan2 instability;
+  // short walls must still snap cleanly to their target angle.
+  if (len < 0.1) return { snapped: end, angle: 0, didSnap: false };
 
   const rawAngle = Math.atan2(dy, dx);
   const rawDeg = rawAngle * (180 / Math.PI);

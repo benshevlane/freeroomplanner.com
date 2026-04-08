@@ -368,11 +368,11 @@ export default function FloorPlanCanvas({
           ? wallSnapped
           : (bodySnap ? bodySnapped : gridSnapped);
 
-      // Angle snapping (15° increments, strong snap) — skip if already snapped to endpoint
+      // Angle snapping to 0/90/180/270 axes (15° tolerance) — skip if already snapped to endpoint
       let angleDeg: number | undefined;
       let adjAngleRad: number | undefined;
       if (!didSnap) {
-        const angleResult = snapAngle(state.wallDrawing.start, finalPoint, 15, 5);
+        const angleResult = snapAngle(state.wallDrawing.start, finalPoint, 90, 15);
         finalPoint = angleResult.snapped;
         // Also snap to alignment guides
         const guideSnap = drawAlignmentGuides(ctx, finalPoint, state.walls, state.gridSize, state.zoom, state.panOffset, w, h, isDark);
@@ -987,10 +987,10 @@ export default function FloorPlanCanvas({
             ? wallSnapped
             : (bodySnap ? bodySnapped : gridSnapped);
 
-        // Apply angle snapping when actively drawing (skip if snapped)
+        // Apply axis snapping (0/90/180/270, 15° tolerance) when actively drawing (skip if snapped)
         const currentWallDrawing = wallDrawingRef.current;
         if (currentWallDrawing && !didSnap) {
-          const angleResult = snapAngle(currentWallDrawing.start, finalPoint, 15, 5);
+          const angleResult = snapAngle(currentWallDrawing.start, finalPoint, 90, 15);
           finalPoint = angleResult.snapped;
           // Apply grid snap to the angle-snapped point
           finalPoint = snapToGrid(finalPoint, 1);
@@ -1649,7 +1649,7 @@ export default function FloorPlanCanvas({
               : (bodySnap ? bodySnapped : gridSnapped);
 
           if (!didSnap) {
-            const angleResult = snapAngle(currentWallDrawing.start, finalPoint, 15, 5);
+            const angleResult = snapAngle(currentWallDrawing.start, finalPoint, 90, 15);
             finalPoint = angleResult.snapped;
             finalPoint = snapToGrid(finalPoint, 1);
           }
