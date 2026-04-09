@@ -31,6 +31,7 @@ import {
   SlidersHorizontal,
   Tags,
   TextCursorInput,
+  Ruler,
 } from "lucide-react";
 
 interface EditorToolbarProps {
@@ -56,6 +57,8 @@ interface EditorToolbarProps {
   onSetUnits: (units: UnitSystem) => void;
   measureMode: MeasureMode;
   onToggleMeasureMode: () => void;
+  showAllMeasurements: boolean;
+  onToggleShowAllMeasurements: () => void;
   onAddTextBox: () => void;
   isMobile?: boolean;
   onToggleFurniturePanel?: () => void;
@@ -94,6 +97,8 @@ export default function EditorToolbar({
   onSetUnits,
   measureMode,
   onToggleMeasureMode,
+  showAllMeasurements,
+  onToggleShowAllMeasurements,
   onAddTextBox,
   isMobile,
   onToggleFurniturePanel,
@@ -210,6 +215,10 @@ export default function EditorToolbar({
               ))}
               <DropdownMenuItem onClick={onToggleMeasureMode}>
                 Measure: {measureMode === "full" ? "Full Wall" : "Inside"}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onToggleShowAllMeasurements}>
+                <Ruler className="h-4 w-4 mr-2" />
+                Show all measurements: {showAllMeasurements ? "On" : "Off"}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={onToggleComponentLabels}>
                 <Tags className="h-4 w-4 mr-2" />
@@ -407,6 +416,23 @@ export default function EditorToolbar({
           </TooltipTrigger>
           <TooltipContent>
             <p>{measureMode === "full" ? "Showing full wall length — click for inside measurement" : "Showing inside measurement — click for full wall length"}</p>
+          </TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              size="sm"
+              variant={showAllMeasurements ? "default" : "outline"}
+              onClick={onToggleShowAllMeasurements}
+              data-testid="btn-toggle-show-all-measurements"
+              className="text-xs px-2"
+            >
+              <Ruler className="h-3.5 w-3.5 mr-1" />
+              All
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>{showAllMeasurements ? "Hide labels for walls under 1 m" : "Show all wall measurements (including short walls)"}</p>
           </TooltipContent>
         </Tooltip>
         <DropdownMenu>

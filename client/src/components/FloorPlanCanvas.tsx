@@ -48,6 +48,9 @@ import {
   drawComponentSnapIndicators,
   drawSnapHighlight,
   hitTestWall,
+  hitTestWallForHover,
+  findWallCluster,
+  computeWallClusterScreenBounds,
   hitTestFurniture,
   hitTestLabel,
   hitTestResizeHandle,
@@ -70,6 +73,7 @@ interface FloorPlanCanvasProps {
   state: EditorState;
   isDark: boolean;
   measureMode: MeasureMode;
+  showAllMeasurements: boolean;
   onAddWall: (start: Point, end: Point) => void;
   onSelectItem: (id: string | null) => void;
   onMoveFurniture: (id: string, x: number, y: number) => void;
@@ -108,6 +112,7 @@ export default function FloorPlanCanvas({
   state,
   isDark,
   measureMode,
+  showAllMeasurements,
   onAddWall,
   onSelectItem,
   onMoveFurniture,
@@ -144,6 +149,12 @@ export default function FloorPlanCanvas({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [mousePos, setMousePos] = useState<Point>({ x: 0, y: 0 });
+  // Hover-based wall label cluster: when the cursor is over (or inside the
+  // bounding box of) a cluster of short walls, surface every label in that
+  // cluster as a tooltip. Persists for 200 ms after the cursor leaves.
+  const [hoveredClusterIds, setHoveredClusterIds] = useState<Set<string> | null>(null);
+  const hoverClusterBoundsRef = useRef<{ left: number; right: number; top: number; bottom: number } | null>(null);
+  const hoverClearTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isPanning, setIsPanning] = useState(false);
   const [dragStart, setDragStart] = useState<Point>({ x: 0, y: 0 });
@@ -321,7 +332,21 @@ export default function FloorPlanCanvas({
     }
 
     // Walls
-    drawWalls(ctx, state.walls, state.gridSize, state.zoom, state.panOffset, isDark, state.selectedItemId, state.units, measureMode, state.furniture, rooms, hoveredWallLabelIdRef.current);
+    drawWalls(
+      ctx,
+      state.walls,
+      state.gridSize,
+      state.zoom,
+      state.panOffset,
+      isDark,
+      state.selectedItemId,
+      state.units,
+      measureMode,
+      state.furniture,
+      rooms,
+      hoveredWallLabelIdRef.current,
+      { showAll: showAllMeasurements, hoveredClusterIds },
+    );
 
     // Measurement indicator lines (on top of walls, below labels/furniture)
     drawMeasurementIndicatorLines(ctx, state.walls, rooms, state.gridSize, state.zoom, state.panOffset, measureMode);
@@ -332,8 +357,12 @@ export default function FloorPlanCanvas({
     // Parallel wall discrepancy detection
     const flaggedWalls = findParallelWallDiscrepancies(state.walls);
 
-    // Wall labels with crowding check at low zoom
-    if (flaggedWalls.size > 0 || state.zoom < 0.6) {
+    // Wall labels with crowding check at low zoom. Suppress when the
+    // "Show all measurements" toggle or hover cluster mode is already
+    // surfacing short-wall labels — the "+N hidden" badge would then be
+    // misleading and can stack on top of the new tooltip pills.
+    const suppressDiscrepancy = showAllMeasurements || hoveredClusterIds !== null;
+    if (!suppressDiscrepancy && (flaggedWalls.size > 0 || state.zoom < 0.6)) {
       drawWallLabelsWithDiscrepancy(ctx, state.walls, state.gridSize, state.zoom, state.panOffset, isDark, state.units, measureMode, state.furniture, flaggedWalls, w, h);
     }
 
@@ -1543,6 +1572,63 @@ export default function FloorPlanCanvas({
         hoveredWallLabelIdRef.current = null;
       }
 
+      // Short-wall hover cluster detection (select tool only, when idle).
+      // 1) If already over a cluster bbox, keep it (cancel pending clear).
+      // 2) Otherwise hit-test a wall within 8 px and promote the whole
+      //    transitive 0.5 m cluster to "hovered".
+      // 3) Miss → schedule a 200 ms clear so the tooltips don't flicker
+      //    when the cursor passes briefly outside the bounds.
+      if (state.selectedTool === "select" && !isDragging && !isPanning && !isResizing && !isRotating && !isDraggingLabel && !isDraggingRoomLabel && !isDraggingWallLabel) {
+        const bounds = hoverClusterBoundsRef.current;
+        const insideBounds =
+          bounds !== null &&
+          pos.x >= bounds.left && pos.x <= bounds.right &&
+          pos.y >= bounds.top && pos.y <= bounds.bottom;
+        if (insideBounds) {
+          if (hoverClearTimeoutRef.current) {
+            clearTimeout(hoverClearTimeoutRef.current);
+            hoverClearTimeoutRef.current = null;
+          }
+        } else {
+          const hitWall = hitTestWallForHover(
+            pos.x, pos.y, state.walls, state.gridSize, state.zoom, state.panOffset, 8
+          );
+          if (hitWall) {
+            const cluster = findWallCluster(hitWall, state.walls, 50);
+            const newBounds = computeWallClusterScreenBounds(
+              cluster, state.walls, state.gridSize, state.zoom, state.panOffset, 16
+            );
+            hoverClusterBoundsRef.current = newBounds;
+            setHoveredClusterIds((prev) => {
+              if (prev && prev.size === cluster.size) {
+                let same = true;
+                cluster.forEach((id) => { if (!prev.has(id)) same = false; });
+                if (same) return prev;
+              }
+              return cluster;
+            });
+            if (hoverClearTimeoutRef.current) {
+              clearTimeout(hoverClearTimeoutRef.current);
+              hoverClearTimeoutRef.current = null;
+            }
+          } else if (hoveredClusterIds && !hoverClearTimeoutRef.current) {
+            hoverClearTimeoutRef.current = setTimeout(() => {
+              hoverClusterBoundsRef.current = null;
+              setHoveredClusterIds(null);
+              hoverClearTimeoutRef.current = null;
+            }, 200);
+          }
+        }
+      } else if (hoveredClusterIds) {
+        // Tool switched or a drag started — drop the cluster immediately.
+        if (hoverClearTimeoutRef.current) {
+          clearTimeout(hoverClearTimeoutRef.current);
+          hoverClearTimeoutRef.current = null;
+        }
+        hoverClusterBoundsRef.current = null;
+        setHoveredClusterIds(null);
+      }
+
       // Eraser hover detection
       if (state.selectedTool === "eraser") {
         const canvas = canvasRef.current;
@@ -1600,8 +1686,18 @@ export default function FloorPlanCanvas({
         setSelectHoverElement(null);
       }
     },
-    [state, isPanning, isDragging, isDraggingLabel, draggingLabelId, labelDragStart, isDraggingRoomLabel, draggingRoomKey, roomLabelDragStart, isDraggingWallLabel, draggingWallLabelId, isResizing, isRotating, rotateStartAngle, rotateItemStartRot, resizeStart, resizeCorner, dragStart, dragItemOffset, eraserHoverId, selectHoverElement, arrowDraggingEndpoint, arrowBodyDragStart, wallDragStart, isRotatingLabel, rotatingLabelId, labelRotateStartAngle, labelRotateItemStartRot, isResizingLabel, resizingLabelId, labelResizeStart, getCanvasPos, onSetPan, onSetZoom, onMoveFurniture, onMoveWall, onMoveLabel, onUpdateFurniture, onUpdateArrow, onSetLabelOffset, onSetRoomLabelOffset, onUpdateWallLabelOffset, isDark, measureMode, onSelectItem]
+    [state, isPanning, isDragging, isDraggingLabel, draggingLabelId, labelDragStart, isDraggingRoomLabel, draggingRoomKey, roomLabelDragStart, isDraggingWallLabel, draggingWallLabelId, isResizing, isRotating, rotateStartAngle, rotateItemStartRot, resizeStart, resizeCorner, dragStart, dragItemOffset, eraserHoverId, selectHoverElement, arrowDraggingEndpoint, arrowBodyDragStart, wallDragStart, isRotatingLabel, rotatingLabelId, labelRotateStartAngle, labelRotateItemStartRot, isResizingLabel, resizingLabelId, labelResizeStart, getCanvasPos, onSetPan, onSetZoom, onMoveFurniture, onMoveWall, onMoveLabel, onUpdateFurniture, onUpdateArrow, onSetLabelOffset, onSetRoomLabelOffset, onUpdateWallLabelOffset, isDark, measureMode, onSelectItem, hoveredClusterIds]
   );
+
+  // Cancel any pending hover-cluster clear timer on unmount.
+  useEffect(() => {
+    return () => {
+      if (hoverClearTimeoutRef.current) {
+        clearTimeout(hoverClearTimeoutRef.current);
+        hoverClearTimeoutRef.current = null;
+      }
+    };
+  }, []);
 
   const handlePointerUp = useCallback(
     (e: React.PointerEvent) => {

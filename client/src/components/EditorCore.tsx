@@ -94,6 +94,18 @@ export default function EditorCore({
     });
   }, []);
 
+  const [showAllMeasurements, setShowAllMeasurements] = useState<boolean>(() => {
+    return safeGetItem("freeroomplanner-show-all-measurements") === "true";
+  });
+
+  const toggleShowAllMeasurements = useCallback(() => {
+    setShowAllMeasurements((prev) => {
+      const next = !prev;
+      safeSetItem("freeroomplanner-show-all-measurements", String(next));
+      return next;
+    });
+  }, []);
+
   const [droppingFurniture, setDroppingFurniture] = useState<FurnitureTemplate | null>(null);
   const [autoEditTextBoxId, setAutoEditTextBoxId] = useState<string | null>(null);
   const [showClearDialog, setShowClearDialog] = useState(false);
@@ -399,8 +411,23 @@ export default function EditorCore({
         drawRoomAreas(ctx, rooms, gridSize, zoom, panOffset, isDark, state.units, state.roomNames, null, roomLabelPositions, state.roomLabelOffsets);
       }
 
-      // Walls with measurement labels
-      drawWalls(ctx, state.walls, gridSize, zoom, panOffset, isDark, null, state.units, measureMode, state.furniture, rooms);
+      // Walls with measurement labels — always render all wall labels in the export,
+      // regardless of the live "Show all measurements" toggle state.
+      drawWalls(
+        ctx,
+        state.walls,
+        gridSize,
+        zoom,
+        panOffset,
+        isDark,
+        null,
+        state.units,
+        measureMode,
+        state.furniture,
+        rooms,
+        undefined,
+        { showAll: true, hoveredClusterIds: null },
+      );
 
       // Measurement indicator lines
       drawMeasurementIndicatorLines(ctx, state.walls, rooms, gridSize, zoom, panOffset, measureMode);
@@ -607,6 +634,8 @@ export default function EditorCore({
           onSetUnits={editor.setUnits}
           measureMode={measureMode}
           onToggleMeasureMode={toggleMeasureMode}
+          showAllMeasurements={showAllMeasurements}
+          onToggleShowAllMeasurements={toggleShowAllMeasurements}
           isMobile={isMobile}
           onToggleFurniturePanel={() => setFurniturePanelOpen((o) => !o)}
           onTogglePropertiesPanel={() => setPropertiesPanelOpen((o) => !o)}
@@ -685,6 +714,7 @@ export default function EditorCore({
           state={state}
           isDark={isDark}
           measureMode={measureMode}
+          showAllMeasurements={showAllMeasurements}
           onAddWall={editor.addWall}
           onSelectItem={editor.setSelectedItem}
           onMoveFurniture={editor.moveFurniture}

@@ -629,13 +629,47 @@ function convexHull(points: { x: number; y: number }[]): { x: number; y: number 
 }
 
 /**
- * Font size for a wall dimension label, scaled down for short walls so they
- * stay readable and don't crowd neighbouring labels. Length is in centimetres.
+ * Display options for wall dimension labels. Three exclusive modes:
+ * - default: only walls ≥ 1 m show a label
+ * - showAll: every wall shows a label with length-scaled font (used by the
+ *   "Show all measurements" toggle and always during export)
+ * - hover:   only walls in the hovered cluster show a label, with a brighter
+ *   pill background so they read as a tooltip over the wall lines
+ * A hover cluster can be layered on top of default or showAll — the render
+ * path applies hover styling to any wall that appears in `hoveredClusterIds`.
  */
-function getWallLabelFontSize(displayLengthCm: number, zoom: number): number {
-  if (displayLengthCm < 20) return Math.max(8, 8 * zoom);   // < 0.20 m
-  if (displayLengthCm < 50) return Math.max(9, 10 * zoom);  // 0.20 – 0.50 m
-  return Math.max(11, 12 * zoom);                            // default (> 0.50 m)
+export interface WallLabelDisplayOptions {
+  showAll: boolean;
+  hoveredClusterIds: Set<string> | null;
+}
+
+const DEFAULT_WALL_LABEL_MIN_CM = 100; // walls shorter than 1 m hide in default mode
+
+/**
+ * Font size for a wall dimension label. Length is in centimetres. The size
+ * depends on which display mode is active:
+ * - default (≥ 1 m only):                        current 11/12 default
+ * - showAll: < 0.2 m → 8, < 0.5 m → 10, < 1 m → 12, ≥ 1 m → default
+ * - hover:  < 0.2 m → 9,  0.2–1 m → 11, ≥ 1 m → default
+ */
+function getWallLabelFontSize(
+  displayLengthCm: number,
+  zoom: number,
+  mode: "default" | "showAll" | "hover" = "default",
+): number {
+  if (mode === "hover") {
+    if (displayLengthCm < 20) return Math.max(9, 9 * zoom);
+    if (displayLengthCm < 100) return Math.max(11, 11 * zoom);
+    return Math.max(11, 12 * zoom);
+  }
+  if (mode === "showAll") {
+    if (displayLengthCm < 20) return Math.max(8, 8 * zoom);
+    if (displayLengthCm < 50) return Math.max(10, 10 * zoom);
+    if (displayLengthCm < 100) return Math.max(12, 12 * zoom);
+    return Math.max(11, 12 * zoom);
+  }
+  // default (only reached for walls ≥ 1 m in default mode)
+  return Math.max(11, 12 * zoom);
 }
 
 export function drawWalls(
@@ -650,7 +684,8 @@ export function drawWalls(
   measureMode: MeasureMode = "inside",
   furniture: FurnitureItem[] = [],
   rooms: DetectedRoom[] = [],
-  hoveredWallLabelId?: string | null
+  hoveredWallLabelId?: string | null,
+  labelDisplay: WallLabelDisplayOptions = { showAll: false, hoveredClusterIds: null },
 ) {
   const pxPerCm = (gridSize * zoom) / 100;
 
@@ -809,9 +844,24 @@ export function drawWalls(
   // Identify doors/windows for occupant checks
   const doorsWindows = furniture.filter((f) => f.type === "door" || f.type === "door_double" || f.type === "window");
 
+  // Decide the per-wall label mode given the current display options. The
+  // hover cluster overrides showAll for that subset of walls — a wall in the
+  // cluster always renders with the brighter hover pill.
+  const resolveLabelMode = (wallId: string, lengthCm: number): "default" | "showAll" | "hover" | "hidden" => {
+    if (labelDisplay.hoveredClusterIds && labelDisplay.hoveredClusterIds.has(wallId)) return "hover";
+    if (labelDisplay.showAll) return "showAll";
+    if (lengthCm >= DEFAULT_WALL_LABEL_MIN_CM) return "default";
+    return "hidden";
+  };
+
   // Collect label positions first (two-pass), then collision-resolve so that
   // adjacent short-wall labels don't overlap, then render.
-  const labelInfos: { pos: WallLabelPositionResult; wall?: Wall }[] = [];
+  const labelInfos: {
+    pos: WallLabelPositionResult;
+    wall?: Wall;
+    mode: "default" | "showAll" | "hover";
+    lengthCm: number;
+  }[] = [];
 
   // Individual labels for non-merged walls (skip if wall has door/window occupants — total shown separately)
   walls.forEach((wall) => {
@@ -828,6 +878,12 @@ export function drawWalls(
     const lengthCm = Math.sqrt(dx * dx + dy * dy);
     if (lengthCm <= 10) return;
 
+    const displayLengthCmRaw = measureMode === "inside"
+      ? Math.max(0, lengthCm - wallThick)
+      : lengthCm;
+    const mode = resolveLabelMode(wall.id, displayLengthCmRaw);
+    if (mode === "hidden") return;
+
     const { startExtension, endExtension } = measureMode === "full"
       ? getEndpointExtensions(wall.start, wall.end, wallThick, walls)
       : { startExtension: 0, endExtension: 0 };
@@ -840,13 +896,13 @@ export function drawWalls(
     const ey = (wall.end.y + udy * endExtension) * pxPerCm + panOffset.y;
 
     const displayLengthCm = measureMode === "inside"
-      ? Math.max(0, lengthCm - wallThick)
+      ? displayLengthCmRaw
       : lengthCm + startExtension + endExtension;
     const pos = computeWallLabelPosition(
       sx, sy, ex, ey, displayLengthCm, wallThick * pxPerCm, zoom,
-      units, wall, furniture, gridSize, panOffset, rooms, walls, measureMode, ctx
+      units, wall, furniture, gridSize, panOffset, rooms, walls, measureMode, ctx, mode
     );
-    if (pos) labelInfos.push({ pos, wall });
+    if (pos) labelInfos.push({ pos, wall, mode, lengthCm: displayLengthCm });
   });
 
   // Merged labels for collinear groups (skip if group has door/window occupants)
@@ -857,6 +913,27 @@ export function drawWalls(
     // Skip groups with door/window occupants — total measurement is drawn by drawWallSegmentMeasurements
     const groupOccupants = getWallOccupants(group.minP, group.maxP, thickness, doorsWindows);
     if (groupOccupants.length > 0) continue;
+
+    const groupTotalDisplayCm = measureMode === "inside"
+      ? Math.max(0, group.totalLengthCm - thickness)
+      : group.totalLengthCm;
+    // A group inherits hover if any of its constituent walls are in the
+    // hovered cluster, else follows showAll / default visibility.
+    let groupMode: "default" | "showAll" | "hover" | "hidden";
+    if (labelDisplay.hoveredClusterIds) {
+      let anyHover = false;
+      for (const id of group.wallIds) {
+        if (labelDisplay.hoveredClusterIds.has(id)) { anyHover = true; break; }
+      }
+      if (anyHover) groupMode = "hover";
+      else if (labelDisplay.showAll) groupMode = "showAll";
+      else groupMode = groupTotalDisplayCm >= DEFAULT_WALL_LABEL_MIN_CM ? "default" : "hidden";
+    } else if (labelDisplay.showAll) {
+      groupMode = "showAll";
+    } else {
+      groupMode = groupTotalDisplayCm >= DEFAULT_WALL_LABEL_MIN_CM ? "default" : "hidden";
+    }
+    if (groupMode === "hidden") continue;
 
     const { startExtension, endExtension } = measureMode === "full"
       ? getEndpointExtensions(group.minP, group.maxP, thickness, walls)
@@ -872,26 +949,33 @@ export function drawWalls(
     const ex = (group.maxP.x + gudx * endExtension) * pxPerCm + panOffset.x;
     const ey = (group.maxP.y + gudy * endExtension) * pxPerCm + panOffset.y;
     const displayLengthCm = measureMode === "inside"
-      ? Math.max(0, group.totalLengthCm - thickness)
+      ? groupTotalDisplayCm
       : group.totalLengthCm + startExtension + endExtension;
     // Find the actual wall for collision detection
     const groupWallIds = group.wallIds;
     const representativeWall = walls.find((w) => groupWallIds.has(w.id)) || walls[0];
     const pos = computeWallLabelPosition(
       sx, sy, ex, ey, displayLengthCm, thickness * pxPerCm, zoom,
-      units, representativeWall, furniture, gridSize, panOffset, rooms, walls, measureMode, ctx
+      units, representativeWall, furniture, gridSize, panOffset, rooms, walls, measureMode, ctx, groupMode
     );
-    if (pos) labelInfos.push({ pos, wall: representativeWall });
+    if (pos) labelInfos.push({ pos, wall: representativeWall, mode: groupMode, lengthCm: displayLengthCm });
   }
 
   // Resolve label-vs-label collisions by iteratively increasing the perpendicular
   // offset of overlapping labels. Short-wall labels on a corner (e.g. 0.04m + 0.16m)
-  // would otherwise stack on top of each other.
-  resolveWallLabelCollisions(labelInfos.map(({ pos }) => pos));
+  // would otherwise stack on top of each other. "Show all" uses 4 px steps and
+  // shifts only the shorter wall's label so long-wall labels stay near midpoint.
+  const useShowAllCollisionPolicy = labelDisplay.showAll && !labelDisplay.hoveredClusterIds;
+  resolveWallLabelCollisions(
+    labelInfos.map(({ pos, lengthCm }) => ({ pos, lengthCm })),
+    useShowAllCollisionPolicy ? 4 : 8,
+    useShowAllCollisionPolicy,
+  );
 
-  // Draw each label at its resolved position.
-  for (const { pos, wall } of labelInfos) {
-    drawWallDimensionLabelAtPosition(ctx, pos, isDark, wall, hoveredWallLabelId);
+  // Draw each label at its resolved position. Hover-mode labels get a brighter
+  // "tooltip" pill so they read over the wall lines.
+  for (const { pos, wall, mode } of labelInfos) {
+    drawWallDimensionLabelAtPosition(ctx, pos, isDark, wall, hoveredWallLabelId, mode === "hover");
   }
 }
 
@@ -922,23 +1006,39 @@ function shiftWallLabelPerpendicular(pos: WallLabelPositionResult, stepPx: numbe
   pos.finalY = my + pos.insideNormY * pos.perpOffsetPx;
 }
 
-/** Iteratively push overlapping wall labels further perpendicular until clear. */
-function resolveWallLabelCollisions(positions: WallLabelPositionResult[]): void {
-  if (positions.length < 2) return;
-  const STEP_PX = 8;
-  const MAX_ITER = 10;
+/**
+ * Iteratively push overlapping wall labels further perpendicular until clear.
+ * When `preferShorter` is true (the "Show all measurements" mode), only the
+ * label on the shorter of the two walls is shifted on each overlap, in `stepPx`
+ * increments — this keeps the long-wall labels near their wall midpoint and
+ * lets the tight short-wall labels be pushed out of the way. Otherwise both
+ * labels are shifted (the original behaviour, used for the default ≥ 1 m set).
+ */
+function resolveWallLabelCollisions(
+  infos: { pos: WallLabelPositionResult; lengthCm: number }[],
+  stepPx: number = 8,
+  preferShorter: boolean = false,
+): void {
+  if (infos.length < 2) return;
+  const MAX_ITER = 14;
   for (let iter = 0; iter < MAX_ITER; iter++) {
     let moved = false;
-    for (let i = 0; i < positions.length; i++) {
-      for (let j = i + 1; j < positions.length; j++) {
-        const a = wallLabelAabb(positions[i]);
-        const b = wallLabelAabb(positions[j]);
+    for (let i = 0; i < infos.length; i++) {
+      for (let j = i + 1; j < infos.length; j++) {
+        const a = wallLabelAabb(infos[i].pos);
+        const b = wallLabelAabb(infos[j].pos);
         const overlaps =
           a.left < b.right && a.right > b.left &&
           a.top < b.bottom && a.bottom > b.top;
         if (overlaps) {
-          shiftWallLabelPerpendicular(positions[i], STEP_PX);
-          shiftWallLabelPerpendicular(positions[j], STEP_PX);
+          if (preferShorter) {
+            // Shift whichever label is on the shorter wall.
+            const shorter = infos[i].lengthCm <= infos[j].lengthCm ? i : j;
+            shiftWallLabelPerpendicular(infos[shorter].pos, stepPx);
+          } else {
+            shiftWallLabelPerpendicular(infos[i].pos, stepPx);
+            shiftWallLabelPerpendicular(infos[j].pos, stepPx);
+          }
           moved = true;
         }
       }
@@ -2010,12 +2110,13 @@ function computeWallLabelPosition(
   rooms: DetectedRoom[],
   allWalls: Wall[],
   measureMode: MeasureMode,
-  ctx?: CanvasRenderingContext2D
+  ctx?: CanvasRenderingContext2D,
+  labelMode: "default" | "showAll" | "hover" = "default",
 ): WallLabelPositionResult | null {
   const angle = Math.atan2(ey - sy, ex - sx);
   const wallLengthPx = Math.sqrt((ex - sx) ** 2 + (ey - sy) ** 2);
 
-  const baseFontSize = getWallLabelFontSize(lengthCm, zoom);
+  const baseFontSize = getWallLabelFontSize(lengthCm, zoom, labelMode);
   const text = formatLength(lengthCm, units);
 
   // Measure text width — use ctx if available, else estimate
@@ -2296,7 +2397,8 @@ function drawWallDimensionLabelAtPosition(
   pos: WallLabelPositionResult,
   isDark: boolean,
   wall?: Wall,
-  hoveredWallLabelId?: string | null
+  hoveredWallLabelId?: string | null,
+  hoverTooltip: boolean = false,
 ) {
   const { finalX, finalY, textAngle, textWidth, baseFontSize, text, pad,
           labelFrac, defaultFrac, insideNormX, insideNormY, perpOffsetPx,
@@ -2351,14 +2453,23 @@ function drawWallDimensionLabelAtPosition(
     ctx.stroke();
   }
 
-  // Background pill
-  ctx.fillStyle = isDark ? "#1c1b19" : "#f9f8f5";
-  ctx.fillRect(
-    -textWidth / 2 - pad,
-    -baseFontSize * 0.5 - pad,
-    textWidth + pad * 2,
-    baseFontSize + pad * 2
-  );
+  // Background pill — hover tooltips use a brighter opaque fill plus a
+  // subtle 1 px border so they read as a distinct tooltip over the wall lines
+  // rather than blending into the page background.
+  const pillX = -textWidth / 2 - pad;
+  const pillY = -baseFontSize * 0.5 - pad;
+  const pillW = textWidth + pad * 2;
+  const pillH = baseFontSize + pad * 2;
+  if (hoverTooltip) {
+    ctx.fillStyle = isDark ? "#2a2826" : "#ffffff";
+    ctx.fillRect(pillX, pillY, pillW, pillH);
+    ctx.strokeStyle = isDark ? "rgba(255,255,255,0.25)" : "rgba(0,0,0,0.18)";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(pillX + 0.5, pillY + 0.5, pillW - 1, pillH - 1);
+  } else {
+    ctx.fillStyle = isDark ? "#1c1b19" : "#f9f8f5";
+    ctx.fillRect(pillX, pillY, pillW, pillH);
+  }
 
   // Text
   ctx.fillStyle = isDark ? DIMENSION_COLOR_DARK : DIMENSION_COLOR_LIGHT;
@@ -4884,6 +4995,127 @@ export function hitTestWall(
     }
   }
   return null;
+}
+
+/**
+ * Screen-space proximity test against a wall segment line with a fixed
+ * pixel tolerance (default 8 px) — used by the hover cluster reveal so
+ * short walls can be hit without needing to click them. Ignores wall
+ * thickness: we want the raw distance from the cursor to the wall line.
+ */
+export function hitTestWallForHover(
+  screenX: number,
+  screenY: number,
+  walls: Wall[],
+  gridSize: number,
+  zoom: number,
+  panOffset: Point,
+  tolerancePx: number = 8,
+): Wall | null {
+  const pxPerCm = (gridSize * zoom) / 100;
+  let bestWall: Wall | null = null;
+  let bestDist = Infinity;
+  for (const wall of walls) {
+    const sx = wall.start.x * pxPerCm + panOffset.x;
+    const sy = wall.start.y * pxPerCm + panOffset.y;
+    const ex = wall.end.x * pxPerCm + panOffset.x;
+    const ey = wall.end.y * pxPerCm + panOffset.y;
+    const dx = ex - sx;
+    const dy = ey - sy;
+    const len = Math.sqrt(dx * dx + dy * dy);
+    if (len === 0) continue;
+    const t = Math.max(0, Math.min(1,
+      ((screenX - sx) * dx + (screenY - sy) * dy) / (len * len)
+    ));
+    const cx = sx + t * dx;
+    const cy = sy + t * dy;
+    const dist = Math.sqrt((screenX - cx) ** 2 + (screenY - cy) ** 2);
+    if (dist < tolerancePx && dist < bestDist) {
+      bestDist = dist;
+      bestWall = wall;
+    }
+  }
+  return bestWall;
+}
+
+/**
+ * Given a seed wall, return the set of wall ids that belong to the same
+ * "local cluster". A cluster is the transitive closure of the relation
+ * "endpoint within `maxDistCm` of any endpoint of an already-included wall"
+ * — this reveals all the short segments that make up a step / indent /
+ * door frame as a single hover target.
+ */
+export function findWallCluster(
+  seed: Wall,
+  walls: Wall[],
+  maxDistCm: number = 50,
+): Set<string> {
+  const cluster = new Set<string>([seed.id]);
+  const maxDistSq = maxDistCm * maxDistCm;
+  const distSq = (a: Point, b: Point) => {
+    const dx = a.x - b.x;
+    const dy = a.y - b.y;
+    return dx * dx + dy * dy;
+  };
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const w of walls) {
+      if (cluster.has(w.id)) continue;
+      for (const other of walls) {
+        if (!cluster.has(other.id)) continue;
+        if (
+          distSq(w.start, other.start) <= maxDistSq ||
+          distSq(w.start, other.end) <= maxDistSq ||
+          distSq(w.end, other.start) <= maxDistSq ||
+          distSq(w.end, other.end) <= maxDistSq
+        ) {
+          cluster.add(w.id);
+          changed = true;
+          break;
+        }
+      }
+    }
+  }
+  return cluster;
+}
+
+/**
+ * Screen-space bounding box (with a small pad) of a set of walls. Used by
+ * the hover persistence logic in FloorPlanCanvas — labels stay visible while
+ * the cursor is inside this box so the user can read them without the
+ * tooltip flickering off the moment they drift away from the wall line.
+ */
+export function computeWallClusterScreenBounds(
+  wallIds: Set<string>,
+  walls: Wall[],
+  gridSize: number,
+  zoom: number,
+  panOffset: Point,
+  padPx: number = 16,
+): { left: number; right: number; top: number; bottom: number } | null {
+  const pxPerCm = (gridSize * zoom) / 100;
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  let any = false;
+  for (const w of walls) {
+    if (!wallIds.has(w.id)) continue;
+    const sx = w.start.x * pxPerCm + panOffset.x;
+    const sy = w.start.y * pxPerCm + panOffset.y;
+    const ex = w.end.x * pxPerCm + panOffset.x;
+    const ey = w.end.y * pxPerCm + panOffset.y;
+    minX = Math.min(minX, sx, ex);
+    minY = Math.min(minY, sy, ey);
+    maxX = Math.max(maxX, sx, ex);
+    maxY = Math.max(maxY, sy, ey);
+    any = true;
+  }
+  if (!any) return null;
+  return {
+    left: minX - padPx,
+    right: maxX + padPx,
+    top: minY - padPx,
+    bottom: maxY + padPx,
+  };
 }
 
 export function hitTestFurniture(
