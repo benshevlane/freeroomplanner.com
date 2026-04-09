@@ -14,6 +14,8 @@ import {
   drawResizeHandles,
   drawSnapIndicator,
   drawAlignmentGuides,
+  computeAlignmentGuideSnap,
+  finalizeWallEndpoint,
   drawDistanceMeasurements,
   collectDistanceMeasurementRects,
   drawEraserHighlight,
@@ -30,7 +32,6 @@ import {
   hitTestRoomLabel,
   computeRoomLabelPositions,
   getRoomKey,
-  snapAngle,
   computeWallAngle,
   findAdjoiningWallDirection,
   screenToWorld,
@@ -368,20 +369,19 @@ export default function FloorPlanCanvas({
           ? wallSnapped
           : (bodySnap ? bodySnapped : gridSnapped);
 
-      // Angle snapping to 0/90/180/270 axes (15° tolerance) — skip if already snapped to endpoint
+      // Alignment guide snap + axis snap + grid round, in that order. The
+      // guide snap can override one axis of an already-axis-locked point;
+      // finalizeWallEndpoint then re-locks to the nearest cardinal and
+      // rounds to 1 cm. This must match handlePointerDown/handlePointerUp
+      // exactly so the preview line cannot diverge from the committed wall.
       let angleDeg: number | undefined;
       let adjAngleRad: number | undefined;
+      const guideSnap = drawAlignmentGuides(ctx, finalPoint, state.walls, state.gridSize, state.zoom, state.panOffset, w, h, isDark);
       if (!didSnap) {
-        const angleResult = snapAngle(state.wallDrawing.start, finalPoint, 90, 15);
-        finalPoint = angleResult.snapped;
-        // Also snap to alignment guides
-        const guideSnap = drawAlignmentGuides(ctx, finalPoint, state.walls, state.gridSize, state.zoom, state.panOffset, w, h, isDark);
         if (guideSnap.snapX !== null) finalPoint = { ...finalPoint, x: guideSnap.snapX };
         if (guideSnap.snapY !== null) finalPoint = { ...finalPoint, y: guideSnap.snapY };
-      } else {
-        // Draw guides even when endpoint-snapped
-        drawAlignmentGuides(ctx, finalPoint, state.walls, state.gridSize, state.zoom, state.panOffset, w, h, isDark);
       }
+      finalPoint = finalizeWallEndpoint(state.wallDrawing.start, finalPoint, didSnap);
 
       // Compute relative angle to adjoining wall (or skip if no adjoining wall)
       adjAngleRad = findAdjoiningWallDirection(state.wallDrawing.start, state.walls);
@@ -987,16 +987,19 @@ export default function FloorPlanCanvas({
             ? wallSnapped
             : (bodySnap ? bodySnapped : gridSnapped);
 
-        // Apply axis snapping (0/90/180/270, 15° tolerance) when actively drawing (skip if snapped)
+        // Alignment guide + axis snap + grid round via the shared helper so
+        // preview and commit compute the exact same endpoint. finalizeWallEndpoint
+        // axis-snaps to 0/90/180/270 (20° cone) when !didSnap and always rounds
+        // to 1 cm — this is the single source of truth for axis-locking walls.
         const currentWallDrawing = wallDrawingRef.current;
-        if (currentWallDrawing && !didSnap) {
-          const angleResult = snapAngle(currentWallDrawing.start, finalPoint, 90, 15);
-          finalPoint = angleResult.snapped;
-          // Apply grid snap to the angle-snapped point
-          finalPoint = snapToGrid(finalPoint, 1);
-        }
-
         if (currentWallDrawing) {
+          const guideSnap = computeAlignmentGuideSnap(finalPoint, state.walls);
+          if (!didSnap) {
+            if (guideSnap.snapX !== null) finalPoint = { ...finalPoint, x: guideSnap.snapX };
+            if (guideSnap.snapY !== null) finalPoint = { ...finalPoint, y: guideSnap.snapY };
+          }
+          finalPoint = finalizeWallEndpoint(currentWallDrawing.start, finalPoint, didSnap);
+
           if (e.pointerType === "touch") {
             // Touch: defer wall commit to pointerUp so user can drag to adjust
             wallPendingCommitRef.current = true;
@@ -1021,8 +1024,11 @@ export default function FloorPlanCanvas({
             }
           }
         } else {
-          onSetWallDrawing({ start: finalPoint });
-          wallDrawingRef.current = { start: finalPoint };
+          // First click of a new chain: round the start to the 1 cm grid so
+          // the chain never inherits sub-grid drift from a body/inner-face snap.
+          const chainStart = snapToGrid(finalPoint, 1);
+          onSetWallDrawing({ start: chainStart });
+          wallDrawingRef.current = { start: chainStart };
         }
       } else if (state.selectedTool === "eraser") {
         const hitFurn = hitTestFurniture(pos.x, pos.y, state.furniture, state.gridSize, state.zoom, state.panOffset);
@@ -1648,11 +1654,15 @@ export default function FloorPlanCanvas({
               ? wallSnapped
               : (bodySnap ? bodySnapped : gridSnapped);
 
+          // Same shared-helper cascade as handlePointerDown so the touch
+          // commit path cannot diverge from the mouse commit path or from
+          // the preview line.
+          const guideSnap = computeAlignmentGuideSnap(finalPoint, state.walls);
           if (!didSnap) {
-            const angleResult = snapAngle(currentWallDrawing.start, finalPoint, 90, 15);
-            finalPoint = angleResult.snapped;
-            finalPoint = snapToGrid(finalPoint, 1);
+            if (guideSnap.snapX !== null) finalPoint = { ...finalPoint, x: guideSnap.snapX };
+            if (guideSnap.snapY !== null) finalPoint = { ...finalPoint, y: guideSnap.snapY };
           }
+          finalPoint = finalizeWallEndpoint(currentWallDrawing.start, finalPoint, didSnap);
 
           // Skip near-zero-length walls (accidental double-tap)
           const dx = finalPoint.x - currentWallDrawing.start.x;

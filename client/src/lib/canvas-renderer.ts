@@ -4221,6 +4221,41 @@ export function drawWallPreview(
 }
 
 /** Draw faint alignment guide lines from existing wall endpoints */
+/**
+ * Pure compute-only version of the alignment-guide snap logic — returns the
+ * snap X/Y values without touching the canvas. Used from pointer handlers
+ * (which have no ctx) so preview and commit apply identical guide snapping.
+ */
+export function computeAlignmentGuideSnap(
+  currentPoint: Point,
+  walls: Wall[],
+  threshold: number = 8,
+): { snapX: number | null; snapY: number | null } {
+  const xValues = new Set<number>();
+  const yValues = new Set<number>();
+  for (const wall of walls) {
+    xValues.add(wall.start.x);
+    xValues.add(wall.end.x);
+    yValues.add(wall.start.y);
+    yValues.add(wall.end.y);
+  }
+  let snapX: number | null = null;
+  let snapY: number | null = null;
+  for (const x of xValues) {
+    if (Math.abs(currentPoint.x - x) < threshold) {
+      snapX = x;
+      break;
+    }
+  }
+  for (const y of yValues) {
+    if (Math.abs(currentPoint.y - y) < threshold) {
+      snapY = y;
+      break;
+    }
+  }
+  return { snapX, snapY };
+}
+
 export function drawAlignmentGuides(
   ctx: CanvasRenderingContext2D,
   currentPoint: Point,
@@ -4233,53 +4268,32 @@ export function drawAlignmentGuides(
   isDark: boolean,
   threshold: number = 8 // world cm tolerance (increased for easier alignment)
 ): { snapX: number | null; snapY: number | null } {
+  const snap = computeAlignmentGuideSnap(currentPoint, walls, threshold);
   const pxPerCm = (gridSize * zoom) / 100;
-  let snapX: number | null = null;
-  let snapY: number | null = null;
-
-  // Collect unique X and Y values from all wall endpoints
-  const xValues = new Set<number>();
-  const yValues = new Set<number>();
-  for (const wall of walls) {
-    xValues.add(wall.start.x);
-    xValues.add(wall.end.x);
-    yValues.add(wall.start.y);
-    yValues.add(wall.end.y);
-  }
 
   ctx.save();
   ctx.setLineDash([6, 5]);
   ctx.lineWidth = 1;
   ctx.strokeStyle = isDark ? "rgba(79,152,163,0.45)" : "rgba(1,105,111,0.35)";
 
-  // Check if cursor aligns with any existing wall endpoint X
-  for (const x of xValues) {
-    if (Math.abs(currentPoint.x - x) < threshold) {
-      const sx = x * pxPerCm + panOffset.x;
-      ctx.beginPath();
-      ctx.moveTo(sx, 0);
-      ctx.lineTo(sx, canvasHeight);
-      ctx.stroke();
-      snapX = x;
-      break;
-    }
+  if (snap.snapX !== null) {
+    const sx = snap.snapX * pxPerCm + panOffset.x;
+    ctx.beginPath();
+    ctx.moveTo(sx, 0);
+    ctx.lineTo(sx, canvasHeight);
+    ctx.stroke();
   }
 
-  // Check Y alignment
-  for (const y of yValues) {
-    if (Math.abs(currentPoint.y - y) < threshold) {
-      const sy = y * pxPerCm + panOffset.y;
-      ctx.beginPath();
-      ctx.moveTo(0, sy);
-      ctx.lineTo(canvasWidth, sy);
-      ctx.stroke();
-      snapY = y;
-      break;
-    }
+  if (snap.snapY !== null) {
+    const sy = snap.snapY * pxPerCm + panOffset.y;
+    ctx.beginPath();
+    ctx.moveTo(0, sy);
+    ctx.lineTo(canvasWidth, sy);
+    ctx.stroke();
   }
 
   ctx.restore();
-  return { snapX, snapY };
+  return snap;
 }
 
 /** Snap angle to nearest multiple of snapAngle degrees */
@@ -4373,6 +4387,37 @@ export function snapToGrid(point: Point, snapSize: number): Point {
     x: Math.round(point.x / snapSize) * snapSize,
     y: Math.round(point.y / snapSize) * snapSize,
   };
+}
+
+/**
+ * Snap a wall endpoint to the nearest cardinal axis (0/90/180/270°) when the
+ * raw angle is within `threshold` degrees of that axis, then round to the
+ * 1 cm grid. This is the single source of truth for axis-locking a wall's
+ * end point — call this from both the drawing preview and the commit
+ * handlers so they can never drift apart.
+ */
+export function snapToCardinal(
+  start: Point,
+  end: Point,
+  threshold: number = 20,
+): Point {
+  const result = snapAngle(start, end, 90, threshold);
+  return snapToGrid(result.snapped, 1);
+}
+
+/**
+ * Finalize any candidate wall endpoint — if it already snapped to an
+ * existing feature (endpoint/body/inner-face/guide), just round to the
+ * grid; otherwise also axis-snap via snapToCardinal. Used from the preview
+ * and both commit handlers so all three paths produce an identical point.
+ */
+export function finalizeWallEndpoint(
+  start: Point,
+  end: Point,
+  alreadySnapped: boolean,
+): Point {
+  if (alreadySnapped) return snapToGrid(end, 1);
+  return snapToCardinal(start, end, 20);
 }
 
 export function snapToWallEndpoints(

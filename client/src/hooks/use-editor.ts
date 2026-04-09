@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { EditorState, RoomData, Wall, FurnitureItem, RoomLabel, TextBox, Arrow, Point, EditorTool, FurnitureTemplate, UnitSystem, DEFAULT_TEXT_BOX, DEFAULT_ARROW, FURNITURE_LIBRARY, DEFAULT_WALL_THICKNESS } from "../lib/types";
+import { snapToGrid } from "../lib/canvas-renderer";
 
 const DEFAULT_AUTOSAVE_KEY = "freeroomplanner-autosave";
 
@@ -272,10 +273,12 @@ export function useEditor(storageKey: string = DEFAULT_AUTOSAVE_KEY) {
 
   const addWall = useCallback((start: Point, end: Point) => {
     pushUndo();
+    // Defensive: grid-snap both endpoints to 1 cm so that chained walls
+    // cannot inherit sub-grid drift from body/inner-face projections.
     const wall: Wall = {
       id: generateId(),
-      start,
-      end,
+      start: snapToGrid(start, 1),
+      end: snapToGrid(end, 1),
       thickness: DEFAULT_WALL_THICKNESS,
     };
     setState((s) => ({ ...s, walls: [...s.walls, wall] }));
@@ -449,12 +452,20 @@ export function useEditor(storageKey: string = DEFAULT_AUTOSAVE_KEY) {
     setState((s) => {
       const wall = s.walls.find(w => w.id === wallId);
       if (!wall) return s;
+      // Defensive: round every endpoint to the 1 cm grid. addWall already
+      // rounds on write, but splitWallAndConnect is a parallel wall-writing
+      // path — any drift from a body/inner-face projection that reaches
+      // here would otherwise be frozen into state.
+      const sp = snapToGrid(splitPoint, 1);
+      const ns = snapToGrid(newWallStart, 1);
+      const wStart = snapToGrid(wall.start, 1);
+      const wEnd = snapToGrid(wall.end, 1);
       const newWalls = s.walls.filter(w => w.id !== wallId);
       // Split the existing wall at the split point
-      newWalls.push({ id: generateId(), start: wall.start, end: splitPoint, thickness: wall.thickness });
-      newWalls.push({ id: generateId(), start: splitPoint, end: wall.end, thickness: wall.thickness });
+      newWalls.push({ id: generateId(), start: wStart, end: sp, thickness: wall.thickness });
+      newWalls.push({ id: generateId(), start: sp, end: wEnd, thickness: wall.thickness });
       // Add the connecting wall from the drawing start to the split point
-      newWalls.push({ id: generateId(), start: newWallStart, end: splitPoint, thickness: DEFAULT_WALL_THICKNESS });
+      newWalls.push({ id: generateId(), start: ns, end: sp, thickness: DEFAULT_WALL_THICKNESS });
       return { ...s, walls: newWalls };
     });
   }, [pushUndo]);
