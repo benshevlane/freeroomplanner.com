@@ -289,6 +289,40 @@ function aabbOverlap(
   return aMinX < bMaxX && aMaxX > bMinX && aMinY < bMaxY && aMaxY > bMinY;
 }
 
+/** Check whether a label at the given screen position overlaps any wall other than the current one. */
+function labelOverlapsOtherWall(
+  labelX: number, labelY: number,
+  labelHalfW: number, labelHalfH: number,
+  textAngle: number,
+  currentWallId: string,
+  allWalls: Wall[],
+  pxPerCm: number,
+  panOffset: Point,
+): boolean {
+  // Compute rotated AABB half-extent (same approach as wallLabelAabb)
+  const cosT = Math.abs(Math.cos(textAngle));
+  const sinT = Math.abs(Math.sin(textAngle));
+  const halfExtentX = labelHalfW * cosT + labelHalfH * sinT;
+  const halfExtentY = labelHalfW * sinT + labelHalfH * cosT;
+
+  for (const w of allWalls) {
+    if (w.id === currentWallId) continue;
+    const wsx = w.start.x * pxPerCm + panOffset.x;
+    const wsy = w.start.y * pxPerCm + panOffset.y;
+    const wex = w.end.x * pxPerCm + panOffset.x;
+    const wey = w.end.y * pxPerCm + panOffset.y;
+    const halfThick = ((w.thickness || DEFAULT_WALL_THICKNESS) * pxPerCm) / 2;
+
+    // Distance from label center to this wall's centerline
+    const { dist } = pointToSegDist(labelX, labelY, wsx, wsy, wex, wey);
+
+    // Overlap if label extent reaches the wall polygon
+    const labelRadius = Math.max(halfExtentX, halfExtentY);
+    if (dist < halfThick + labelRadius) return true;
+  }
+  return false;
+}
+
 /**
  * Pre-compute optimal room label positions that avoid furniture.
  * Returns a Map from roomKey to world-coordinate position (cm).
@@ -2251,6 +2285,42 @@ function computeWallLabelPosition(
           }
         }
       }
+    }
+  }
+
+  // Wall overlap check: outside → inside fallback
+  if (wall && allWalls.length > 1 && gridSize && panOffset) {
+    const tentMx = sx + (ex - sx) * labelFrac;
+    const tentMy = sy + (ey - sy) * labelFrac;
+    const tentPerpOffset = flippedSide ? -perpOffsetPx : perpOffsetPx;
+    const tentX = tentMx + insideNormX * tentPerpOffset;
+    const tentY = tentMy + insideNormY * tentPerpOffset;
+
+    let tentTextAngle = angle;
+    if (tentTextAngle > Math.PI / 2 || tentTextAngle < -Math.PI / 2) {
+      tentTextAngle += Math.PI;
+    }
+
+    const labelHalfW = textWidth / 2 + pad;
+    const labelHalfH = baseFontSize / 2 + pad;
+
+    if (labelOverlapsOtherWall(
+      tentX, tentY, labelHalfW, labelHalfH, tentTextAngle,
+      wall.id, allWalls, pxPerCm, panOffset
+    )) {
+      // Try opposite side
+      const oppPerpOffset = -tentPerpOffset;
+      const oppX = tentMx + insideNormX * oppPerpOffset;
+      const oppY = tentMy + insideNormY * oppPerpOffset;
+
+      if (!labelOverlapsOtherWall(
+        oppX, oppY, labelHalfW, labelHalfH, tentTextAngle,
+        wall.id, allWalls, pxPerCm, panOffset
+      )) {
+        // Opposite side is clear — flip
+        flippedSide = !flippedSide;
+      }
+      // If both sides overlap, keep current side
     }
   }
 
