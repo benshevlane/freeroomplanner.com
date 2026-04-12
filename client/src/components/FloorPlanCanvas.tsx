@@ -1272,10 +1272,11 @@ export default function FloorPlanCanvas({
         const localDx = dxPx * cosR + dyPx * sinR;
         const localDy = -dxPx * sinR + dyPx * cosR;
 
-        // Apply with minimum size constraint (60×20px)
-        const newW = Math.max(60, labelResizeStart.labelW + localDx);
-        const newH = Math.max(20, labelResizeStart.labelH + localDy);
-        onUpdateFurniture(resizingLabelId, { labelWidth: newW, labelHeight: newH });
+        // Apply with minimum size constraint (60×20px), then convert to cm for storage
+        const newWPx = Math.max(60, labelResizeStart.labelW + localDx);
+        const newHPx = Math.max(20, labelResizeStart.labelH + localDy);
+        const pxPerCm = (state.gridSize * state.zoom) / 100;
+        onUpdateFurniture(resizingLabelId, { labelWidth: newWPx / pxPerCm, labelHeight: newHPx / pxPerCm });
         return;
       }
 

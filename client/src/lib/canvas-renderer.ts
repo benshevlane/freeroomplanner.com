@@ -6819,13 +6819,14 @@ export function collectComponentLabelRects(
 
     const labelRotation = item.labelRotation ?? 0;
 
-    // When custom label size is set, derive font sizes from width
+    // When custom label size is set (stored in cm), derive font sizes from width
     const hasCustomSize = item.labelWidth != null;
     let nameFontSize: number;
     let dimFontSize: number;
     if (hasCustomSize) {
+      const customWidthPx = item.labelWidth! * pxPerCm;
       const charCount = Math.max(1, displayName.length);
-      nameFontSize = Math.min(24, Math.max(8, (item.labelWidth! / charCount) * 1.5));
+      nameFontSize = Math.min(24 * zoom, Math.max(8, (customWidthPx / charCount) * 1.5));
       dimFontSize = Math.max(7, nameFontSize * 0.8);
     } else {
       nameFontSize = Math.max(9, 11 * zoom);
@@ -6839,9 +6840,9 @@ export function collectComponentLabelRects(
     const maxWidth = Math.max(nameWidth, dimWidth);
     const autoPillW = maxWidth + 10;
     const autoPillH = nameFontSize + dimFontSize + 8;
-    // Use custom label dimensions if set, otherwise use auto-computed
-    const pillW = item.labelWidth ?? autoPillW;
-    const pillH = item.labelHeight ?? autoPillH;
+    // Use custom label dimensions if set (cm → px), otherwise use auto-computed
+    const pillW = item.labelWidth != null ? item.labelWidth * pxPerCm : autoPillW;
+    const pillH = item.labelHeight != null ? item.labelHeight * pxPerCm : autoPillH;
 
     // Check if label fits inside the component
     const isLabelInsideType = item.labelInside ?? LABEL_INSIDE_TYPES.has(item.type);
