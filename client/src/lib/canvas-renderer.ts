@@ -985,9 +985,9 @@ export function drawWalls(
 }
 
 /** Axis-aligned bounding box of a (possibly rotated) wall label in screen space. */
-function wallLabelAabb(pos: WallLabelPositionResult): { left: number; right: number; top: number; bottom: number } {
-  const halfW = pos.textWidth / 2 + pos.pad;
-  const halfH = pos.baseFontSize / 2 + pos.pad;
+function wallLabelAabb(pos: WallLabelPositionResult, margin: number = 4): { left: number; right: number; top: number; bottom: number } {
+  const halfW = pos.textWidth / 2 + pos.pad + margin;
+  const halfH = pos.baseFontSize / 2 + pos.pad + margin;
   const cosT = Math.abs(Math.cos(pos.textAngle));
   const sinT = Math.abs(Math.sin(pos.textAngle));
   // Tight AABB of the rotated rect
@@ -2531,7 +2531,8 @@ function drawWallDimensionLabelAtPosition(
     ctx.fillRect(pillX, pillY, pillW, pillH);
   }
 
-  // Text
+  // Text — must set the same font used by computeWallLabelPosition to measure textWidth
+  ctx.font = `500 ${baseFontSize}px 'General Sans', 'DM Sans', sans-serif`;
   ctx.fillStyle = isDark ? DIMENSION_COLOR_DARK : DIMENSION_COLOR_LIGHT;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";

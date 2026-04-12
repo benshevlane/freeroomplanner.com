@@ -2292,7 +2292,8 @@ export default function FloorPlanCanvas({
     if (state.selectedTool === "select") {
       if (isDragging) return "grabbing";
       if (emptyCanvasDragStart.current) return "grabbing";
-      // Unified: ANY hovered element → pointer cursor, empty canvas → grab/pan
+      // Wall labels and room labels get grab cursor; other hovered elements get pointer
+      if (selectHoverElement?.kind === "wallLabel" || selectHoverElement?.kind === "roomLabel") return "grab";
       if (selectHoverElement) return "default";
       return "grab";
     }
