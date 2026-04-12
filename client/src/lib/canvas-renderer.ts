@@ -5973,6 +5973,12 @@ export function snapFurnitureToWalls(
   let didSnap = false;
   let snappedWallThickness: number | undefined;
   const snappedEdges: SnappedWallEdge[] = [];
+  // Track whether each axis has been snapped by a wall-face snap.
+  // Face snaps (perpendicular to wall) take priority over endpoint snaps
+  // (along wall) to prevent corner conflicts where an endpoint snap from
+  // one wall overrides the face snap from an adjoining wall.
+  let xSnappedByFace = false;
+  let ySnappedByFace = false;
 
   // Use AABB for rotated items
   const aabb = getFurnitureAABB(item);
@@ -6016,11 +6022,13 @@ export function snapFurnitureToWalls(
           candidates.sort((a, b) => a.dist - b.dist);
           y = candidates[0].newY;
           didSnap = true; snappedWallThickness = wallThick;
+          ySnappedByFace = true;
           snappedEdges.push({ wall, axis: 'y', edgeCoord: candidates[0].edgeCoord, segStart: wallMinX, segEnd: wallMaxX });
         }
       }
       // Snap furniture edges to wall endpoints (horizontal alignment)
-      if (bb.bottom > wallY - halfThick - threshold && bb.top < wallY + halfThick + threshold) {
+      // Skip if X axis was already face-snapped by a perpendicular wall
+      if (!xSnappedByFace && bb.bottom > wallY - halfThick - threshold && bb.top < wallY + halfThick + threshold) {
         // Left edge to wall left end
         if (Math.abs(bb.left - wallMinX) < threshold) {
           x = wallMinX - aabbOffX;
@@ -6054,11 +6062,13 @@ export function snapFurnitureToWalls(
           candidates.sort((a, b) => a.dist - b.dist);
           x = candidates[0].newX;
           didSnap = true; snappedWallThickness = wallThick;
+          xSnappedByFace = true;
           snappedEdges.push({ wall, axis: 'x', edgeCoord: candidates[0].edgeCoord, segStart: wallMinY, segEnd: wallMaxY });
         }
       }
       // Snap furniture edges to wall endpoints (vertical alignment)
-      if (bb.right > wallX - halfThick - threshold && bb.left < wallX + halfThick + threshold) {
+      // Skip if Y axis was already face-snapped by a perpendicular wall
+      if (!ySnappedByFace && bb.right > wallX - halfThick - threshold && bb.left < wallX + halfThick + threshold) {
         // Top edge to wall top end
         if (Math.abs(bb.top - wallMinY) < threshold) {
           y = wallMinY - aabbOffY;
@@ -6071,6 +6081,12 @@ export function snapFurnitureToWalls(
         }
       }
     }
+
+    // Update bb after each wall so subsequent walls use the snapped position
+    bb.left = x + aabbOffX;
+    bb.right = x + aabbOffX + aabbW;
+    bb.top = y + aabbOffY;
+    bb.bottom = y + aabbOffY + aabbH;
   }
 
   return { x, y, didSnap, snappedWallThickness, snappedEdges };
