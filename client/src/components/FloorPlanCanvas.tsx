@@ -65,6 +65,7 @@ import {
   hitTestWallMeasurementLabel,
   hitTestWallLabelResetIcon,
   ComponentLabelInfo,
+  ResolvedWallLabelPosition,
 } from "../lib/canvas-renderer";
 import { isWallCupboard } from "../lib/types";
 import { detectRooms } from "../lib/room-detection";
@@ -209,6 +210,8 @@ export default function FloorPlanCanvas({
   const [isDraggingWallLabel, setIsDraggingWallLabel] = useState(false);
   const [draggingWallLabelId, setDraggingWallLabelId] = useState<string | null>(null);
   const hoveredWallLabelIdRef = useRef<string | null>(null);
+  // Cache resolved wall label positions from drawWalls for accurate hit testing
+  const resolvedWallLabelPositionsRef = useRef<ResolvedWallLabelPosition[]>([]);
 
   // Smart cursor: click-vs-drag on empty canvas (deselect on click, pan on drag)
   const emptyCanvasDragStart = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null);
@@ -331,8 +334,8 @@ export default function FloorPlanCanvas({
       drawRoomAreas(ctx, rooms, state.gridSize, state.zoom, state.panOffset, isDark, state.units, state.roomNames, selectedRoomKey, roomLabelPositions, state.roomLabelOffsets);
     }
 
-    // Walls
-    drawWalls(
+    // Walls — cache resolved label positions for accurate hit testing
+    resolvedWallLabelPositionsRef.current = drawWalls(
       ctx,
       state.walls,
       state.gridSize,
@@ -940,7 +943,8 @@ export default function FloorPlanCanvas({
           const wallLabelRooms = detectedRoomsRef.current;
           const resetHit = hitTestWallLabelResetIcon(
             pos.x, pos.y, state.walls, state.gridSize, state.zoom, state.panOffset,
-            isDark, state.units, measureMode, state.furniture, wallLabelRooms
+            isDark, state.units, measureMode, state.furniture, wallLabelRooms,
+            resolvedWallLabelPositionsRef.current
           );
           if (resetHit) {
             onUpdateWallLabelOffset(resetHit.id, 0, false);
@@ -948,7 +952,8 @@ export default function FloorPlanCanvas({
           }
           const labelHit = hitTestWallMeasurementLabel(
             pos.x, pos.y, state.walls, state.gridSize, state.zoom, state.panOffset,
-            isDark, state.units, measureMode, state.furniture, wallLabelRooms
+            isDark, state.units, measureMode, state.furniture, wallLabelRooms,
+            resolvedWallLabelPositionsRef.current
           );
           if (labelHit) {
             onPushUndo();
@@ -1434,6 +1439,8 @@ export default function FloorPlanCanvas({
 
       // Handle wall body dragging
       if (wallDragStart) {
+        // Clear stale hover state — label positions update on next render
+        hoveredWallLabelIdRef.current = null;
         const world = screenToWorld(pos.x, pos.y, state.gridSize, state.zoom, state.panOffset);
         let wdx = world.x - wallDragStart.mouseWorldX;
         let wdy = world.y - wallDragStart.mouseWorldY;
@@ -1615,7 +1622,8 @@ export default function FloorPlanCanvas({
         const wallLabelRooms = detectedRoomsRef.current;
         const labelHit = hitTestWallMeasurementLabel(
           pos.x, pos.y, state.walls, state.gridSize, state.zoom, state.panOffset,
-          isDark, state.units, measureMode, state.furniture, wallLabelRooms
+          isDark, state.units, measureMode, state.furniture, wallLabelRooms,
+          resolvedWallLabelPositionsRef.current
         );
         hoveredWallLabelIdRef.current = labelHit ? labelHit.id : null;
       } else if (!isDraggingWallLabel) {
@@ -1728,6 +1736,7 @@ export default function FloorPlanCanvas({
           isDark,
           units: state.units,
           measureMode,
+          resolvedWallLabelPositions: resolvedWallLabelPositionsRef.current,
         });
         if (!hoveredElementsEqual(selectHoverElement, hit)) {
           setSelectHoverElement(hit);

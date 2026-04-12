@@ -49,6 +49,7 @@ export interface HitTestAnyElementParams {
   isDark?: boolean;
   units?: UnitSystem;
   measureMode?: MeasureMode;
+  resolvedWallLabelPositions?: ResolvedWallLabelPosition[];
 }
 
 /** Hit-test ALL interactive canvas elements in priority order (topmost first).
@@ -60,7 +61,7 @@ export function hitTestAnyElement(
 ): HoveredElement | null {
   const { furniture, walls, labels, arrows, rooms, roomNames, labelPositions,
     roomLabelOffsets, componentLabelInfos, gridSize, zoom, panOffset, ctx,
-    selectedItemId, isDark, units, measureMode } = params;
+    selectedItemId, isDark, units, measureMode, resolvedWallLabelPositions } = params;
 
   // 1. Component labels (topmost interactive layer)
   const hitCompLabel = hitTestComponentLabel(screenX, screenY, componentLabelInfos);
@@ -72,7 +73,8 @@ export function hitTestAnyElement(
   if (isDark !== undefined && units && measureMode) {
     const hitWallLabel = hitTestWallMeasurementLabel(
       screenX, screenY, walls, gridSize, zoom, panOffset,
-      isDark, units, measureMode, furniture, rooms
+      isDark, units, measureMode, furniture, rooms,
+      resolvedWallLabelPositions
     );
     if (hitWallLabel) {
       return { kind: "wallLabel", id: hitWallLabel.id };
@@ -974,9 +976,14 @@ export function drawWalls(
 
   // Draw each label at its resolved position. Hover-mode labels get a brighter
   // "tooltip" pill so they read over the wall lines.
+  const resolvedLabelPositions: ResolvedWallLabelPosition[] = [];
   for (const { pos, wall, mode } of labelInfos) {
     drawWallDimensionLabelAtPosition(ctx, pos, isDark, wall, hoveredWallLabelId, mode === "hover");
+    if (wall) {
+      resolvedLabelPositions.push({ wallId: wall.id, pos });
+    }
   }
+  return resolvedLabelPositions;
 }
 
 /** Axis-aligned bounding box of a (possibly rotated) wall label in screen space. */
@@ -2076,6 +2083,12 @@ function findFurnitureNearWallLabel(
 }
 
 /** Result of computing wall label position — reused for rendering and hit testing */
+/** Cached resolved wall label position after collision resolution */
+export interface ResolvedWallLabelPosition {
+  wallId: string;
+  pos: WallLabelPositionResult;
+}
+
 export interface WallLabelPositionResult {
   finalX: number;
   finalY: number;
@@ -4254,7 +4267,7 @@ export function drawWallPreview(
 
   ctx.strokeStyle = isDark ? DIMENSION_COLOR_DARK : DIMENSION_COLOR_LIGHT;
   ctx.lineWidth = wallThickness * pxPerCm;
-  ctx.lineCap = "round";
+  ctx.lineCap = "butt";
   ctx.setLineDash([8, 4]);
   ctx.beginPath();
   ctx.moveTo(sx, sy);
@@ -4775,6 +4788,10 @@ export function drawSnapIndicator(
 /**
  * Hit test wall measurement labels. Returns the wall whose label was clicked, or null.
  * For collinear groups, returns the representative wall.
+ *
+ * When `resolvedPositions` is provided (cached from the last render pass of drawWalls),
+ * those collision-resolved positions are used for hit testing — ensuring the click target
+ * matches the actual rendered label position. Falls back to recomputing positions if not provided.
  */
 export function hitTestWallMeasurementLabel(
   screenX: number,
@@ -4787,8 +4804,21 @@ export function hitTestWallMeasurementLabel(
   units: UnitSystem,
   measureMode: MeasureMode,
   furniture: FurnitureItem[],
-  rooms: DetectedRoom[]
+  rooms: DetectedRoom[],
+  resolvedPositions?: ResolvedWallLabelPosition[]
 ): Wall | null {
+  // Use cached resolved positions from the render pass when available.
+  // These include collision-resolution shifts, so click targets match visual positions.
+  if (resolvedPositions && resolvedPositions.length > 0) {
+    for (const { wallId, pos } of resolvedPositions) {
+      if (hitTestLabelRect(screenX, screenY, pos)) {
+        return walls.find(w => w.id === wallId) || null;
+      }
+    }
+    return null;
+  }
+
+  // Fallback: recompute positions (without collision resolution)
   const pxPerCm = (gridSize * zoom) / 100;
   const doorsWindows = furniture.filter((f) => f.type === "door" || f.type === "door_double" || f.type === "window");
 
@@ -4881,8 +4911,20 @@ export function hitTestWallLabelResetIcon(
   units: UnitSystem,
   measureMode: MeasureMode,
   furniture: FurnitureItem[],
-  rooms: DetectedRoom[]
+  rooms: DetectedRoom[],
+  resolvedPositions?: ResolvedWallLabelPosition[]
 ): Wall | null {
+  // Use cached resolved positions when available
+  if (resolvedPositions && resolvedPositions.length > 0) {
+    for (const { wallId, pos } of resolvedPositions) {
+      const wall = walls.find(w => w.id === wallId);
+      if (!wall?.measurementLabelPinned) continue;
+      if (hitTestResetIcon(screenX, screenY, pos)) return wall;
+    }
+    return null;
+  }
+
+  // Fallback: recompute positions
   const pxPerCm = (gridSize * zoom) / 100;
   const doorsWindows = furniture.filter((f) => f.type === "door" || f.type === "door_double" || f.type === "window");
 
