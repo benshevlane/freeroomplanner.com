@@ -4267,7 +4267,7 @@ export function drawWallPreview(
 
   ctx.strokeStyle = isDark ? DIMENSION_COLOR_DARK : DIMENSION_COLOR_LIGHT;
   ctx.lineWidth = wallThickness * pxPerCm;
-  ctx.lineCap = "round";
+  ctx.lineCap = "butt";
   ctx.setLineDash([8, 4]);
   ctx.beginPath();
   ctx.moveTo(sx, sy);

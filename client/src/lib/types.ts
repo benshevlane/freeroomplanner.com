@@ -5,7 +5,7 @@ export interface Point {
 
 export type WallType = "exterior" | "interior";
 
-export const DEFAULT_WALL_THICKNESS = 15; // cm
+export const DEFAULT_WALL_THICKNESS = 5; // cm (50mm)
 
 export interface Wall {
   id: string;

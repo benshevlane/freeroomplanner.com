@@ -17,7 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Plus, Trash2, Wand2 } from "lucide-react";
-import { Wall, FurnitureItem, Point } from "@/lib/types";
+import { Wall, FurnitureItem, Point, DEFAULT_WALL_THICKNESS } from "@/lib/types";
 
 type WallSide = "top" | "bottom" | "left" | "right";
 type FeatureType = "window" | "door";
@@ -105,7 +105,7 @@ export default function RoomGeneratorWizard({
     const dCm = parseFloat(depthM) * 100; // room interior depth in cm
     if (isNaN(wCm) || isNaN(dCm) || wCm <= 0 || dCm <= 0) return;
 
-    const wallThickness = 15; // cm
+    const wallThickness = DEFAULT_WALL_THICKNESS;
     const halfT = wallThickness / 2;
 
     // Origin: top-left outer corner of the room at (100, 100)
