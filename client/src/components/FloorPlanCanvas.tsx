@@ -891,6 +891,7 @@ export default function FloorPlanCanvas({
         // Try to hit test furniture first, then walls, then labels
         const hitFurn = hitTestFurniture(pos.x, pos.y, state.furniture, state.gridSize, state.zoom, state.panOffset);
         if (hitFurn) {
+          onPushUndo();
           const pxPerCm = (state.gridSize * state.zoom) / 100;
           onSelectItem(hitFurn.id);
           setIsDragging(true);
@@ -903,6 +904,7 @@ export default function FloorPlanCanvas({
 
         const hitLbl = hitTestLabel(pos.x, pos.y, state.labels, state.gridSize, state.zoom, state.panOffset, ctx);
         if (hitLbl) {
+          onPushUndo();
           const pxPerCm = (state.gridSize * state.zoom) / 100;
           onSelectItem(hitLbl.id);
           setIsDragging(true);
@@ -973,6 +975,7 @@ export default function FloorPlanCanvas({
 
         const hitW = hitTestWall(pos.x, pos.y, state.walls, state.gridSize, state.zoom, state.panOffset);
         if (hitW) {
+          onPushUndo();
           onSelectItem(hitW.id);
           // Start wall body drag
           const world = screenToWorld(pos.x, pos.y, state.gridSize, state.zoom, state.panOffset);
@@ -1840,17 +1843,12 @@ export default function FloorPlanCanvas({
       }
 
       if (wallDragStart) {
-        onPushUndo();
         setWallDragStart(null);
       }
       if (isDragging) {
-        onPushUndo();
         setWallSnapEdges([]);
         setComponentSnapEdges([]);
         prevDidSnap.current = false;
-      }
-      if (isDraggingLabel) {
-        onPushUndo();
       }
       if (isDraggingWallLabel) {
         // Release pointer capture
