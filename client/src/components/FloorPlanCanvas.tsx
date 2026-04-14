@@ -1955,26 +1955,29 @@ export default function FloorPlanCanvas({
           return;
         }
 
-        // Check component labels (double-click to reset offset or rename)
+        // Check component labels (double-click to rename)
         if (state.componentLabelsVisible) {
-          // First check if double-clicking on a label — reset its offset
           const hitLabelItem = hitTestComponentLabel(pos.x, pos.y, componentLabelInfosRef.current);
           if (hitLabelItem) {
-            const hasOffset = hitLabelItem.labelOffset && (hitLabelItem.labelOffset.x !== 0 || hitLabelItem.labelOffset.y !== 0);
-            const hasCustomLabel = hitLabelItem.labelRotation || hitLabelItem.labelWidth || hitLabelItem.labelHeight;
-            if (hasOffset || hasCustomLabel) {
-              // Reset label to default position, rotation, and size
-              onSetLabelOffset(hitLabelItem.id, { x: 0, y: 0 });
-              onUpdateFurniture(hitLabelItem.id, { labelRotation: undefined, labelWidth: undefined, labelHeight: undefined });
-              return;
-            }
-            // If no offset, fall through to rename behavior
+            // Use the actual rendered label position (which already accounts for
+            // user offset, rotation, and inside/outside placement) so the rename
+            // input appears over the label even when it has been customized.
+            const labelInfo = componentLabelInfosRef.current.find(
+              (info) => info.item.id === hitLabelItem.id
+            );
             const pxPerCm = (state.gridSize * state.zoom) / 100;
-            const centerX = (hitLabelItem.x + hitLabelItem.width / 2) * pxPerCm + state.panOffset.x;
-            const labelY = (hitLabelItem.y + hitLabelItem.height) * pxPerCm + state.panOffset.y + 14 * state.zoom;
+            const screenX = labelInfo
+              ? labelInfo.centerX
+              : (hitLabelItem.x + hitLabelItem.width / 2) * pxPerCm + state.panOffset.x;
+            const screenY = labelInfo
+              ? labelInfo.labelY
+              : (hitLabelItem.y + hitLabelItem.height) * pxPerCm + state.panOffset.y + 14 * state.zoom;
             const displayName = hitLabelItem.customName || hitLabelItem.label;
-            setEditingLabel({ id: hitLabelItem.id, x: centerX, y: labelY, text: displayName, isNew: false });
-            editingLabelWorldPos.current = { x: hitLabelItem.x + hitLabelItem.width / 2, y: hitLabelItem.y + hitLabelItem.height };
+            setEditingLabel({ id: hitLabelItem.id, x: screenX, y: screenY, text: displayName, isNew: false });
+            editingLabelWorldPos.current = {
+              x: (screenX - state.panOffset.x) / pxPerCm,
+              y: (screenY - state.panOffset.y) / pxPerCm,
+            };
             setTimeout(() => labelInputRef.current?.focus(), 0);
             return;
           }
@@ -1993,7 +1996,7 @@ export default function FloorPlanCanvas({
         }
       }
     },
-    [state.selectedTool, state.wallDrawing, state.labels, state.walls, state.gridSize, state.zoom, state.panOffset, state.roomNames, state.componentLabelsVisible, state.furniture, onSetWallDrawing, onSetLabelOffset]
+    [state.selectedTool, state.wallDrawing, state.labels, state.walls, state.gridSize, state.zoom, state.panOffset, state.roomNames, state.componentLabelsVisible, state.furniture, onSetWallDrawing]
   );
 
   // Inline label editing handlers
