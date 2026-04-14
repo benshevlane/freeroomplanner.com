@@ -6993,24 +6993,59 @@ export function collectComponentLabelRects(
       dimFontSize = Math.max(8, 9 * zoom);
     }
 
-    // Always measure with weight "500" so isInside doesn't flip when item is selected
-    ctx.font = `500 ${nameFontSize}px 'General Sans', 'DM Sans', sans-serif`;
-    const nameWidth = ctx.measureText(displayName).width;
-    ctx.font = `400 ${dimFontSize}px 'General Sans', 'DM Sans', sans-serif`;
-    const dimWidth = ctx.measureText(dimText).width;
-    const maxWidth = Math.max(nameWidth, dimWidth);
-    const autoPillW = maxWidth + 10;
-    const autoPillH = nameFontSize + dimFontSize + 8;
-    // Use custom label dimensions if set (cm → px), otherwise use auto-computed
-    const pillW = item.labelWidth != null ? item.labelWidth * pxPerCm : autoPillW;
-    const pillH = item.labelHeight != null ? item.labelHeight * pxPerCm : autoPillH;
+    // Measure pill dimensions at current font size
+    const measurePill = (nfs: number, dfs: number) => {
+      ctx.font = `500 ${nfs}px 'General Sans', 'DM Sans', sans-serif`;
+      const nw = ctx.measureText(displayName).width;
+      ctx.font = `400 ${dfs}px 'General Sans', 'DM Sans', sans-serif`;
+      const dw = ctx.measureText(dimText).width;
+      const mw = Math.max(nw, dw);
+      return { pillW: mw + 10, pillH: nfs + dfs + 8 };
+    };
+
+    let { pillW: autoPillW, pillH: autoPillH } = measurePill(nameFontSize, dimFontSize);
 
     // Check if label fits inside the component
     const isLabelInsideType = item.labelInside ?? LABEL_INSIDE_TYPES.has(item.type);
-    const isInside = isLabelInsideType
-      && !isWallCupboard(item.type)
-      && pillW < visualWidthPx * 0.95
-      && pillH < visualHeightPx * 0.85;
+    let isInside = isLabelInsideType && !isWallCupboard(item.type);
+
+    // For inside labels, try scaling font down before moving outside
+    if (isInside && !hasCustomSize) {
+      const targetW = visualWidthPx * 0.95;
+      const targetH = visualHeightPx * 0.85;
+      const MIN_NAME_FONT = 7;
+      const MIN_DIM_FONT = 6;
+
+      // Scale down font if label doesn't fit, down to minimum
+      while (
+        (autoPillW >= targetW || autoPillH >= targetH) &&
+        nameFontSize > MIN_NAME_FONT
+      ) {
+        nameFontSize = Math.max(MIN_NAME_FONT, nameFontSize - 0.5);
+        dimFontSize = Math.max(MIN_DIM_FONT, dimFontSize - 0.5);
+        ({ pillW: autoPillW, pillH: autoPillH } = measurePill(nameFontSize, dimFontSize));
+      }
+
+      // If still doesn't fit at minimum font size, move outside
+      if (autoPillW >= targetW || autoPillH >= targetH) {
+        isInside = false;
+        // Reset font sizes back to default for the outside label
+        nameFontSize = Math.max(9, 11 * zoom);
+        dimFontSize = Math.max(8, 9 * zoom);
+        ({ pillW: autoPillW, pillH: autoPillH } = measurePill(nameFontSize, dimFontSize));
+      }
+    } else if (isInside) {
+      // Custom size: just check fit without scaling
+      const pw = item.labelWidth != null ? item.labelWidth * pxPerCm : autoPillW;
+      const ph = item.labelHeight != null ? item.labelHeight * pxPerCm : autoPillH;
+      if (pw >= visualWidthPx * 0.95 || ph >= visualHeightPx * 0.85) {
+        isInside = false;
+      }
+    }
+
+    // Use custom label dimensions if set (cm → px), otherwise use auto-computed
+    const pillW = item.labelWidth != null ? item.labelWidth * pxPerCm : autoPillW;
+    const pillH = item.labelHeight != null ? item.labelHeight * pxPerCm : autoPillH;
 
     // Apply labelOffset (stored in cm, convert to px)
     const offsetPx = item.labelOffset
@@ -7058,6 +7093,19 @@ export function collectComponentLabelRects(
   return results;
 }
 
+/** Normalize an angle (radians) so text is never upside-down.
+ *  Keeps the angle in (-π/2, π/2] by flipping 180° when needed. */
+function normalizeTextAngle(rad: number): number {
+  // Reduce to (-π, π]
+  let a = rad % (2 * Math.PI);
+  if (a > Math.PI) a -= 2 * Math.PI;
+  if (a <= -Math.PI) a += 2 * Math.PI;
+  // If pointing "down-left" quadrant, flip 180°
+  if (a > Math.PI / 2) a -= Math.PI;
+  if (a < -Math.PI / 2) a += Math.PI;
+  return a;
+}
+
 /** Draw a component label centered inside the component (no pill background) */
 function drawInsideComponentLabel(
   ctx: CanvasRenderingContext2D,
@@ -7075,7 +7123,11 @@ function drawInsideComponentLabel(
 
   const cx = (item.x + item.width / 2) * pxPerCm + panOffset.x;
   const cy = (item.y + item.height / 2) * pxPerCm + panOffset.y;
-  const rotation = (item.rotation * Math.PI) / 180;
+  const rawRotation = (item.rotation * Math.PI) / 180;
+  const labelRotRad = (info.labelRotation * Math.PI) / 180;
+
+  // Normalize the combined rotation so text is never upside-down
+  const effectiveRotation = normalizeTextAngle(rawRotation + labelRotRad);
 
   // Apply labelOffset in local (rotated) space
   const offsetPx = item.labelOffset
@@ -7084,18 +7136,8 @@ function drawInsideComponentLabel(
 
   ctx.save();
   ctx.translate(cx, cy);
-  if (rotation) ctx.rotate(rotation);
+  ctx.rotate(effectiveRotation);
   if (item.mirrored) ctx.scale(-1, 1); // counter-mirror so text reads normally
-
-  // Apply label-specific rotation on top of component rotation
-  const labelRot = info.labelRotation;
-  if (labelRot) {
-    const lrx = offsetPx.x;
-    const lry = offsetPx.y;
-    ctx.translate(lrx, lry);
-    ctx.rotate((labelRot * Math.PI) / 180);
-    ctx.translate(-lrx, -lry);
-  }
 
   const totalTextH = info.nameFontSize + info.dimFontSize + 2;
   const nameY = -totalTextH / 2 + offsetPx.y;
@@ -7293,8 +7335,10 @@ function drawSingleComponentLabel(
 
   ctx.save();
   if (labelRotation) {
+    // Normalize rotation so outside label text is never upside-down
+    const normalizedRot = normalizeTextAngle((labelRotation * Math.PI) / 180);
     ctx.translate(labelCenterX, labelCenterY);
-    ctx.rotate((labelRotation * Math.PI) / 180);
+    ctx.rotate(normalizedRot);
     ctx.translate(-labelCenterX, -labelCenterY);
   }
 
