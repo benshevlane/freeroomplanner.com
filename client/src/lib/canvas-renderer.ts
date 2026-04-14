@@ -3274,34 +3274,9 @@ function drawFurnitureDetail(
       break;
     }
     case "drawer_unit_2":
-    case "drawer_unit_3": {
-      const drawers = type === "drawer_unit_2" ? 2 : 3;
-      const sectionH = h / drawers;
-      // Divider lines between drawers
-      ctx.strokeStyle = stroke;
-      ctx.lineWidth = 1;
-      ctx.globalAlpha = 0.55;
-      for (let i = 1; i < drawers; i++) {
-        const yDiv = -h / 2 + sectionH * i;
-        ctx.beginPath();
-        ctx.moveTo(-w / 2, yDiv);
-        ctx.lineTo(w / 2, yDiv);
-        ctx.stroke();
-      }
-      // Handle mark centred on the front edge of each drawer
-      ctx.lineWidth = 2;
-      const handleW = w * 0.35;
-      for (let i = 0; i < drawers; i++) {
-        const yFront = -h / 2 + sectionH * (i + 1);
-        ctx.beginPath();
-        ctx.moveTo(-handleW / 2, yFront - sectionH * 0.12);
-        ctx.lineTo(handleW / 2, yFront - sectionH * 0.12);
-        ctx.stroke();
-      }
-      ctx.lineWidth = 1;
-      ctx.globalAlpha = 1;
+    case "drawer_unit_3":
+      // Plain rectangle — top-down view, no inner detail (outer rect already drawn)
       break;
-    }
     case "corner_bath": {
       // Inner rim rectangle
       ctx.globalAlpha = 0.3;
