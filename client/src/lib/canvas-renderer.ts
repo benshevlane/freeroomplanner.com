@@ -4662,6 +4662,7 @@ export function snapToWallEndpoints(
   let closestDist = effectiveThreshold;
 
   for (const wall of walls) {
+    // Check centerline endpoints directly
     for (const ep of [wall.start, wall.end]) {
       const dx = point.x - ep.x;
       const dy = point.y - ep.y;
@@ -4669,6 +4670,38 @@ export function snapToWallEndpoints(
       if (dist < closestDist) {
         closestDist = dist;
         closest = ep;
+      }
+    }
+
+    // Also check the visual corner points of the wall rectangle.
+    // Walls are rendered with thickness — the visible corners are offset
+    // from the centerline by halfThickness along the perpendicular.
+    // Without this, the user must aim at the invisible centerline instead
+    // of the visible wall corner, especially for thick exterior walls.
+    const halfThick = (wall.thickness || DEFAULT_WALL_THICKNESS) / 2;
+    if (halfThick > 0) {
+      const wdx = wall.end.x - wall.start.x;
+      const wdy = wall.end.y - wall.start.y;
+      const len = Math.sqrt(wdx * wdx + wdy * wdy);
+      if (len > 0.01) {
+        const nx = (-wdy / len) * halfThick;
+        const ny = (wdx / len) * halfThick;
+        // Four visual corners, each maps to its centerline endpoint
+        const corners: { corner: Point; endpoint: Point }[] = [
+          { corner: { x: wall.start.x + nx, y: wall.start.y + ny }, endpoint: wall.start },
+          { corner: { x: wall.start.x - nx, y: wall.start.y - ny }, endpoint: wall.start },
+          { corner: { x: wall.end.x + nx, y: wall.end.y + ny }, endpoint: wall.end },
+          { corner: { x: wall.end.x - nx, y: wall.end.y - ny }, endpoint: wall.end },
+        ];
+        for (const { corner, endpoint } of corners) {
+          const cdx = point.x - corner.x;
+          const cdy = point.y - corner.y;
+          const dist = Math.sqrt(cdx * cdx + cdy * cdy);
+          if (dist < closestDist) {
+            closestDist = dist;
+            closest = endpoint;
+          }
+        }
       }
     }
   }
