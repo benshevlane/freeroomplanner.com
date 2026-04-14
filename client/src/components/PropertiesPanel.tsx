@@ -27,6 +27,16 @@ interface PropertiesPanelProps {
   measureMode?: MeasureMode;
 }
 
+/** Return the step increment for number inputs: 1cm worth in the active unit */
+function stepForUnit(units: UnitSystem): number {
+  switch (units) {
+    case "m": return 0.01;
+    case "cm": return 1;
+    case "mm": return 10;
+    case "ft": return 0.394;
+  }
+}
+
 /** Format a cm value for display in the selected units */
 function formatDimension(cm: number, units: UnitSystem): string {
   switch (units) {
@@ -92,6 +102,14 @@ export default function PropertiesPanel({
   const [editingThickness, setEditingThickness] = useState(false);
   const lengthRef = useRef<HTMLInputElement>(null);
   const thicknessRef = useRef<HTMLInputElement>(null);
+
+  // Local state for furniture dimension inputs (avoids clobbering intermediate typing)
+  const [widthLocal, setWidthLocal] = useState("");
+  const [widthFocused, setWidthFocused] = useState(false);
+  const [heightLocal, setHeightLocal] = useState("");
+  const [heightFocused, setHeightFocused] = useState(false);
+  const [hffLocal, setHffLocal] = useState("");
+  const [hffFocused, setHffFocused] = useState(false);
 
   if (selectedWall) {
     const dx = selectedWall.end.x - selectedWall.start.x;
@@ -268,16 +286,39 @@ export default function PropertiesPanel({
             <span className="text-muted-foreground">{widthLabel}</span>
             <Input
               type="number"
-              min={Math.round(cmToDisplay(minWidth, units))}
-              value={Math.round(cmToDisplay(selectedFurniture.width, units) * 100) / 100}
+              step={stepForUnit(units)}
+              min={cmToDisplay(minWidth, units)}
+              value={widthFocused ? widthLocal : Math.round(cmToDisplay(selectedFurniture.width, units) * 100) / 100}
+              onFocus={() => {
+                setWidthLocal(String(Math.round(cmToDisplay(selectedFurniture.width, units) * 100) / 100));
+                setWidthFocused(true);
+              }}
               onChange={(e) => {
-                const displayVal = parseFloat(e.target.value) || 0;
-                const newCm = Math.max(minWidth, displayToCm(displayVal, units));
-                const delta = newCm - selectedFurniture.width;
-                onUpdateFurniture(selectedFurniture.id, {
-                  width: newCm,
-                  x: selectedFurniture.x - delta / 2,
-                });
+                setWidthLocal(e.target.value);
+                const parsed = parseFloat(e.target.value);
+                if (!isNaN(parsed) && parsed > 0) {
+                  const newCm = Math.max(minWidth, displayToCm(parsed, units));
+                  const delta = newCm - selectedFurniture.width;
+                  onUpdateFurniture(selectedFurniture.id, {
+                    width: newCm,
+                    x: selectedFurniture.x - delta / 2,
+                  });
+                }
+              }}
+              onBlur={() => {
+                setWidthFocused(false);
+                const parsed = parseFloat(widthLocal);
+                if (!isNaN(parsed) && parsed > 0) {
+                  const newCm = Math.max(minWidth, displayToCm(parsed, units));
+                  const delta = newCm - selectedFurniture.width;
+                  onUpdateFurniture(selectedFurniture.id, {
+                    width: newCm,
+                    x: selectedFurniture.x - delta / 2,
+                  });
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") e.currentTarget.blur();
               }}
               className="h-9 w-24 text-sm md:h-7 md:w-20"
               data-testid="input-furniture-width"
@@ -288,16 +329,39 @@ export default function PropertiesPanel({
             <span className="text-muted-foreground">{heightLabel}</span>
             <Input
               type="number"
-              min={Math.round(cmToDisplay(minHeight, units))}
-              value={Math.round(cmToDisplay(selectedFurniture.height, units) * 100) / 100}
+              step={stepForUnit(units)}
+              min={cmToDisplay(minHeight, units)}
+              value={heightFocused ? heightLocal : Math.round(cmToDisplay(selectedFurniture.height, units) * 100) / 100}
+              onFocus={() => {
+                setHeightLocal(String(Math.round(cmToDisplay(selectedFurniture.height, units) * 100) / 100));
+                setHeightFocused(true);
+              }}
               onChange={(e) => {
-                const displayVal = parseFloat(e.target.value) || 0;
-                const newCm = Math.max(minHeight, displayToCm(displayVal, units));
-                const delta = newCm - selectedFurniture.height;
-                onUpdateFurniture(selectedFurniture.id, {
-                  height: newCm,
-                  y: selectedFurniture.y - delta / 2,
-                });
+                setHeightLocal(e.target.value);
+                const parsed = parseFloat(e.target.value);
+                if (!isNaN(parsed) && parsed > 0) {
+                  const newCm = Math.max(minHeight, displayToCm(parsed, units));
+                  const delta = newCm - selectedFurniture.height;
+                  onUpdateFurniture(selectedFurniture.id, {
+                    height: newCm,
+                    y: selectedFurniture.y - delta / 2,
+                  });
+                }
+              }}
+              onBlur={() => {
+                setHeightFocused(false);
+                const parsed = parseFloat(heightLocal);
+                if (!isNaN(parsed) && parsed > 0) {
+                  const newCm = Math.max(minHeight, displayToCm(parsed, units));
+                  const delta = newCm - selectedFurniture.height;
+                  onUpdateFurniture(selectedFurniture.id, {
+                    height: newCm,
+                    y: selectedFurniture.y - delta / 2,
+                  });
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") e.currentTarget.blur();
               }}
               className="h-9 w-24 text-sm md:h-7 md:w-20"
               data-testid="input-furniture-height"
@@ -309,12 +373,31 @@ export default function PropertiesPanel({
               <span className="text-muted-foreground">Height from floor:</span>
               <Input
                 type="number"
+                step={stepForUnit(units)}
                 min={0}
-                value={Math.round(cmToDisplay(selectedFurniture.heightFromFloor ?? 145, units) * 100) / 100}
+                value={hffFocused ? hffLocal : Math.round(cmToDisplay(selectedFurniture.heightFromFloor ?? 145, units) * 100) / 100}
+                onFocus={() => {
+                  setHffLocal(String(Math.round(cmToDisplay(selectedFurniture.heightFromFloor ?? 145, units) * 100) / 100));
+                  setHffFocused(true);
+                }}
                 onChange={(e) => {
-                  const displayVal = parseFloat(e.target.value) || 0;
-                  const newCm = Math.max(0, displayToCm(displayVal, units));
-                  onUpdateFurniture(selectedFurniture.id, { heightFromFloor: newCm });
+                  setHffLocal(e.target.value);
+                  const parsed = parseFloat(e.target.value);
+                  if (!isNaN(parsed) && parsed >= 0) {
+                    const newCm = Math.max(0, displayToCm(parsed, units));
+                    onUpdateFurniture(selectedFurniture.id, { heightFromFloor: newCm });
+                  }
+                }}
+                onBlur={() => {
+                  setHffFocused(false);
+                  const parsed = parseFloat(hffLocal);
+                  if (!isNaN(parsed) && parsed >= 0) {
+                    const newCm = Math.max(0, displayToCm(parsed, units));
+                    onUpdateFurniture(selectedFurniture.id, { heightFromFloor: newCm });
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") e.currentTarget.blur();
                 }}
                 className="h-9 w-24 text-sm md:h-7 md:w-20"
                 data-testid="input-furniture-height-from-floor"
