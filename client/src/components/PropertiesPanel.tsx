@@ -489,8 +489,8 @@ export default function PropertiesPanel({
           <p className="text-xs text-muted-foreground">Padding: {tb.padding}px</p>
           <Slider
             value={[tb.padding]}
-            min={4}
-            max={40}
+            min={0}
+            max={20}
             step={1}
             onValueChange={([v]) => onUpdateTextBox(tb.id, { padding: v })}
           />

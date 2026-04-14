@@ -131,7 +131,7 @@ export async function exportToPdf(state: EditorState, roomName: string) {
     if (tb.content) {
       const textContent = tb.content.replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
       if (textContent) {
-        const padding = (tb.padding || 12) * (pxPerCm / 100);
+        const padding = (tb.padding ?? 2) * (pxPerCm / 100);
         const fontSize = Math.max(8, (tb.fontSize || 14) * (pxPerCm / 100));
         ctx.font = `400 ${fontSize}px ${tb.fontFamily || "sans-serif"}`;
         ctx.fillStyle = "#28251d";

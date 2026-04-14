@@ -71,7 +71,7 @@ export interface TextBox {
   cornerRadius: number; // px 0–40
   backgroundColor: string;
   backgroundOpacity: number; // 0–1
-  padding: number; // px 4–40
+  padding: number; // px 0–20
   shadowEnabled: boolean;
   shadowBlur: number; // px
   shadowOffsetX: number; // px
@@ -120,7 +120,7 @@ export const DEFAULT_TEXT_BOX: Omit<TextBox, "id" | "x" | "y"> = {
   cornerRadius: 0,
   backgroundColor: "#ffffff",
   backgroundOpacity: 1,
-  padding: 4,
+  padding: 2,
   shadowEnabled: false,
   shadowBlur: 8,
   shadowOffsetX: 2,

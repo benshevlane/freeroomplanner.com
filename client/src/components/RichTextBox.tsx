@@ -159,7 +159,7 @@ export default function RichTextBox({
     transformOrigin: "center center",
     backgroundColor: bgRgba,
     borderRadius: textBox.cornerRadius,
-    padding: textBox.padding * zoom,
+    padding: textBox.padding,
     fontSize: textBox.fontSize * zoom,
     fontFamily: textBox.fontFamily,
     overflow: isEditMode ? "auto" : "visible",
