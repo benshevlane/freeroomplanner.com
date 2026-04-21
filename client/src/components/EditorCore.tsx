@@ -17,6 +17,7 @@ import {
   drawRoomAreas,
   drawLabels,
   drawArrows,
+  drawTextBoxes,
   collectComponentLabelRects,
   resolveAndDrawLabelCollisions,
   collectWallMeasurementLabelRects,
@@ -439,6 +440,10 @@ export default function EditorCore({
 
       // Arrows
       drawArrows(ctx, state.arrows, gridSize, zoom, panOffset, isDark, null);
+
+      // Text boxes (notes) — drawn above walls/furniture/arrows so they stay
+      // visible in the exported image, matching the live editor.
+      drawTextBoxes(ctx, state.textBoxes, gridSize, zoom, panOffset);
 
       // Attribution badge
       const w = canvasW / exportScale;

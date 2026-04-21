@@ -1,4 +1,4 @@
-import { Wall, FurnitureItem, RoomLabel, Arrow, ArrowHeadStyle, Point, UnitSystem, MeasureMode, LabelColor, isWallCupboard, DEFAULT_WALL_THICKNESS } from "./types";
+import { Wall, FurnitureItem, RoomLabel, Arrow, ArrowHeadStyle, Point, TextBox, UnitSystem, MeasureMode, LabelColor, isWallCupboard, DEFAULT_WALL_THICKNESS } from "./types";
 import { DetectedRoom } from "./room-detection";
 
 // ==========================================
@@ -8097,4 +8097,145 @@ export function hitTestArrowEndpoint(
   if (distEnd < threshold) return "end";
   if (distStart < threshold) return "start";
   return null;
+}
+
+/**
+ * Render text boxes ("notes") onto a canvas for image/PDF export.
+ *
+ * Text boxes are rich-HTML overlays in the live editor (see RichTextBox.tsx),
+ * but for flat exports we need to draw them onto the canvas. This helper
+ * strips HTML tags and renders plain text with the box's background, border,
+ * and basic styling. Used by both the PNG export (EditorCore.tsx) and the
+ * PDF export (pdf-export.ts) so the two stay in sync.
+ */
+export function drawTextBoxes(
+  ctx: CanvasRenderingContext2D,
+  textBoxes: TextBox[] | undefined,
+  gridSize: number,
+  zoom: number,
+  panOffset: Point
+) {
+  if (!textBoxes || textBoxes.length === 0) return;
+  const pxPerCm = (gridSize * zoom) / 100;
+
+  // Respect z-index so stacking order matches the live editor
+  const ordered = [...textBoxes].sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0));
+
+  for (const tb of ordered) {
+    const x = tb.x * pxPerCm + panOffset.x;
+    const y = tb.y * pxPerCm + panOffset.y;
+    const w = tb.width * pxPerCm;
+    const h = tb.height * pxPerCm;
+
+    ctx.save();
+    if (tb.rotation) {
+      ctx.translate(x + w / 2, y + h / 2);
+      ctx.rotate((tb.rotation * Math.PI) / 180);
+      ctx.translate(-(x + w / 2), -(y + h / 2));
+    }
+
+    // Drop shadow
+    if (tb.shadowEnabled) {
+      ctx.shadowColor = "rgba(0, 0, 0, 0.2)";
+      ctx.shadowBlur = (tb.shadowBlur ?? 8) * zoom;
+      ctx.shadowOffsetX = (tb.shadowOffsetX ?? 2) * zoom;
+      ctx.shadowOffsetY = (tb.shadowOffsetY ?? 2) * zoom;
+    }
+
+    // Background fill
+    const bgOpacity = tb.backgroundOpacity ?? 1;
+    if (bgOpacity > 0) {
+      const bgHex = tb.backgroundColor || "#ffffff";
+      const br = parseInt(bgHex.slice(1, 3), 16) || 0;
+      const bg = parseInt(bgHex.slice(3, 5), 16) || 0;
+      const bb = parseInt(bgHex.slice(5, 7), 16) || 0;
+      ctx.fillStyle = `rgba(${br}, ${bg}, ${bb}, ${bgOpacity})`;
+      ctx.beginPath();
+      const cr = tb.cornerRadius || 0;
+      if (cr > 0) {
+        ctx.moveTo(x + cr, y);
+        ctx.arcTo(x + w, y, x + w, y + h, cr);
+        ctx.arcTo(x + w, y + h, x, y + h, cr);
+        ctx.arcTo(x, y + h, x, y, cr);
+        ctx.arcTo(x, y, x + w, y, cr);
+      } else {
+        ctx.rect(x, y, w, h);
+      }
+      ctx.fill();
+    }
+
+    // Clear shadow before drawing border + text so they don't get shadowed too
+    ctx.shadowColor = "transparent";
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
+
+    // Border
+    if (tb.borderEnabled) {
+      ctx.strokeStyle = tb.borderColor || "#000000";
+      ctx.lineWidth = (tb.borderWidth || 1) * zoom;
+      if (tb.borderStyle === "dashed") ctx.setLineDash([6, 3]);
+      else if (tb.borderStyle === "dotted") ctx.setLineDash([2, 2]);
+      else ctx.setLineDash([]);
+      ctx.strokeRect(x, y, w, h);
+      ctx.setLineDash([]);
+    }
+
+    // Text content — strip HTML tags for flat canvas rendering
+    if (tb.content) {
+      const textContent = tb.content
+        .replace(/<br\s*\/?>/gi, "\n")
+        .replace(/<\/(p|div|li|h[1-6])>/gi, "\n")
+        .replace(/<[^>]*>/g, "")
+        .replace(/&nbsp;/g, " ")
+        .replace(/&amp;/g, "&")
+        .replace(/&lt;/g, "<")
+        .replace(/&gt;/g, ">")
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'");
+      if (textContent.trim()) {
+        const padding = (tb.padding ?? 2) * zoom;
+        const fontSize = Math.max(8, (tb.fontSize || 14) * zoom);
+        ctx.font = `400 ${fontSize}px ${tb.fontFamily || "sans-serif"}`;
+        ctx.fillStyle = "#28251d";
+        ctx.textAlign = "left";
+        ctx.textBaseline = "top";
+
+        const maxWidth = w - padding * 2;
+        const lineHeight = fontSize * 1.4;
+        let cursorY = y + padding;
+        const bottomLimit = y + h - padding;
+
+        // Respect explicit newlines from block-level tags and <br>
+        const paragraphs = textContent.split("\n");
+        outer: for (const paragraph of paragraphs) {
+          if (!paragraph.trim()) {
+            cursorY += lineHeight;
+            if (cursorY > bottomLimit) break;
+            continue;
+          }
+          // Word-wrap each paragraph
+          const words = paragraph.split(/\s+/).filter(Boolean);
+          let line = "";
+          for (const word of words) {
+            const testLine = line ? `${line} ${word}` : word;
+            if (ctx.measureText(testLine).width > maxWidth && line) {
+              ctx.fillText(line, x + padding, cursorY);
+              line = word;
+              cursorY += lineHeight;
+              if (cursorY > bottomLimit) break outer;
+            } else {
+              line = testLine;
+            }
+          }
+          if (line && cursorY <= bottomLimit) {
+            ctx.fillText(line, x + padding, cursorY);
+            cursorY += lineHeight;
+          }
+        }
+      }
+    }
+
+    ctx.restore();
+  }
 }
