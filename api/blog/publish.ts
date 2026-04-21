@@ -36,8 +36,8 @@ import {
   estimateReadingTime,
   normaliseBody,
   slugify,
-} from "./_template";
-import { ghFileExists, ghGetFile, ghCommitMany } from "./_github";
+} from "./_template.js";
+import { ghFileExists, ghGetFile, ghCommitMany } from "./_github.js";
 
 const schema = z
   .object({
