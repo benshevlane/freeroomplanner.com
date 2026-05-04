@@ -1,16 +1,31 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    <!-- Google Analytics GA4 -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-J3KLE5WE3S"></script>
+    <!-- Analytics: load after the page is interactive so they don't block LCP -->
     <script>
       window.dataLayer = window.dataLayer || [];
       function gtag(){dataLayer.push(arguments);}
       gtag('js', new Date());
       gtag('config', 'G-J3KLE5WE3S');
+      (function(){
+        function loadAnalytics(){
+          var ga = document.createElement('script');
+          ga.async = true;
+          ga.src = 'https://www.googletagmanager.com/gtag/js?id=G-J3KLE5WE3S';
+          document.head.appendChild(ga);
+          var ah = document.createElement('script');
+          ah.async = true;
+          ah.src = 'https://analytics.ahrefs.com/analytics.js';
+          ah.setAttribute('data-key', 'MsX/2VW6nY/D19aSN0t29Q');
+          document.head.appendChild(ah);
+        }
+        if ('requestIdleCallback' in window) {
+          requestIdleCallback(loadAnalytics, { timeout: 3000 });
+        } else {
+          window.addEventListener('load', function(){ setTimeout(loadAnalytics, 1500); });
+        }
+      })();
     </script>
-    <!-- Ahrefs Analytics -->
-    <script src="https://analytics.ahrefs.com/analytics.js" data-key="MsX/2VW6nY/D19aSN0t29Q" async></script>
     <!--
        ______                            __
       / ____/___  ____ ___  ____  __  __/ /____  _____
@@ -44,18 +59,13 @@
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
     <link rel="manifest" href="/site.webmanifest">
     <meta name="theme-color" content="#0d9488">
-    <link rel="preconnect" href="https://api.fontshare.com">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://api.fontshare.com" crossorigin>
     <link rel="preload" as="style" href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap">
-    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap">
     <link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
     <style>/* Anti-FOUC: hide SEO fallback until React mounts */
     .seo-shell { visibility: hidden; position: absolute; }</style>
     <noscript>
       <link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap" rel="stylesheet">
-      <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     </noscript>
     <script type="application/ld+json">{
       "@context": "https://schema.org",
