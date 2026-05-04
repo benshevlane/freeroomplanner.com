@@ -5,7 +5,6 @@ import ContactFormDialog from "@/components/ContactFormDialog";
 import FeedbackFormDialog from "@/components/FeedbackFormDialog";
 import { useDocumentMeta } from "@/hooks/use-document-meta";
 import { safeMatchMediaMatches } from "../lib/safe-match-media";
-import { supabase } from "@/lib/supabase";
 
 const HERO_BUCKET = "hero-images";
 const HERO_PATH = "hero-floorplan.jpg";
@@ -100,24 +99,43 @@ export default function Landing() {
     document.documentElement.classList.toggle("dark", isDark);
   }, [isDark]);
 
-  // Check if a custom hero image exists in Supabase Storage
+  // Check if a custom hero image exists in Supabase Storage.
+  // Lazy-loaded after first paint so the supabase-js bundle never blocks LCP.
   useEffect(() => {
-    if (!supabase) return;
-    (async () => {
-      try {
-        const { data } = await supabase.storage
-          .from(HERO_BUCKET)
-          .list("", { search: HERO_PATH });
-        if (data && data.some((f) => f.name === HERO_PATH)) {
-          const { data: urlData } = supabase.storage
-            .from(HERO_BUCKET)
-            .getPublicUrl(HERO_PATH);
-          setHeroImageUrl(urlData.publicUrl);
-        }
-      } catch {
-        // Silently fall back to SVG illustration
-      }
-    })();
+    let cancelled = false;
+    const run = () => {
+      if (cancelled) return;
+      import("@/lib/supabase").then(({ supabase }) => {
+        if (!supabase || cancelled) return;
+        (async () => {
+          try {
+            const { data } = await supabase.storage
+              .from(HERO_BUCKET)
+              .list("", { search: HERO_PATH });
+            if (cancelled) return;
+            if (data && data.some((f) => f.name === HERO_PATH)) {
+              const { data: urlData } = supabase.storage
+                .from(HERO_BUCKET)
+                .getPublicUrl(HERO_PATH);
+              if (!cancelled) setHeroImageUrl(urlData.publicUrl);
+            }
+          } catch {
+            // Silently fall back to SVG illustration
+          }
+        })();
+      }).catch(() => { /* ignore */ });
+    };
+    if (typeof window !== "undefined" && "requestIdleCallback" in window) {
+      const id = (window as unknown as { requestIdleCallback: (cb: () => void, opts?: { timeout: number }) => number })
+        .requestIdleCallback(run, { timeout: 2500 });
+      return () => {
+        cancelled = true;
+        const cancel = (window as unknown as { cancelIdleCallback?: (id: number) => void }).cancelIdleCallback;
+        if (cancel) cancel(id);
+      };
+    }
+    const t = setTimeout(run, 1200);
+    return () => { cancelled = true; clearTimeout(t); };
   }, []);
 
   // Scroll to hash target on page load (for links like /#features from static pages)
