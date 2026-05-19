@@ -76,6 +76,16 @@
       "source": "/kitchen-extension-planning",
       "destination": "/blog/how-to-plan-a-kitchen-renovation",
       "permanent": true
+    },
+    {
+      "source": "/blog/ikea-pax-planner-uk-how",
+      "destination": "/blog/ikea-pax-planner-uk-plan",
+      "permanent": true
+    },
+    {
+      "source": "/blog/ikea-pax-planner-uk-plan-your-perfect-wardrobe-free-tools-tips",
+      "destination": "/blog/ikea-pax-planner-uk-plan",
+      "permanent": true
     }
   ],
   "buildCommand": "npx vite build && cp dist/public/index.html dist/public/app.html && cp dist/public/index.html dist/public/embed.html && cp dist/public/index.html dist/public/admin.html && cp dist/public/index.html dist/public/get-embed.html",
