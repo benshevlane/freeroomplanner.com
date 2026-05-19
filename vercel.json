@@ -46,6 +46,36 @@
       "source": "/blog/best-room-planner-app-no-sign-up",
       "destination": "/blog/room-planner-app-no-sign-up",
       "permanent": true
+    },
+    {
+      "source": "/free-kitchen-planner",
+      "destination": "/blog/best-free-online-kitchen-planner-no-sign-up",
+      "permanent": true
+    },
+    {
+      "source": "/free-kitchen-planner-online",
+      "destination": "/blog/best-free-online-kitchen-planner-no-sign-up",
+      "permanent": true
+    },
+    {
+      "source": "/kitchen-design-tool-online",
+      "destination": "/blog/best-free-online-kitchen-planner-no-sign-up",
+      "permanent": true
+    },
+    {
+      "source": "/kitchen-island-layout-planner",
+      "destination": "/blog/kitchen-island-layout-planner",
+      "permanent": true
+    },
+    {
+      "source": "/small-bathroom-layout-ideas-6x8",
+      "destination": "/blog/small-bathroom-layout-ideas-6x8",
+      "permanent": true
+    },
+    {
+      "source": "/kitchen-extension-planning",
+      "destination": "/blog/how-to-plan-a-kitchen-renovation",
+      "permanent": true
     }
   ],
   "buildCommand": "npx vite build && cp dist/public/index.html dist/public/app.html && cp dist/public/index.html dist/public/embed.html && cp dist/public/index.html dist/public/admin.html && cp dist/public/index.html dist/public/get-embed.html",
