@@ -3,7 +3,12 @@
   "redirects": [
     {
       "source": "/:path(.*)",
-      "has": [{ "type": "host", "value": "www.freeroomplanner.com" }],
+      "has": [
+        {
+          "type": "host",
+          "value": "www.freeroomplanner.com"
+        }
+      ],
       "destination": "https://freeroomplanner.com/:path",
       "permanent": true
     },
@@ -16,6 +21,31 @@
       "source": "/floor-plan",
       "destination": "/floor-plan-maker",
       "permanent": true
+    },
+    {
+      "source": "/blog/best-free-online-kitchen-planner",
+      "destination": "/blog/best-free-online-kitchen-planner-no-sign-up",
+      "permanent": true
+    },
+    {
+      "source": "/blog/free-2d-floor-plan-creator-simple-beats-complex",
+      "destination": "/blog/free-2d-floor-plan-creator",
+      "permanent": true
+    },
+    {
+      "source": "/blog/garage-conversion-planner-free-tool",
+      "destination": "/blog/how-to-plan-a-garage-conversion-floor-plan-guide",
+      "permanent": true
+    },
+    {
+      "source": "/blog/loft-conversion-planning-tool-free-floor-plan-software-uk",
+      "destination": "/blog/loft-conversion-planning-tool-free-floor-plan-guide",
+      "permanent": true
+    },
+    {
+      "source": "/blog/best-room-planner-app-no-sign-up",
+      "destination": "/blog/room-planner-app-no-sign-up",
+      "permanent": true
     }
   ],
   "buildCommand": "npx vite build && cp dist/public/index.html dist/public/app.html && cp dist/public/index.html dist/public/embed.html && cp dist/public/index.html dist/public/admin.html && cp dist/public/index.html dist/public/get-embed.html",
@@ -25,40 +55,73 @@
     {
       "source": "/embed",
       "headers": [
-        { "key": "X-Frame-Options", "value": "ALLOWALL" },
-        { "key": "Content-Security-Policy", "value": "frame-ancestors *" }
+        {
+          "key": "X-Frame-Options",
+          "value": "ALLOWALL"
+        },
+        {
+          "key": "Content-Security-Policy",
+          "value": "frame-ancestors *"
+        }
       ]
     },
     {
       "source": "/assets/(.*)",
       "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
       ]
     },
     {
       "source": "/(.*)\\.(woff2|woff|ttf|otf)",
       "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
       ]
     },
     {
       "source": "/(.*)\\.(png|jpg|jpeg|gif|svg|webp|avif|ico)",
       "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=2592000" }
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=2592000"
+        }
       ]
     },
     {
       "source": "/rs.(css|js)",
       "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=86400, must-revalidate" }
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=86400, must-revalidate"
+        }
       ]
     }
   ],
   "rewrites": [
-    { "source": "/app", "destination": "/index.html" },
-    { "source": "/app/(.*)", "destination": "/index.html" },
-    { "source": "/admin", "destination": "/index.html" },
-    { "source": "/get-embed", "destination": "/index.html" },
-    { "source": "/embed", "destination": "/index.html" }
+    {
+      "source": "/app",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/app/(.*)",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/admin",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/get-embed",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/embed",
+      "destination": "/index.html"
+    }
   ]
 }
