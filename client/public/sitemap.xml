@@ -88,13 +88,7 @@
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
-  <url>
-    <loc>https://freeroomplanner.com/blog/ikea-pax-planner-uk</loc>
-    <lastmod>2026-03-28</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
+    <url>
     <loc>https://freeroomplanner.com/blog/kitchen-planning-guide</loc>
     <lastmod>2026-04-06</lastmod>
     <changefreq>monthly</changefreq>
@@ -190,12 +184,7 @@
     <lastmod>2026-05-18</lastmod>
     <changefreq>weekly</changefreq>
   </url>
-  <url>
-    <loc>https://freeroomplanner.com/blog/best-free-online-kitchen-planner</loc>
-    <lastmod>2026-05-18</lastmod>
-    <changefreq>weekly</changefreq>
-  </url>
-  <url>
+    <url>
     <loc>https://freeroomplanner.com/blog/best-free-floor-plan-software-home-renovation</loc>
     <lastmod>2026-05-18</lastmod>
     <changefreq>weekly</changefreq>
@@ -205,12 +194,7 @@
     <lastmod>2026-05-18</lastmod>
     <changefreq>weekly</changefreq>
   </url>
-  <url>
-    <loc>https://freeroomplanner.com/blog/best-room-planner-app-no-sign-up</loc>
-    <lastmod>2026-05-18</lastmod>
-    <changefreq>weekly</changefreq>
-  </url>
-  <url>
+    <url>
     <loc>https://freeroomplanner.com/blog/room-planner-no-sign-up-free-browser-tools</loc>
     <lastmod>2026-05-18</lastmod>
     <changefreq>weekly</changefreq>
@@ -230,27 +214,12 @@
     <lastmod>2026-05-18</lastmod>
     <changefreq>weekly</changefreq>
   </url>
-  <url>
-    <loc>https://freeroomplanner.com/blog/loft-conversion-planning-tool-free-floor-plan-software-uk</loc>
-    <lastmod>2026-05-18</lastmod>
-    <changefreq>weekly</changefreq>
-  </url>
-  <url>
+    <url>
     <loc>https://freeroomplanner.com/blog/free-2d-floor-plan-creator</loc>
     <lastmod>2026-05-18</lastmod>
     <changefreq>weekly</changefreq>
   </url>
-  <url>
-    <loc>https://freeroomplanner.com/blog/free-2d-floor-plan-creator-simple-beats-complex</loc>
-    <lastmod>2026-05-18</lastmod>
-    <changefreq>weekly</changefreq>
-  </url>
-  <url>
-    <loc>https://freeroomplanner.com/blog/garage-conversion-planner-free-tool</loc>
-    <lastmod>2026-05-18</lastmod>
-    <changefreq>weekly</changefreq>
-  </url>
-  <url>
+      <url>
     <loc>https://freeroomplanner.com/blog/floor-plan-maker-contractors</loc>
     <lastmod>2026-05-18</lastmod>
     <changefreq>weekly</changefreq>
