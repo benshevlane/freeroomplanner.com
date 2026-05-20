@@ -63,6 +63,21 @@
       "permanent": true
     },
     {
+      "source": "/bedroom-layout-planner",
+      "destination": "/bedroom-planner",
+      "permanent": true
+    },
+    {
+      "source": "/house-floor-plan-creator",
+      "destination": "/floor-plan-maker",
+      "permanent": true
+    },
+    {
+      "source": "/home-office-layout-planner",
+      "destination": "/blog/home-office-layout-planner",
+      "permanent": true
+    },
+    {
       "source": "/kitchen-island-layout-planner",
       "destination": "/blog/kitchen-island-layout-planner",
       "permanent": true
@@ -84,6 +99,11 @@
     },
     {
       "source": "/blog/ikea-pax-planner-uk-plan-your-perfect-wardrobe-free-tools-tips",
+      "destination": "/blog/ikea-pax-planner-uk-plan",
+      "permanent": true
+    },
+    {
+      "source": "/blog/ikea-pax-planner-uk",
       "destination": "/blog/ikea-pax-planner-uk-plan",
       "permanent": true
     }
