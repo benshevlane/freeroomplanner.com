@@ -106,6 +106,26 @@
       "source": "/blog/ikea-pax-planner-uk",
       "destination": "/blog/ikea-pax-planner-uk-plan",
       "permanent": true
+    },
+    {
+      "source": "/best-free-online-bathroom-planners",
+      "destination": "/bathroom-planner",
+      "permanent": true
+    },
+    {
+      "source": "/how-to-draw-floor-plans-accurately",
+      "destination": "/floor-plan-maker",
+      "permanent": true
+    },
+    {
+      "source": "/best-room-planner-app-for-renovations",
+      "destination": "/room-planner",
+      "permanent": true
+    },
+    {
+      "source": "/small-bathroom-layout",
+      "destination": "/blog/small-bathroom-layout-ideas-6x8",
+      "permanent": true
     }
   ],
   "buildCommand": "npx vite build && cp dist/public/index.html dist/public/app.html && cp dist/public/index.html dist/public/embed.html && cp dist/public/index.html dist/public/admin.html && cp dist/public/index.html dist/public/get-embed.html",
