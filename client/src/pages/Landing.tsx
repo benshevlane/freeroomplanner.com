@@ -9,6 +9,12 @@ import { safeMatchMediaMatches } from "../lib/safe-match-media";
 const HERO_BUCKET = "hero-images";
 const HERO_PATH = "hero-floorplan.jpg";
 
+// Update this when the homepage receives non-trivial content changes.
+// Also update the matching date in client/index.html (visible <time> + WebPage/SoftwareApplication dateModified)
+// so the pre-rendered SEO shell stays in sync with the React-rendered hero.
+const LAST_UPDATED_ISO = "2026-05-21";
+const LAST_UPDATED_DISPLAY = "21 May 2026";
+
 const features = [
   {
     icon: (
@@ -217,8 +223,11 @@ export default function Landing() {
           <h1 className="text-4xl sm:text-5xl font-bold tracking-tight leading-[1.1] mb-5">
             Draw your room.<br />Share your plan.
           </h1>
-          <p className={`text-lg max-w-xl mx-auto mb-8 ${isDark ? "text-[#a09a8c]" : "text-[#6b6457]"}`}>
+          <p className={`text-lg max-w-xl mx-auto mb-3 ${isDark ? "text-[#a09a8c]" : "text-[#6b6457]"}`}>
             A browser-based floor planner built for homeowners. Brief kitchen makers, bathroom fitters, architects, and contractors — fast.
+          </p>
+          <p className={`text-xs mb-8 ${isDark ? "text-[#7a7468]" : "text-[#9a9488]"}`}>
+            Last updated: <time dateTime={LAST_UPDATED_ISO}>{LAST_UPDATED_DISPLAY}</time>
           </p>
           <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 justify-center">
             <button
@@ -571,6 +580,16 @@ export default function Landing() {
 
       <ContactFormDialog open={contactOpen} onOpenChange={setContactOpen} />
       <FeedbackFormDialog open={feedbackOpen} onOpenChange={setFeedbackOpen} />
+
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({
+        "@context": "https://schema.org",
+        "@type": "WebPage",
+        "url": "https://freeroomplanner.com/",
+        "name": "Free Room Planner — Draw your room. Share your plan.",
+        "description": "A browser-based floor planner built for homeowners. Brief kitchen makers, bathroom fitters, architects, and contractors — fast.",
+        "dateModified": LAST_UPDATED_ISO,
+        "publisher": {"@type": "Organization", "name": "Free Room Planner", "url": "https://freeroomplanner.com"}
+      }) }} />
 
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({
         "@context": "https://schema.org",
