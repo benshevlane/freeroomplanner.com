@@ -217,6 +217,9 @@ export default function Landing() {
           <h1 className="text-4xl sm:text-5xl font-bold tracking-tight leading-[1.1] mb-5">
             Draw your room.<br />Share your plan.
           </h1>
+          <p className={`text-xs mb-4 ${isDark ? "text-[#7a7468]" : "text-[#9a9488]"}`}>
+            <time dateTime="2026-05-21">Last updated: 21 May 2026</time>
+          </p>
           <p className={`text-lg max-w-xl mx-auto mb-8 ${isDark ? "text-[#a09a8c]" : "text-[#6b6457]"}`}>
             A browser-based floor planner built for homeowners. Brief kitchen makers, bathroom fitters, architects, and contractors — fast.
           </p>
