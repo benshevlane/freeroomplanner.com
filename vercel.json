@@ -128,7 +128,7 @@
       "permanent": true
     }
   ],
-  "buildCommand": "npx vite build && cp dist/public/index.html dist/public/app.html && cp dist/public/index.html dist/public/embed.html && cp dist/public/index.html dist/public/admin.html && cp dist/public/index.html dist/public/get-embed.html",
+  "buildCommand": "npx vite build && cp dist/public/index.html dist/public/app.html && cp dist/public/index.html dist/public/embed.html && cp dist/public/index.html dist/public/admin.html && cp dist/public/index.html dist/public/get-embed.html && cp client/home.html dist/public/index.html",
   "outputDirectory": "dist/public",
   "framework": null,
   "headers": [
@@ -185,23 +185,23 @@
   "rewrites": [
     {
       "source": "/app",
-      "destination": "/index.html"
+      "destination": "/app.html"
     },
     {
       "source": "/app/(.*)",
-      "destination": "/index.html"
+      "destination": "/app.html"
     },
     {
       "source": "/admin",
-      "destination": "/index.html"
+      "destination": "/admin.html"
     },
     {
       "source": "/get-embed",
-      "destination": "/index.html"
+      "destination": "/get-embed.html"
     },
     {
       "source": "/embed",
-      "destination": "/index.html"
+      "destination": "/embed.html"
     }
   ]
 }
