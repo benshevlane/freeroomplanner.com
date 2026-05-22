@@ -182,26 +182,5 @@
       ]
     }
   ],
-  "rewrites": [
-    {
-      "source": "/app",
-      "destination": "/app.html"
-    },
-    {
-      "source": "/app/(.*)",
-      "destination": "/app.html"
-    },
-    {
-      "source": "/admin",
-      "destination": "/admin.html"
-    },
-    {
-      "source": "/get-embed",
-      "destination": "/get-embed.html"
-    },
-    {
-      "source": "/embed",
-      "destination": "/embed.html"
-    }
-  ]
+  "rewrites": []
 }
