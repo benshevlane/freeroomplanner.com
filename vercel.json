@@ -128,7 +128,7 @@
       "permanent": true
     }
   ],
-  "buildCommand": "npx vite build && cp dist/public/index.html dist/public/app.html && cp dist/public/index.html dist/public/embed.html && cp dist/public/index.html dist/public/admin.html && cp dist/public/index.html dist/public/get-embed.html",
+  "buildCommand": "npx vite build && node scripts/postbuild.mjs",
   "outputDirectory": "dist/public",
   "framework": null,
   "headers": [
@@ -180,28 +180,6 @@
           "value": "public, max-age=86400, must-revalidate"
         }
       ]
-    }
-  ],
-  "rewrites": [
-    {
-      "source": "/app",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/app/(.*)",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/admin",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/get-embed",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/embed",
-      "destination": "/index.html"
     }
   ]
 }
