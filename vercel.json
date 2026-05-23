@@ -126,6 +126,21 @@
       "source": "/small-bathroom-layout",
       "destination": "/blog/small-bathroom-layout-ideas-6x8",
       "permanent": true
+    },
+    {
+      "source": "/floor-plan-maker-contractors",
+      "destination": "/blog/floor-plan-maker-contractors",
+      "permanent": true
+    },
+    {
+      "source": "/room-planner-app-no-sign-up",
+      "destination": "/blog/room-planner-app-no-sign-up",
+      "permanent": true
+    },
+    {
+      "source": "/small-bathroom-layout-planner",
+      "destination": "/blog/small-bathroom-layout-planner",
+      "permanent": true
     }
   ],
   "buildCommand": "npx vite build && node scripts/postbuild.mjs",
