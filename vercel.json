@@ -141,6 +141,11 @@
       "source": "/small-bathroom-layout-planner",
       "destination": "/blog/small-bathroom-layout-planner",
       "permanent": true
+    },
+    {
+      "source": "/best-free-kitchen-planner-no-sign-up-no-download",
+      "destination": "/blog/best-free-online-kitchen-planner-no-sign-up",
+      "permanent": true
     }
   ],
   "buildCommand": "npx vite build && node scripts/postbuild.mjs",

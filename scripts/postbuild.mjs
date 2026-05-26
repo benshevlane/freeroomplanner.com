@@ -13,9 +13,45 @@ const OUT = "dist/public";
 
 // 1. The vite-built index.html is the React SPA shell — copy it to the
 //    app-route files so /app, /embed, /admin, /get-embed load the SPA.
-for (const f of ["app.html", "embed.html", "admin.html", "get-embed.html"]) {
+//    Each shell is otherwise byte-identical, which gave every SPA route the
+//    same <title>/description/og:title as the homepage (duplicate-title and
+//    duplicate-description SEO findings). After copying we give each route a
+//    distinct title + description, and mark the non-landing routes
+//    (/embed widget, /admin) noindex so they don't compete in search at all.
+const BASE_TITLE = "Free Room Planner — Draw Your Floor Plan, No Sign-Up";
+const BASE_DESC =
+  "Draw an accurate floor plan in minutes. Snap-to-grid walls, 30+ furniture items, live measurements. Free, forever. No email or download required.";
+const ROBOTS_INDEX =
+  "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1";
+
+const SHELLS = {
+  "app.html": {
+    title: "Free Room Planner App — Draw & Export Floor Plans",
+    desc: "Open the free Room Planner app — draw rooms to scale, drag furniture, and export a PNG floor plan. No sign-up, no download.",
+    index: true,
+  },
+  "get-embed.html": {
+    title: "Embed the Free Room Planner on Your Website",
+    desc: "Add the free Room Planner to your site so customers can sketch their space. A simple embed for builders, fitters, and retailers.",
+    index: true,
+  },
+  "embed.html": { title: "Free Room Planner — Embeddable Widget", desc: BASE_DESC, index: false },
+  "admin.html": { title: "Free Room Planner — Admin", desc: BASE_DESC, index: false },
+};
+
+for (const [f, cfg] of Object.entries(SHELLS)) {
   copyFileSync(`${OUT}/index.html`, `${OUT}/${f}`);
+  let html = readFileSync(`${OUT}/${f}`, "utf8");
+  html = html
+    .split(`<title>${BASE_TITLE}</title>`).join(`<title>${cfg.title}</title>`)
+    .split(`content="${BASE_TITLE}"`).join(`content="${cfg.title}"`)
+    .split(`content="${BASE_DESC}"`).join(`content="${cfg.desc}"`);
+  if (!cfg.index) {
+    html = html.split(`content="${ROBOTS_INDEX}"`).join('content="noindex, follow"');
+  }
+  writeFileSync(`${OUT}/${f}`, html);
 }
+
 // 2. Overwrite index.html with the static homepage so / is a fast static page
 //    (must run AFTER the copies in step 1).
 copyFileSync("client/home.html", `${OUT}/index.html`);
@@ -55,5 +91,5 @@ if (rsCss) {
 }
 
 console.log(
-  `postbuild: app shells written + static homepage installed at /; inlined rs.css into ${inlined} page(s)`,
+  `postbuild: app shells written (unique titles) + static homepage installed at /; inlined rs.css into ${inlined} page(s)`,
 );
