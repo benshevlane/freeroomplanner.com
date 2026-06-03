@@ -146,6 +146,41 @@
       "source": "/best-free-kitchen-planner-no-sign-up-no-download",
       "destination": "/blog/best-free-online-kitchen-planner-no-sign-up",
       "permanent": true
+    },
+    {
+      "source": "/blog/best-free-online-kitchen-planner-no-sign-up",
+      "destination": "/blog/best-free-kitchen-planners-compared",
+      "permanent": true
+    },
+    {
+      "source": "/blog/best-free-kitchen-design-tools-online-2025",
+      "destination": "/blog/best-free-kitchen-planners-compared",
+      "permanent": true
+    },
+    {
+      "source": "/blog/how-to-plan-a-garage-conversion-floor-plan",
+      "destination": "/blog/how-to-plan-a-garage-conversion-floor-plan-guide",
+      "permanent": true
+    },
+    {
+      "source": "/blog/room-planner-no-sign-up-free-browser-tools",
+      "destination": "/blog/room-planner-app-no-sign-up",
+      "permanent": true
+    },
+    {
+      "source": "/blog/best-free-room-planner-online-no-sign-up-no-download",
+      "destination": "/blog/room-planner-app-no-sign-up",
+      "permanent": true
+    },
+    {
+      "source": "/blog/why-the-finer-details-make",
+      "destination": "/blog/finer-details-in-room-planning",
+      "permanent": true
+    },
+    {
+      "source": "/blog/the-finer-details-that-make",
+      "destination": "/blog/finer-details-in-room-planning",
+      "permanent": true
     }
   ],
   "buildCommand": "npx vite build && node scripts/postbuild.mjs",
