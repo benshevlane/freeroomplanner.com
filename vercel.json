@@ -181,6 +181,31 @@
       "source": "/blog/the-finer-details-that-make",
       "destination": "/blog/finer-details-in-room-planning",
       "permanent": true
+    },
+    {
+      "source": "/how-to-plan-a-kitchen-renovation",
+      "destination": "/blog/how-to-plan-a-kitchen-renovation",
+      "permanent": true
+    },
+    {
+      "source": "/furniture-arrangement-tool-online",
+      "destination": "/blog/furniture-arrangement-tool-online",
+      "permanent": true
+    },
+    {
+      "source": "/room-layout-planner-guide",
+      "destination": "/blog/how-to-use-a-room-layout-planner",
+      "permanent": true
+    },
+    {
+      "source": "/home-renovation-planning-floor-plan-guide",
+      "destination": "/blog/home-renovation-planning-visual-floor-plan-guide",
+      "permanent": true
+    },
+    {
+      "source": "/how-to-plan-furniture-arrangement-online",
+      "destination": "/blog/furniture-arrangement-tool-online",
+      "permanent": true
     }
   ],
   "buildCommand": "npx vite build && node scripts/postbuild.mjs",
