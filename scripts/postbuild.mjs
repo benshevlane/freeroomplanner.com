@@ -28,11 +28,15 @@ const SHELLS = {
   "app.html": {
     title: "Free Room Planner App — Draw & Export Floor Plans",
     desc: "Open the free Room Planner app — draw rooms to scale, drag furniture, and export a PNG floor plan. No sign-up, no download.",
+    h1: "Free Room Planner App — draw and export your floor plan",
+    intro: "Draw rooms to scale, drag in furniture, and export a clean PNG floor plan. The planner is loading — it runs entirely in your browser, free, with no sign-up.",
     index: true,
   },
   "get-embed.html": {
     title: "Embed the Free Room Planner on Your Website",
     desc: "Add the free Room Planner to your site so customers can sketch their space. A simple embed for builders, fitters, and retailers.",
+    h1: "Turn visitors into ready-to-quote leads by embedding Free Room Planner",
+    intro: "Customers who plan their room arrive at enquiry knowing their space. Add the planner to your site with a simple embed — free, live in minutes.",
     index: true,
   },
   "embed.html": { title: "Free Room Planner — Embeddable Widget", desc: BASE_DESC, index: false },
@@ -49,6 +53,28 @@ for (const [f, cfg] of Object.entries(SHELLS)) {
   if (!cfg.index) {
     html = html.split(`content="${ROBOTS_INDEX}"`).join('content="noindex, follow"');
   }
+  // Give each indexable shell a unique H1 + intro (the shared pre-rendered
+  // shell otherwise repeats the homepage H1 on every SPA route — duplicate-H1
+  // SEO finding).
+  if (cfg.h1) {
+    html = html
+      .split("<h1>Draw your room. Share your plan.</h1>")
+      .join(`<h1>${cfg.h1}</h1>`);
+    html = html
+      .split("<p>A browser-based floor planner built for homeowners. Brief kitchen makers, bathroom fitters, architects, and contractors — fast.</p>")
+      .join(`<p>${cfg.intro}</p>`);
+  }
+  // Load the Vite stylesheet asynchronously. The pre-rendered shell inside
+  // #root uses inline styles only, so nothing above the fold needs the app
+  // CSS — but as a render-blocking <link> it delayed first paint ~2s on
+  // throttled mobile (4.1s LCP on /get-embed, 10 Jun audit). preload+swap
+  // paints the shell immediately; the app CSS applies before React mounts.
+  html = html.replace(
+    /<link rel="stylesheet" crossorigin href="(\/assets\/[^"]+\.css)">/,
+    (_m, href) =>
+      `<link rel="preload" as="style" crossorigin href="${href}" onload="this.onload=null;this.rel='stylesheet'">` +
+      `<noscript><link rel="stylesheet" crossorigin href="${href}"></noscript>`,
+  );
   writeFileSync(`${OUT}/${f}`, html);
 }
 
