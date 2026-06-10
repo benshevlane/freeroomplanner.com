@@ -35,8 +35,8 @@ const SHELLS = {
   "get-embed.html": {
     title: "Embed the Free Room Planner on Your Website",
     desc: "Add the free Room Planner to your site so customers can sketch their space. A simple embed for builders, fitters, and retailers.",
-    h1: "Turn visitors into ready-to-quote leads by embedding Free Room Planner",
-    intro: "Customers who plan their room arrive at enquiry knowing their space. Add the planner to your site with a simple embed — free, live in minutes.",
+    h1: "Turn visitors into ready-to-quote leads by embedding Free Room Planner into your website",
+    intro: "Customers who plan their room arrive at enquiry knowing their space. You spend less time measuring — and more time closing.",
     index: true,
   },
   "embed.html": { title: "Free Room Planner — Embeddable Widget", desc: BASE_DESC, index: false },
@@ -89,6 +89,15 @@ copyFileSync("client/home.html", `${OUT}/index.html`);
 //    stylesheet removes that blocking request so the hero paints as soon as
 //    the HTML arrives. The SPA shells use Vite's hashed CSS and don't contain
 //    this link, so they're left untouched.
+// Defer the eager Ahrefs analytics tag on static/blog pages until idle.
+// The SPA shells already defer; on static pages the async script competed
+// for bandwidth in the LCP window on throttled mobile (/how-it-works 2.7s,
+// 10 Jun audit).
+const EAGER_ANALYTICS_RE =
+  /<script src="https:\/\/analytics\.ahrefs\.com\/analytics\.js" data-key="([^"]+)" async><\/script>/;
+const deferredAnalytics = (key) =>
+  `<script>(function(){function l(){var s=document.createElement('script');s.src='https://analytics.ahrefs.com/analytics.js';s.async=true;s.dataset.key='${key}';document.head.appendChild(s);}if('requestIdleCallback' in window){requestIdleCallback(l,{timeout:3000});}else{addEventListener('load',function(){setTimeout(l,1500);});}})()</script>`;
+
 const LINK = '<link rel="stylesheet" href="/rs.css">';
 let inlined = 0;
 let rsCss = "";
@@ -107,10 +116,19 @@ if (rsCss) {
         continue;
       }
       if (!name.endsWith(".html")) continue;
-      const html = readFileSync(p, "utf8");
-      if (!html.includes(LINK)) continue;
-      writeFileSync(p, html.split(LINK).join(styleTag));
-      inlined += 1;
+      let html = readFileSync(p, "utf8");
+      let changed = false;
+      const am = html.match(EAGER_ANALYTICS_RE);
+      if (am) {
+        html = html.replace(EAGER_ANALYTICS_RE, deferredAnalytics(am[1]));
+        changed = true;
+      }
+      if (html.includes(LINK)) {
+        html = html.split(LINK).join(styleTag);
+        inlined += 1;
+        changed = true;
+      }
+      if (changed) writeFileSync(p, html);
     }
   };
   walk(OUT);
