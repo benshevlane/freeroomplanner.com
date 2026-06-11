@@ -56,6 +56,18 @@ for (const [f, cfg] of Object.entries(SHELLS)) {
   // Give each indexable shell a unique H1 + intro (the shared pre-rendered
   // shell otherwise repeats the homepage H1 on every SPA route — duplicate-H1
   // SEO finding).
+  // Reveal the pre-rendered shell on indexable routes. client/index.html
+  // ships an "Anti-FOUC" rule that hides .seo-shell until React mounts —
+  // which meant NOTHING painted until the JS executed, so LCP was pinned
+  // to the React mount (4.5s on throttled mobile; PSI element trace
+  // 11 Jun). For indexed pages an early, plainly-styled paint beats an
+  // invisible one; React replaces the shell on mount as before.
+  if (cfg.index) {
+    html = html.replace(
+      /<style>\/\* Anti-FOUC[\s\S]*?<\/style>/,
+      "",
+    );
+  }
   if (cfg.h1) {
     // Inline-styled and slightly LARGER than the React-rendered hero
     // (text-3xl/4xl ≈ 2.25rem): LCP only re-assigns to a LATER element if
