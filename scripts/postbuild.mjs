@@ -57,12 +57,17 @@ for (const [f, cfg] of Object.entries(SHELLS)) {
   // shell otherwise repeats the homepage H1 on every SPA route — duplicate-H1
   // SEO finding).
   if (cfg.h1) {
+    // Inline-styled and slightly LARGER than the React-rendered hero
+    // (text-3xl/4xl ≈ 2.25rem): LCP only re-assigns to a LATER element if
+    // it paints strictly larger, so sizing the instant shell h1 above the
+    // post-mount h1 locks LCP to the first paint (~1-2s) instead of the
+    // React mount (4.5s+, the 11 Jun PSI element trace).
     html = html
       .split("<h1>Draw your room. Share your plan.</h1>")
-      .join(`<h1>${cfg.h1}</h1>`);
+      .join(`<h1 style="font-size:2.6rem;line-height:1.2;font-weight:700;letter-spacing:-0.02em;margin:0 0 14px">${cfg.h1}</h1>`);
     html = html
       .split("<p>A browser-based floor planner built for homeowners. Brief kitchen makers, bathroom fitters, architects, and contractors — fast.</p>")
-      .join(`<p>${cfg.intro}</p>`);
+      .join(`<p style="font-size:1.15rem;line-height:1.6">${cfg.intro}</p>`);
   }
   // Load the Vite stylesheet asynchronously. The pre-rendered shell inside
   // #root uses inline styles only, so nothing above the fold needs the app
