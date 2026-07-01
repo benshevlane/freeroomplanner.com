@@ -11,7 +11,9 @@ import { PerplexityAttribution } from "../components/PerplexityAttribution";
 import IntentCapture from "../components/IntentCapture";
 import { FurnitureItem } from "../lib/types";
 import { safeGetItem } from "../lib/safe-storage";
-import { fetchSharedPlan, type FetchedPlan } from "../lib/plan-share";
+import { fetchSharedPlan, intentToRoomType, type FetchedPlan } from "../lib/plan-share";
+import { safeSessionGetItem, safeSessionSetItem } from "../lib/safe-storage";
+import { trackEvent } from "../lib/analytics";
 import { safeMatchMediaMatches } from "../lib/safe-match-media";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -73,6 +75,19 @@ export default function Editor() {
   const [isDark, setIsDark] = useState(() =>
     safeMatchMediaMatches("(prefers-color-scheme: dark)")
   );
+
+  // Count a "plan started" once per browser session (feeds the daily report).
+  useEffect(() => {
+    if (showIntentCapture) return;
+    if (safeSessionGetItem("freeroomplanner-started-tracked")) return;
+    safeSessionSetItem("freeroomplanner-started-tracked", "1");
+    trackEvent("plan_started");
+    fetch("/api/track", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ event: "plan_started", roomType: intentToRoomType() }),
+    }).catch(() => {});
+  }, [showIntentCapture]);
 
   // Mobile onboarding wizard
   const [showMobileWizard, setShowMobileWizard] = useState(false);
