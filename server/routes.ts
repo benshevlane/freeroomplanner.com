@@ -87,19 +87,37 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  // Dev-only in-memory version of api/plans.ts (same request/response shape
+  // as the Vercel function so the save & share feature works in local dev).
+  const devPlans = new Map<string, { name: string; data: unknown; roomType: string | null; editKey: string }>();
+  const CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+  const makeCode = () =>
+    Array.from({ length: 8 }, () => CODE_ALPHABET[Math.floor(Math.random() * CODE_ALPHABET.length)]).join("");
+
   app.post("/api/plans", async (req, res) => {
-    try {
-      const plan = await storage.createRoomPlan(req.body);
-      res.json(plan);
-    } catch (e) {
-      res.status(400).json({ error: "Invalid plan data" });
-    }
+    const { data, name, roomType } = req.body ?? {};
+    if (!data) return res.status(400).json({ error: "Invalid plan data" });
+    const id = makeCode();
+    const editKey = crypto.randomUUID();
+    devPlans.set(id, { name: name || "My floor plan", data, roomType: roomType ?? null, editKey });
+    res.json({ id, editKey, url: `/p/${id}` });
   });
 
-  app.get("/api/plans/:id", async (req, res) => {
-    const plan = await storage.getRoomPlan(req.params.id);
+  app.put("/api/plans", async (req, res) => {
+    const { id, editKey, data, name } = req.body ?? {};
+    const plan = id ? devPlans.get(String(id)) : undefined;
     if (!plan) return res.status(404).json({ error: "Plan not found" });
-    res.json(plan);
+    if (plan.editKey !== editKey) return res.status(403).json({ error: "Not allowed to update this plan" });
+    plan.data = data;
+    if (name) plan.name = name;
+    res.json({ id, url: `/p/${id}`, updated: true });
+  });
+
+  app.get("/api/plans", async (req, res) => {
+    const id = String(req.query.id ?? "").toUpperCase();
+    const plan = devPlans.get(id);
+    if (!plan) return res.status(404).json({ error: "Plan not found" });
+    res.json({ id, name: plan.name, data: plan.data, roomType: plan.roomType });
   });
 
   // Admin: login

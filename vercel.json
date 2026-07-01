@@ -262,5 +262,11 @@
       ]
     }
   ],
-  "trailingSlash": false
+  "trailingSlash": false,
+  "rewrites": [
+    {
+      "source": "/p/:code",
+      "destination": "/plan"
+    }
+  ]
 }

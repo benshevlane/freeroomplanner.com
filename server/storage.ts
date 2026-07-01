@@ -19,7 +19,18 @@ export class MemStorage implements IStorage {
 
   async createRoomPlan(insertPlan: InsertRoomPlan): Promise<RoomPlan> {
     const id = randomUUID();
-    const plan: RoomPlan = { ...insertPlan, id };
+    const now = new Date();
+    const plan: RoomPlan = {
+      name: "My floor plan",
+      roomType: null,
+      country: null,
+      editKeyHash: null,
+      openCount: 0,
+      createdAt: now,
+      updatedAt: now,
+      ...insertPlan,
+      id,
+    };
     this.plans.set(id, plan);
     return plan;
   }

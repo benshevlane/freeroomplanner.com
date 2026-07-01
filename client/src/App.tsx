@@ -19,6 +19,7 @@ function AppRouter() {
       <Switch>
         <Route path="/" component={Landing} />
         <Route path="/app" component={Editor} />
+        <Route path="/p/:code" component={Editor} />
         <Route path="/embed" component={Embed} />
         <Route path="/get-embed" component={GetEmbed} />
         <Route path="/admin" component={Admin} />

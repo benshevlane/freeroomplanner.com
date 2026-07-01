@@ -40,6 +40,11 @@ const SHELLS = {
     index: true,
   },
   "embed.html": { title: "Free Room Planner — Embeddable Widget", desc: BASE_DESC, index: false },
+  "plan.html": {
+    title: "Shared Floor Plan — Free Room Planner",
+    desc: "View and edit a floor plan someone shared with you — free, in your browser, no sign-up.",
+    index: false,
+  },
   "admin.html": { title: "Free Room Planner — Admin", desc: BASE_DESC, index: false },
 };
 

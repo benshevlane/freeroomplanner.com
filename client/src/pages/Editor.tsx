@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
-import { Link } from "wouter";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { Link, useRoute } from "wouter";
 import { useDocumentMeta } from "../hooks/use-document-meta";
 import { useIsMobile } from "../hooks/use-mobile";
 import EditorCore from "../components/EditorCore";
@@ -11,6 +11,7 @@ import { PerplexityAttribution } from "../components/PerplexityAttribution";
 import IntentCapture from "../components/IntentCapture";
 import { FurnitureItem } from "../lib/types";
 import { safeGetItem } from "../lib/safe-storage";
+import { fetchSharedPlan, type FetchedPlan } from "../lib/plan-share";
 import { safeMatchMediaMatches } from "../lib/safe-match-media";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -35,8 +36,39 @@ export default function Editor() {
     description: "Draw walls, place furniture, and export your floor plan as PNG. Free online room planning tool — no account required.",
   });
   const isMobile = useIsMobile();
+
+  // Shared plan support: /p/:code opens a plan saved to the cloud.
+  const [, shareParams] = useRoute("/p/:code");
+  const shareCode = shareParams?.code ? shareParams.code.toUpperCase() : null;
+  const [sharedPlan, setSharedPlan] = useState<FetchedPlan | null>(null);
+  const [shareStatus, setShareStatus] = useState<"idle" | "loading" | "error">(
+    shareCode ? "loading" : "idle"
+  );
+
+  useEffect(() => {
+    if (!shareCode) return;
+    let cancelled = false;
+    fetchSharedPlan(shareCode)
+      .then((plan) => {
+        if (cancelled) return;
+        if (plan) {
+          setSharedPlan(plan);
+          setShareStatus("idle");
+        } else {
+          setShareStatus("error");
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setShareStatus("error");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [shareCode]);
+
   const [showIntentCapture, setShowIntentCapture] = useState(() => {
-    return !safeGetItem("freeroomplanner-intent");
+    // Never interrupt someone opening a shared link with the intent question.
+    return !shareCode && !safeGetItem("freeroomplanner-intent");
   });
   const [isDark, setIsDark] = useState(() =>
     safeMatchMediaMatches("(prefers-color-scheme: dark)")
@@ -64,9 +96,24 @@ export default function Editor() {
     document.documentElement.classList.toggle("dark", isDark);
   }, [isDark]);
 
-  // We need a ref to the editor's importState / pushUndo / setTool for the room generator.
-  // EditorCore exposes the editor via renderHeader's parameter.
-  const editorRef = { current: null as any };
+  // We need a ref to the editor's importState / pushUndo / setTool for the
+  // room generator and for loading shared plans. EditorCore exposes the
+  // editor via renderHeader's parameter.
+  const editorRef = useRef<any>(null);
+
+  // Once a shared plan has been fetched and the editor is mounted, load it.
+  const importedShareRef = useRef(false);
+  useEffect(() => {
+    if (!sharedPlan || importedShareRef.current) return;
+    const timer = setInterval(() => {
+      if (editorRef.current) {
+        importedShareRef.current = true;
+        clearInterval(timer);
+        editorRef.current.importState(sharedPlan.data);
+      }
+    }, 50);
+    return () => clearInterval(timer);
+  }, [sharedPlan]);
 
   const handleGenerateRoom = useCallback(
     (plan: { walls: import("@/lib/types").Wall[]; furniture: FurnitureItem[] }) => {
@@ -95,10 +142,40 @@ export default function Editor() {
     );
   }
 
+  // Shared link: wait for the plan before showing the editor (avoids a flash
+  // of someone else's autosaved work), and show a friendly not-found state.
+  if (shareCode && shareStatus === "loading") {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-background" data-testid="shared-plan-loading">
+        <div className="text-center">
+          <div className="h-10 w-10 mx-auto mb-4 rounded-full border-4 border-muted border-t-primary animate-spin" />
+          <p className="text-sm text-muted-foreground">Opening shared plan…</p>
+        </div>
+      </div>
+    );
+  }
+  if (shareCode && shareStatus === "error") {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-background" data-testid="shared-plan-error">
+        <div className="text-center max-w-sm px-6">
+          <h1 className="text-lg font-semibold mb-2">Plan not found</h1>
+          <p className="text-sm text-muted-foreground mb-4">
+            This plan link doesn’t exist or is no longer available. Check the
+            link, or start a fresh plan — it only takes a minute.
+          </p>
+          <Button asChild>
+            <Link href="/app">Open the planner</Link>
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 flex flex-col bg-background overflow-hidden overscroll-none" data-testid="editor-page">
       <EditorCore
-        storageKey="freeroomplanner-autosave"
+        storageKey={shareCode ? `freeroomplanner-shared-${shareCode}` : "freeroomplanner-autosave"}
+        initialShareCode={shareCode}
         isDark={isDark}
         renderHeader={(editor) => {
           // Store editor ref for room generator

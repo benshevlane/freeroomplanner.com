@@ -13,11 +13,20 @@ export const adminUsers = pgTable("admin_users", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-// Room plans stored on server for sharing
+// Room plans stored on server for sharing.
+// `id` is a short human-friendly code (e.g. K7M2XQ4A) used in /p/:code links.
+// `edit_key_hash` lets the original creator update the plan in place;
+// everyone else who opens the link saves a copy under a new code.
 export const roomPlans = pgTable("room_plans", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  name: text("name").notNull(),
-  data: jsonb("data").notNull(), // full plan JSON
+  id: varchar("id").primaryKey(),
+  name: text("name").notNull().default("My floor plan"),
+  data: jsonb("data").notNull(), // full plan JSON (editor exportAllRooms format)
+  roomType: text("room_type"), // kitchen | bathroom | office | general (from intent)
+  country: text("country"), // ISO country at save time (from Vercel geo header)
+  editKeyHash: text("edit_key_hash"),
+  openCount: integer("open_count").notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export const insertRoomPlanSchema = createInsertSchema(roomPlans).omit({

@@ -28,6 +28,8 @@ import {
 } from "../lib/canvas-renderer";
 import { detectRooms } from "../lib/room-detection";
 import { safeGetItem, safeSetItem } from "../lib/safe-storage";
+import SavePlanDialog from "./SavePlanDialog";
+import type { SharedPlanResult } from "../lib/plan-share";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -57,6 +59,10 @@ interface EditorCoreProps {
   renderStatusBar?: (state: ReturnType<typeof useEditor>["state"]) => React.ReactNode;
   /** Optional callback fired after a successful PNG export. */
   onExport?: () => void;
+  /** Code of the shared plan this session was opened from (e.g. via /p/CODE). */
+  initialShareCode?: string | null;
+  /** When true, a successful cloud save rewrites the page URL to /p/CODE. */
+  updateUrlOnSave?: boolean;
 }
 
 export default function EditorCore({
@@ -67,6 +73,8 @@ export default function EditorCore({
   renderHeader,
   renderStatusBar,
   onExport,
+  initialShareCode = null,
+  updateUrlOnSave = false,
 }: EditorCoreProps) {
   const editor = useEditor(storageKey);
   const { state } = editor;
@@ -109,6 +117,27 @@ export default function EditorCore({
   const [droppingFurniture, setDroppingFurniture] = useState<FurnitureTemplate | null>(null);
   const [autoEditTextBoxId, setAutoEditTextBoxId] = useState<string | null>(null);
   const [showClearDialog, setShowClearDialog] = useState(false);
+  const [showShareDialog, setShowShareDialog] = useState(false);
+  const [currentPlanCode, setCurrentPlanCode] = useState<string | null>(initialShareCode);
+
+  const handleShareLink = useCallback(() => {
+    trackEvent("share_dialog_opened");
+    setShowShareDialog(true);
+  }, []);
+
+  const handlePlanSaved = useCallback(
+    (result: SharedPlanResult) => {
+      setCurrentPlanCode(result.code);
+      if (updateUrlOnSave) {
+        try {
+          window.history.replaceState(null, "", `/p/${result.code}`);
+        } catch {
+          /* URL update is cosmetic — never break the save */
+        }
+      }
+    },
+    [updateUrlOnSave]
+  );
   const [furniturePanelOpen, setFurniturePanelOpen] = useState(false);
   const [propertiesPanelOpen, setPropertiesPanelOpen] = useState(false);
   const [toast, setToast] = useState<{ message: string; visible: boolean }>({ message: "", visible: false });
@@ -618,6 +647,7 @@ export default function EditorCore({
           onSavePlan={handleSavePlan}
           onSaveJSON={handleSaveJSON}
           onSaveAllJSON={handleSaveAllJSON}
+          onShareLink={handleShareLink}
           onLoadPlan={handleLoadPlan}
           onClearAll={() => setShowClearDialog(true)}
           zoom={state.zoom}
@@ -788,6 +818,16 @@ export default function EditorCore({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Save & share dialog */}
+      <SavePlanDialog
+        open={showShareDialog}
+        onOpenChange={setShowShareDialog}
+        getPlanData={() => editor.exportAllRooms()}
+        planName={state.roomName}
+        existingCode={currentPlanCode}
+        onSaved={handlePlanSaved}
+      />
 
       {/* Toast notification */}
       {toast.visible && (

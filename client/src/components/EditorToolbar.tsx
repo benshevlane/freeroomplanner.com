@@ -27,6 +27,7 @@ import {
   FileDown,
   FolderOpen,
   MoreHorizontal,
+  Link2,
   LayoutList,
   SlidersHorizontal,
   Tags,
@@ -50,6 +51,7 @@ interface EditorToolbarProps {
   onSavePlan: () => void;
   onSaveJSON: () => void;
   onSaveAllJSON: () => void;
+  onShareLink: () => void;
   onLoadPlan: () => void;
   onClearAll: () => void;
   zoom: number;
@@ -90,6 +92,7 @@ export default function EditorToolbar({
   onSavePlan,
   onSaveJSON,
   onSaveAllJSON,
+  onShareLink,
   onLoadPlan,
   onClearAll,
   zoom,
@@ -191,6 +194,11 @@ export default function EditorToolbar({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={onShareLink} data-testid="menu-share-link">
+                <Link2 className="h-4 w-4 mr-2" />
+                Save &amp; Get Link
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
               <DropdownMenuItem onClick={onSavePlan}>
                 <Image className="h-4 w-4 mr-2" />
                 Save Image (PNG)
@@ -388,6 +396,11 @@ export default function EditorToolbar({
             <TooltipContent><p>Save options</p></TooltipContent>
           </Tooltip>
           <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={onShareLink} data-testid="menu-share-link-desktop">
+              <Link2 className="h-4 w-4 mr-2" />
+              Save &amp; Get Link
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
             <DropdownMenuItem onClick={onSavePlan}>
               <Image className="h-4 w-4 mr-2" />
               Save Image (PNG)
