@@ -8,7 +8,9 @@ import { getOffers, type RoomType } from "@/lib/affiliates";
 // "Next steps" cards shown under the plan link in the Save window.
 // Country + room aware, driven entirely by the affiliate lookup table.
 // Renders nothing when there's no relevant partner — never a broken slot.
-// The affiliate step is always optional and never blocks the save.
+// Styling uses the site theme tokens (teal primary, General Sans) so it
+// matches the rest of Free Room Planner; only a partner's own logo keeps
+// its brand colour.
 // ---------------------------------------------------------------------------
 
 interface Props {
@@ -53,7 +55,7 @@ export default function AffiliateNextSteps({ country, roomType, planUrl, planCod
           target="_blank"
           rel="sponsored noopener noreferrer"
           onClick={() => trackEvent("affiliate_click", { partner: o.partner, role: "product", plan_code: planCode })}
-          className="mb-2 flex items-center gap-3 rounded-xl border border-border p-3 no-underline transition hover:border-primary"
+          className="mb-2 flex items-center gap-3 rounded-xl border border-border p-3 no-underline transition hover:border-primary hover:bg-accent"
           data-testid="affiliate-product-card"
         >
           <div className="flex-1">
@@ -66,11 +68,11 @@ export default function AffiliateNextSteps({ country, roomType, planUrl, planCod
 
       {trade && (
         <div
-          className="rounded-xl border-[1.5px] border-amber-300 bg-amber-50 p-4"
+          className="rounded-xl border border-border bg-accent/50 p-4"
           data-testid="affiliate-trade-card"
         >
           <div className="flex items-start gap-3">
-            <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg border border-amber-200 bg-white text-sm font-extrabold tracking-tight text-[#e0301e]">
+            <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg border border-border bg-white text-sm font-extrabold tracking-tight text-[#e0301e]">
               {trade.partner}
             </div>
             <div className="min-w-0 flex-1">
@@ -79,20 +81,20 @@ export default function AffiliateNextSteps({ country, roomType, planUrl, planCod
             </div>
           </div>
           <div className="mt-3 flex gap-2">
-            <a
-              href={trade.url}
-              target="_blank"
-              rel="sponsored noopener noreferrer"
-              onClick={() => trackEvent("affiliate_click", { partner: trade.partner, role: "trade", plan_code: planCode })}
-              className="flex-1 rounded-lg bg-amber-500 px-3 py-2.5 text-center text-sm font-semibold text-white no-underline transition hover:bg-amber-600"
-              data-testid="affiliate-trade-cta"
-            >
-              Get free quotes on {trade.partner} →
-            </a>
+            <Button asChild className="flex-1">
+              <a
+                href={trade.url}
+                target="_blank"
+                rel="sponsored noopener noreferrer"
+                onClick={() => trackEvent("affiliate_click", { partner: trade.partner, role: "trade", plan_code: planCode })}
+                data-testid="affiliate-trade-cta"
+              >
+                Get free quotes on {trade.partner}
+              </a>
+            </Button>
             <Button
               type="button"
               variant="outline"
-              className="border-amber-300 text-amber-800 hover:bg-amber-100"
               onClick={copyMessage}
               data-testid="affiliate-copy-message"
             >

@@ -47,7 +47,7 @@ interface SavePlanDialogProps {
 
 type Phase = "saving" | "done" | "error";
 
-const MIN_LOADER_MS = 2000;
+const PREPARE_BEAT_MS = 1800;
 
 // Testing aid: ?country=US forces the country used to pick affiliate cards,
 // so any country's Save window can be previewed from anywhere. Affects only
@@ -82,32 +82,34 @@ export default function SavePlanDialog({
   const [copied, setCopied] = useState(false);
   const runIdRef = useRef(0);
   const downloadedForRef = useRef<string | null>(null);
+  const [linkReady, setLinkReady] = useState(false);
 
   const runSave = useCallback(async () => {
     const runId = ++runIdRef.current;
     setPhase("saving");
     setCopied(false);
-    const startedAt = Date.now();
+    setLinkReady(false);
     try {
       const saved = await savePlanToCloud(getPlanData(), {
         name: planName,
         roomType: intentToRoomType(),
         existingCode,
       });
-      const elapsed = Date.now() - startedAt;
-      if (elapsed < MIN_LOADER_MS) {
-        await new Promise((r) => setTimeout(r, MIN_LOADER_MS - elapsed));
-      }
       if (runId !== runIdRef.current) return; // dialog was reopened meanwhile
+      // Show the full window straight away — link, next-step options and all —
+      // so the affiliate options are visible during the short "preparing" beat.
       setResult(saved);
       setPhase("done");
       onSaved?.(saved);
-      trackEvent("plan_saved", {
-        plan_code: saved.code,
-        updated: saved.updated,
-      });
-      // A single Save gives the file, the link and the next-step options
-      // together: download the plan image once the window resolves.
+      trackEvent("plan_saved", { plan_code: saved.code, updated: saved.updated });
+
+      // A brief beat before the link + download so the moment registers
+      // (the plan is already stored; this is deliberate pacing, not a wait).
+      await new Promise((r) => setTimeout(r, PREPARE_BEAT_MS));
+      if (runId !== runIdRef.current) return;
+      setLinkReady(true);
+
+      // One Save gives the file too: download the plan image once ready.
       if (onDownloadImage && downloadedForRef.current !== saved.code) {
         downloadedForRef.current = saved.code;
         try { onDownloadImage(); } catch { /* download is best-effort */ }
@@ -156,9 +158,13 @@ export default function SavePlanDialog({
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                  <Check className="h-4 w-4" />
+                  {linkReady ? <Check className="h-4 w-4" /> : <Loader2 className="h-4 w-4 animate-spin" />}
                 </span>
-                {result.updated ? "Your plan is updated" : "Your plan is saved"}
+                {!linkReady
+                  ? "Saving your plan…"
+                  : result.updated
+                  ? "Your plan is updated"
+                  : "Your plan is saved"}
               </DialogTitle>
               <DialogDescription>
                 Anyone with this link can view your plan and edit a copy — no
@@ -166,29 +172,41 @@ export default function SavePlanDialog({
               </DialogDescription>
             </DialogHeader>
 
-            <div className="mt-4 flex gap-2">
-              <Input
-                readOnly
-                value={result.url}
-                onFocus={(e) => e.currentTarget.select()}
-                className="font-medium"
-                data-testid="save-plan-link"
-              />
-              <Button onClick={copyLink} className="shrink-0" data-testid="save-plan-copy">
-                {copied ? (
-                  <>
-                    <Check className="h-4 w-4 mr-1" /> Copied
-                  </>
-                ) : (
-                  <>
-                    <Copy className="h-4 w-4 mr-1" /> Copy link
-                  </>
-                )}
-              </Button>
-            </div>
-            <p className="mt-2 text-xs text-muted-foreground">
-              Tip: send it to your partner, builder, or future self.
-            </p>
+            {!linkReady ? (
+              <div
+                className="mt-4 flex items-center gap-2 rounded-md border border-border bg-muted/50 px-3 py-2.5 text-sm text-muted-foreground"
+                data-testid="save-plan-link-preparing"
+              >
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Preparing your shareable link…
+              </div>
+            ) : (
+              <>
+                <div className="mt-4 flex gap-2">
+                  <Input
+                    readOnly
+                    value={result.url}
+                    onFocus={(e) => e.currentTarget.select()}
+                    className="font-medium"
+                    data-testid="save-plan-link"
+                  />
+                  <Button onClick={copyLink} className="shrink-0" data-testid="save-plan-copy">
+                    {copied ? (
+                      <>
+                        <Check className="h-4 w-4 mr-1" /> Copied
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-4 w-4 mr-1" /> Copy link
+                      </>
+                    )}
+                  </Button>
+                </div>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Tip: send it to your partner, builder, or future self.
+                </p>
+              </>
+            )}
 
             <AffiliateNextSteps
               country={overrideCountry(result.country)}
