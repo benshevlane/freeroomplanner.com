@@ -383,35 +383,45 @@ export default function EditorToolbar({
           </TooltipTrigger>
           <TooltipContent><p>Clear all items</p></TooltipContent>
         </Tooltip>
+        {/* Primary action: one Save button -> save & get shareable link. */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button size="sm" onClick={onShareLink} data-testid="btn-save-plan">
+              <Link2 className="h-4 w-4 mr-1" />
+              Save
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent><p>Save your plan &amp; get a shareable link</p></TooltipContent>
+        </Tooltip>
+        {/* Secondary: file exports, tucked away so they don't compete with Save. */}
         <DropdownMenu>
           <Tooltip>
             <TooltipTrigger asChild>
               <DropdownMenuTrigger asChild>
-                <Button size="sm" variant="ghost" data-testid="btn-save-plan">
+                <Button size="sm" variant="ghost" data-testid="btn-export">
                   <Download className="h-4 w-4 mr-1" />
-                  Save
+                  Export
                 </Button>
               </DropdownMenuTrigger>
             </TooltipTrigger>
-            <TooltipContent><p>Save options</p></TooltipContent>
+            <TooltipContent><p>Download as image or file</p></TooltipContent>
           </Tooltip>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={onShareLink} data-testid="menu-share-link-desktop">
-              <Link2 className="h-4 w-4 mr-2" />
-              Save &amp; Get Link
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
             <DropdownMenuItem onClick={onSavePlan}>
               <Image className="h-4 w-4 mr-2" />
-              Save Image (PNG)
+              Image (PNG)
             </DropdownMenuItem>
             <DropdownMenuItem onClick={onSaveJSON}>
               <FileDown className="h-4 w-4 mr-2" />
-              Save Room (JSON)
+              Room file (JSON)
             </DropdownMenuItem>
             <DropdownMenuItem onClick={onSaveAllJSON}>
               <Download className="h-4 w-4 mr-2" />
-              Save All Rooms (JSON)
+              All rooms (JSON)
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={onLoadPlan}>
+              <FolderOpen className="h-4 w-4 mr-2" />
+              Load a saved file
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

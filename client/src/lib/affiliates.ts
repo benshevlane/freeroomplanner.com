@@ -69,6 +69,18 @@ export const AFFILIATES: Record<string, CountryTable> = {
       },
     ],
     // office: no trade partner yet — the card simply won't render.
+    _default: [
+      {
+        partner: "Angi",
+        network: "CJ",
+        role: "trade",
+        headline: "Get quotes to build this project",
+        blurb:
+          "Angi connects you with vetted local pros. Send them your exact floor plan.",
+        clickUrl: ANGI_REMODEL,
+        active: true,
+      },
+    ],
   },
   // UK, AU, CA, etc. added here as programmes get approved.
 };

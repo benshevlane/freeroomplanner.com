@@ -52,8 +52,18 @@ const MIN_LOADER_MS = 1200;
 // which cards render — never what's stored.
 function overrideCountry(detected: string | null): string | null {
   if (typeof window === "undefined") return detected;
-  const forced = new URLSearchParams(window.location.search).get("country");
-  return forced ? forced.toUpperCase() : detected;
+  try {
+    const fromUrl = new URLSearchParams(window.location.search).get("country");
+    if (fromUrl) {
+      sessionStorage.setItem("frp-test-country", fromUrl.toUpperCase());
+      return fromUrl.toUpperCase();
+    }
+    const remembered = sessionStorage.getItem("frp-test-country");
+    if (remembered) return remembered;
+  } catch {
+    /* ignore */
+  }
+  return detected;
 }
 
 export default function SavePlanDialog({
