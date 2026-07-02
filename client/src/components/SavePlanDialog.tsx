@@ -140,7 +140,7 @@ export default function SavePlanDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md" data-testid="save-plan-dialog">
+      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto" data-testid="save-plan-dialog">
         {phase === "saving" && (
           <div className="py-10 text-center" data-testid="save-plan-loading">
             <Loader2 className="h-10 w-10 mx-auto mb-4 animate-spin text-primary" />
@@ -167,8 +167,8 @@ export default function SavePlanDialog({
                   : "Your plan is saved"}
               </DialogTitle>
               <DialogDescription>
-                Anyone with this link can view your plan and edit a copy — no
-                account needed. Saving here again keeps the same link.
+                Your design is stored at this link — reopen or share it anytime,
+                no account needed. Save again to update the same link.
               </DialogDescription>
             </DialogHeader>
 

@@ -44,7 +44,7 @@ export default function AffiliateNextSteps({ country, roomType, planUrl, planCod
     <div className="mt-5" data-testid="affiliate-next-steps">
       <div className="mb-3 flex items-center gap-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
         <span className="h-px flex-1 bg-border" />
-        {trade ? "Get it built" : "Next steps"}
+        {trade ? "Optional next step" : "Next steps"}
         <span className="h-px flex-1 bg-border" />
       </div>
 
@@ -89,7 +89,7 @@ export default function AffiliateNextSteps({ country, roomType, planUrl, planCod
                 onClick={() => trackEvent("affiliate_click", { partner: trade.partner, role: "trade", plan_code: planCode })}
                 data-testid="affiliate-trade-cta"
               >
-                Get free quotes on {trade.partner}
+                Get free quotes on {trade.partner} →
               </a>
             </Button>
             <Button
@@ -102,6 +102,10 @@ export default function AffiliateNextSteps({ country, roomType, planUrl, planCod
               {copied ? "Copied" : "Copy plan message"}
             </Button>
           </div>
+          <p className="mt-2 text-[11.5px] leading-relaxed text-muted-foreground">
+            Opens {trade.partner} in a new tab. “Copy plan message” copies a ready-made
+            note with your plan link to paste into their quote form.
+          </p>
         </div>
       )}
 
