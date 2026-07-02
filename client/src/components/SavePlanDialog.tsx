@@ -47,6 +47,15 @@ type Phase = "saving" | "done" | "error";
 
 const MIN_LOADER_MS = 1200;
 
+// Testing aid: ?country=US forces the country used to pick affiliate cards,
+// so any country's Save window can be previewed from anywhere. Affects only
+// which cards render — never what's stored.
+function overrideCountry(detected: string | null): string | null {
+  if (typeof window === "undefined") return detected;
+  const forced = new URLSearchParams(window.location.search).get("country");
+  return forced ? forced.toUpperCase() : detected;
+}
+
 export default function SavePlanDialog({
   open,
   onOpenChange,
@@ -161,7 +170,7 @@ export default function SavePlanDialog({
             </p>
 
             <AffiliateNextSteps
-              country={result.country}
+              country={overrideCountry(result.country)}
               roomType={intentToRoomType() as RoomType | null}
               planUrl={result.url}
               planCode={result.code}
