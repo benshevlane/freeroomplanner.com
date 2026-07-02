@@ -86,17 +86,24 @@ for (const [f, cfg] of Object.entries(SHELLS)) {
       .split("<p>A browser-based floor planner built for homeowners. Brief kitchen makers, bathroom fitters, architects, and contractors — fast.</p>")
       .join(`<p style="font-size:1.15rem;line-height:1.6">${cfg.intro}</p>`);
   }
-  // Load the Vite stylesheet asynchronously. The pre-rendered shell inside
-  // #root uses inline styles only, so nothing above the fold needs the app
-  // CSS — but as a render-blocking <link> it delayed first paint ~2s on
-  // throttled mobile (4.1s LCP on /get-embed, 10 Jun audit). preload+swap
-  // paints the shell immediately; the app CSS applies before React mounts.
-  html = html.replace(
-    /<link rel="stylesheet" crossorigin href="(\/assets\/[^"]+\.css)">/,
-    (_m, href) =>
-      `<link rel="preload" as="style" crossorigin href="${href}" onload="this.onload=null;this.rel='stylesheet'">` +
-      `<noscript><link rel="stylesheet" crossorigin href="${href}"></noscript>`,
-  );
+  // Stylesheet loading strategy differs by shell type:
+  //   - Indexable hero shells (cfg.index): load CSS asynchronously so the
+  //     inline-styled hero paints immediately for LCP (10/11 Jun audits).
+  //     React content briefly paints before the CSS applies, but the hero
+  //     is inline-styled so the visible flash is minor.
+  //   - App-driven shells (noindex: plan, embed, admin): the visible UI is
+  //     the React app, so async CSS causes a flash of unstyled content when
+  //     React paints before the stylesheet. These have no LCP/SEO stake, so
+  //     keep the CSS render-blocking — the page stays blank the extra beat
+  //     and then paints fully styled. Removes the FOUC on shared /p links.
+  if (cfg.index) {
+    html = html.replace(
+      /<link rel="stylesheet" crossorigin href="(\/assets\/[^"]+\.css)">/,
+      (_m, href) =>
+        `<link rel="preload" as="style" crossorigin href="${href}" onload="this.onload=null;this.rel='stylesheet'">` +
+        `<noscript><link rel="stylesheet" crossorigin href="${href}"></noscript>`,
+    );
+  }
   writeFileSync(`${OUT}/${f}`, html);
 }
 
