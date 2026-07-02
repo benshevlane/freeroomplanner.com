@@ -140,7 +140,7 @@ export default function SavePlanDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto overflow-x-hidden" data-testid="save-plan-dialog">
+      <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-lg max-h-[85vh] overflow-y-auto" data-testid="save-plan-dialog">
         {phase === "saving" && (
           <div className="py-10 text-center" data-testid="save-plan-loading">
             <Loader2 className="h-10 w-10 mx-auto mb-4 animate-spin text-primary" />

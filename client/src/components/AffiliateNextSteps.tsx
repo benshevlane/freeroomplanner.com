@@ -80,8 +80,8 @@ export default function AffiliateNextSteps({ country, roomType, planUrl, planCod
               <span className="mt-0.5 block text-xs text-muted-foreground">{trade.blurb}</span>
             </div>
           </div>
-          <div className="mt-3 flex gap-2">
-            <Button asChild className="flex-1">
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button asChild className="flex-1 min-w-[12rem]">
               <a
                 href={trade.url}
                 target="_blank"
