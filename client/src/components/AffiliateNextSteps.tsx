@@ -4,6 +4,19 @@ import { ArrowRight, ClipboardCheck } from "lucide-react";
 import { trackEvent } from "@/lib/analytics";
 import { getOffers, type RoomType } from "@/lib/affiliates";
 
+// Fire-and-forget server-side usage event (feeds the admin summary), in
+// addition to the GA event. Never blocks or surfaces errors to the user.
+function recordUsage(event: string, roomType: RoomType | null) {
+  try {
+    fetch("/api/track", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ event, roomType: roomType ?? undefined }),
+      keepalive: true,
+    }).catch(() => {});
+  } catch { /* ignore */ }
+}
+
 // ---------------------------------------------------------------------------
 // "Next steps" cards shown under the plan link in the Save window.
 // Country + room aware, driven entirely by the affiliate lookup table.
@@ -32,6 +45,7 @@ export default function AffiliateNextSteps({ country, roomType, planUrl, planCod
       await navigator.clipboard.writeText(msg);
       setCopied(true);
       trackEvent("affiliate_message_copied", { partner: trade?.partner, plan_code: planCode });
+      recordUsage("affiliate_message_copied", roomType);
       setTimeout(() => setCopied(false), 2200);
     } catch {
       /* clipboard unavailable — the primary button still works */
@@ -54,7 +68,7 @@ export default function AffiliateNextSteps({ country, roomType, planUrl, planCod
           href={o.url}
           target="_blank"
           rel="sponsored noopener noreferrer"
-          onClick={() => trackEvent("affiliate_click", { partner: o.partner, role: "product", plan_code: planCode })}
+          onClick={() => { trackEvent("affiliate_click", { partner: o.partner, role: "product", plan_code: planCode }); recordUsage("affiliate_click", roomType); }}
           className="mb-2 flex items-center gap-3 rounded-xl border border-border p-3 no-underline transition hover:border-primary hover:bg-accent"
           data-testid="affiliate-product-card"
         >
@@ -86,7 +100,7 @@ export default function AffiliateNextSteps({ country, roomType, planUrl, planCod
                 href={trade.url}
                 target="_blank"
                 rel="sponsored noopener noreferrer"
-                onClick={() => trackEvent("affiliate_click", { partner: trade.partner, role: "trade", plan_code: planCode })}
+                onClick={() => { trackEvent("affiliate_click", { partner: trade.partner, role: "trade", plan_code: planCode }); recordUsage("affiliate_click", roomType); }}
                 data-testid="affiliate-trade-cta"
               >
                 Get free quotes on {trade.partner} →

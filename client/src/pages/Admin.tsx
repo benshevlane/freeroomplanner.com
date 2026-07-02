@@ -360,6 +360,92 @@ function DownloadsReport() {
   );
 }
 
+function ActivityReport() {
+  const [days, setDays] = useState(30);
+  const { data, isLoading, error } = useQuery<{
+    days: number;
+    totalPlansAllTime: number | null;
+    starts: { total: number; byRoom: Record<string, number>; byCountry: Record<string, number> };
+    saves: { total: number; byRoom: Record<string, number>; byCountry: Record<string, number> };
+    affiliateClicks: { total: number; byRoom: Record<string, number>; byCountry: Record<string, number> };
+  }>({
+    queryKey: [`/api/admin/plans-report?days=${days}`],
+  });
+
+  const rows = (obj: Record<string, number> | undefined) =>
+    Object.entries(obj ?? {}).sort((a, b) => b[1] - a[1]);
+
+  return (
+    <div className="mt-12">
+      <div className="flex items-center justify-between mb-1">
+        <h2 className="text-lg font-semibold">Planner Activity</h2>
+        <select
+          value={days}
+          onChange={(e) => setDays(Number(e.target.value))}
+          className="text-sm border border-[#e8e3d8] rounded-lg px-2 py-1 bg-white"
+          data-testid="activity-range"
+        >
+          <option value={7}>Last 7 days</option>
+          <option value={30}>Last 30 days</option>
+          <option value={90}>Last 90 days</option>
+        </select>
+      </div>
+      <p className="text-sm text-[#6b6457] mb-4">
+        Plans started, saved, and affiliate clicks. Confirmed leads &amp; revenue are in your CJ dashboard (tracked by SubID).
+      </p>
+
+      {isLoading && <p className="text-sm text-[#9a9488]">Loading activity…</p>}
+      {error && <p className="text-sm text-red-600">Failed to load activity report.</p>}
+
+      {data && (
+        <>
+          <div className="grid grid-cols-3 gap-3 mb-4">
+            {[
+              { label: "Plans started", value: data.starts.total },
+              { label: "Plans saved", value: data.saves.total },
+              { label: "Affiliate clicks", value: data.affiliateClicks.total },
+            ].map((c) => (
+              <div key={c.label} className="rounded-xl border border-[#e8e3d8] bg-white p-4 shadow-sm">
+                <div className="text-2xl font-semibold tabular-nums">{c.value}</div>
+                <div className="text-xs text-[#6b6457] mt-1">{c.label}</div>
+              </div>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {([
+              { title: "Saved — by room", data: data.saves.byRoom },
+              { title: "Saved — by country", data: data.saves.byCountry },
+              { title: "Clicks — by country", data: data.affiliateClicks.byCountry },
+            ]).map((panel) => (
+              <div key={panel.title} className="rounded-xl border border-[#e8e3d8] bg-white p-4 shadow-sm">
+                <h3 className="text-sm font-medium text-[#6b6457] mb-2">{panel.title}</h3>
+                {rows(panel.data).length === 0 ? (
+                  <p className="text-sm text-[#9a9488]">No data yet.</p>
+                ) : (
+                  <table className="w-full text-sm">
+                    <tbody>
+                      {rows(panel.data).map(([k, v]) => (
+                        <tr key={k} className="border-b border-[#f0ece3] last:border-0">
+                          <td className="py-1.5 text-[#374151] capitalize">{k}</td>
+                          <td className="py-1.5 text-right font-medium tabular-nums">{v}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-[#9a9488] mt-3">
+            {data.totalPlansAllTime ?? "—"} plans saved all time.
+          </p>
+        </>
+      )}
+    </div>
+  );
+}
+
 function EmbedReport() {
   const { data, isLoading, error } = useQuery<{ partners: EmbedPartner[] }>({
     queryKey: ["/api/admin/embed-report"],
@@ -737,6 +823,9 @@ export default function Admin() {
             <p className="text-xs text-[#9a9488] mt-2">Stored in Supabase Storage</p>
           </div>
         )}
+
+        {/* Planner Activity (starts / saves / affiliate clicks) */}
+        <ActivityReport />
 
         {/* Plan Downloads Report */}
         <DownloadsReport />
