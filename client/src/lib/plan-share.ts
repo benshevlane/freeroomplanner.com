@@ -17,6 +17,8 @@ export interface SharedPlanResult {
   url: string;
   /** True when an existing plan was updated rather than a new one created. */
   updated: boolean;
+  /** Visitor's country (ISO-2) as detected at save time, if available. */
+  country: string | null;
 }
 
 type KeyMap = Record<string, string>;
@@ -84,7 +86,13 @@ export async function savePlanToCloud(
         body: JSON.stringify({ id: existingCode, editKey, data, name, roomType: roomType ?? undefined }),
       });
       if (res.ok) {
-        return { code: existingCode, url: planUrlFor(existingCode), updated: true };
+        const body = (await res.json().catch(() => ({}))) as { country?: string | null };
+        return {
+          code: existingCode,
+          url: planUrlFor(existingCode),
+          updated: true,
+          country: body.country ?? null,
+        };
       }
       // If the update is rejected (e.g. plan was deleted), fall through and
       // create a fresh plan instead — the user must never lose a save.
@@ -99,9 +107,14 @@ export async function savePlanToCloud(
   if (!res.ok) {
     throw new Error("save-failed");
   }
-  const body = (await res.json()) as { id: string; editKey: string };
+  const body = (await res.json()) as { id: string; editKey: string; country?: string | null };
   rememberEditKey(body.id, body.editKey);
-  return { code: body.id, url: planUrlFor(body.id), updated: false };
+  return {
+    code: body.id,
+    url: planUrlFor(body.id),
+    updated: false,
+    country: body.country ?? null,
+  };
 }
 
 export interface FetchedPlan {

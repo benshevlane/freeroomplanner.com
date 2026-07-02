@@ -129,7 +129,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           edit_key_hash: hashKey(editKey),
         });
         if (!error) {
-          return res.status(200).json({ id, editKey, url: `/p/${id}` });
+          return res.status(200).json({ id, editKey, url: `/p/${id}`, country });
         }
         if (error.code !== "23505") throw error; // 23505 = unique violation
       }
@@ -143,6 +143,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(400).json({ error: "Invalid plan data" });
       }
       const { id, editKey, data, name, roomType } = parsed.data;
+      const putCountry =
+        (req.headers["x-vercel-ip-country"] as string | undefined) ?? null;
 
       const { data: row, error: fetchErr } = await db
         .from("room_plans")
@@ -166,7 +168,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .eq("id", id);
       if (updateErr) throw updateErr;
 
-      return res.status(200).json({ id, url: `/p/${id}`, updated: true });
+      return res.status(200).json({ id, url: `/p/${id}`, updated: true, country: putCountry });
     }
 
     res.setHeader("Allow", "GET, POST, PUT");

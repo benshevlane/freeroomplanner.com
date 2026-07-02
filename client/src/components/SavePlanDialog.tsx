@@ -15,6 +15,8 @@ import {
   intentToRoomType,
   type SharedPlanResult,
 } from "@/lib/plan-share";
+import AffiliateNextSteps from "./AffiliateNextSteps";
+import type { RoomType } from "@/lib/affiliates";
 
 // ---------------------------------------------------------------------------
 // The Save & Share window.
@@ -158,11 +160,12 @@ export default function SavePlanDialog({
               Tip: send it to your partner, builder, or future self.
             </p>
 
-            {/*
-              NEXT-STEPS SLOT — phase 3 of the build adds country + room-type
-              matched "shop this room" / "get it built" cards here, with the
-              partner-link disclosure. Renders nothing until then.
-            */}
+            <AffiliateNextSteps
+              country={result.country}
+              roomType={intentToRoomType() as RoomType | null}
+              planUrl={result.url}
+              planCode={result.code}
+            />
 
             <div className="mt-4 flex justify-end">
               <Button variant="ghost" onClick={() => onOpenChange(false)} data-testid="save-plan-close">
