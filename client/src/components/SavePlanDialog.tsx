@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Check, Copy, Download, Link2, Loader2 } from "lucide-react";
+import { Check, Copy, Link2, Loader2 } from "lucide-react";
 import { trackEvent } from "@/lib/analytics";
 import {
   savePlanToCloud,
@@ -47,7 +47,7 @@ interface SavePlanDialogProps {
 
 type Phase = "saving" | "done" | "error";
 
-const MIN_LOADER_MS = 1200;
+const MIN_LOADER_MS = 2000;
 
 // Testing aid: ?country=US forces the country used to pick affiliate cards,
 // so any country's Save window can be previewed from anywhere. Affects only
@@ -81,6 +81,7 @@ export default function SavePlanDialog({
   const [result, setResult] = useState<SharedPlanResult | null>(null);
   const [copied, setCopied] = useState(false);
   const runIdRef = useRef(0);
+  const downloadedForRef = useRef<string | null>(null);
 
   const runSave = useCallback(async () => {
     const runId = ++runIdRef.current;
@@ -105,11 +106,18 @@ export default function SavePlanDialog({
         plan_code: saved.code,
         updated: saved.updated,
       });
+      // A single Save gives the file, the link and the next-step options
+      // together: download the plan image once the window resolves.
+      if (onDownloadImage && downloadedForRef.current !== saved.code) {
+        downloadedForRef.current = saved.code;
+        try { onDownloadImage(); } catch { /* download is best-effort */ }
+        trackEvent("plan_image_downloaded", { plan_code: saved.code });
+      }
     } catch {
       if (runId !== runIdRef.current) return;
       setPhase("error");
     }
-  }, [getPlanData, planName, existingCode, onSaved]);
+  }, [getPlanData, planName, existingCode, onSaved, onDownloadImage]);
 
   useEffect(() => {
     if (open) void runSave();
@@ -181,21 +189,6 @@ export default function SavePlanDialog({
             <p className="mt-2 text-xs text-muted-foreground">
               Tip: send it to your partner, builder, or future self.
             </p>
-
-            {onDownloadImage && (
-              <Button
-                variant="outline"
-                className="mt-3 w-full"
-                onClick={() => {
-                  onDownloadImage();
-                  trackEvent("plan_image_downloaded", { plan_code: result.code });
-                }}
-                data-testid="save-plan-download"
-              >
-                <Download className="mr-2 h-4 w-4" />
-                Download plan image (PNG)
-              </Button>
-            )}
 
             <AffiliateNextSteps
               country={overrideCountry(result.country)}
