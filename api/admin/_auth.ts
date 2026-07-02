@@ -5,7 +5,12 @@ const COOKIE_NAME = "admin_token";
 const MAX_AGE_SECONDS = 8 * 60 * 60; // 8 hours
 
 function getSigningSecret(): string {
-  return process.env.ADMIN_TOKEN_SECRET || process.env.ADMIN_PASSWORD || "Rayleigh11";
+  const secret = process.env.ADMIN_TOKEN_SECRET || process.env.ADMIN_PASSWORD;
+  if (!secret) {
+    // Fail closed: never fall back to a secret baked into (public) source.
+    throw new Error("ADMIN_TOKEN_SECRET (or ADMIN_PASSWORD) is not configured");
+  }
+  return secret;
 }
 
 export function createToken(email: string): string {
@@ -27,8 +32,15 @@ export function verifyToken(token: string): { valid: true; email: string } | { v
   if (parts.length !== 2) return { valid: false };
   const [payloadB64, sig] = parts;
 
+  let secret: string;
+  try {
+    secret = getSigningSecret();
+  } catch {
+    return { valid: false }; // no secret configured -> treat as unauthenticated
+  }
+
   const expectedSig = crypto
-    .createHmac("sha256", getSigningSecret())
+    .createHmac("sha256", secret)
     .update(payloadB64)
     .digest("hex");
 

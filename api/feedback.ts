@@ -2,6 +2,16 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { Resend } from "resend";
 import { z } from "zod";
 
+// Escape user-supplied text before placing it in the notification email HTML.
+function esc(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 const feedbackFormSchema = z.object({
   type: z.enum(["bug", "feature", "general", "praise"], {
     required_error: "Please select a feedback type",
@@ -34,10 +44,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       to: process.env.CONTACT_EMAIL || "ben@freeroomplanner.com",
       ...(email ? { replyTo: email } : {}),
       subject: `[Feedback - ${type}] New feedback from Free Room Planner`,
-      html: `<p><strong>Type:</strong> ${type}</p>
-${email ? `<p><strong>Email:</strong> ${email}</p>` : ""}
+      html: `<p><strong>Type:</strong> ${esc(type)}</p>
+${email ? `<p><strong>Email:</strong> ${esc(email)}</p>` : ""}
 <hr/>
-<p>${message.replace(/\n/g, "<br/>")}</p>`,
+<p>${esc(message).replace(/\n/g, "<br/>")}</p>`,
     });
 
     if (error) {

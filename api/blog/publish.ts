@@ -80,15 +80,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  // Auth
-  //
-  // Token is baked into source on purpose: this repo is private and the
-  // dashboard auto-generates/rotates this file, so we avoid the need for a
-  // Vercel env var to be set by hand. `process.env.BLOG_PUBLISH_TOKEN` is
-  // still honoured if set (useful for local dev / rotation in-place).
-  const BAKED_PUBLISH_TOKEN =
-    "frp_pub_aJ3WWmkVWqVViQoim0rMNw3PdYUcolo3ndL_EZtLbNcWQ788oKSR2w";
-  const expected = process.env.BLOG_PUBLISH_TOKEN || BAKED_PUBLISH_TOKEN;
+  // Auth — the token lives only in the BLOG_PUBLISH_TOKEN env var. It must
+  // never be baked into source (this repo is public).
+  const expected = process.env.BLOG_PUBLISH_TOKEN;
   if (!expected) {
     return res.status(503).json({ error: "Publishing is not configured (no token available)" });
   }

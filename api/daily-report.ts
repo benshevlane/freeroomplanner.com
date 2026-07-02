@@ -54,11 +54,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const cronSecret = process.env.CRON_SECRET;
   const isVercelCron = (req.headers["user-agent"] ?? "").includes("vercel-cron");
   const hasSecret =
-    cronSecret && req.headers.authorization === `Bearer ${cronSecret}`;
-  const sendAllowed = isVercelCron || hasSecret || req.query.dry === "1";
-  if (!sendAllowed) {
+    !!cronSecret && req.headers.authorization === `Bearer ${cronSecret}`;
+  // Every caller must be the Vercel cron or present the secret — including
+  // the ?dry=1 preview, which returns aggregate counts.
+  if (!isVercelCron && !hasSecret) {
     return res.status(403).json({ error: "Not allowed" });
   }
+  const dryRun = req.query.dry === "1";
 
   if (!db) return res.status(503).json({ error: "Storage not configured" });
 
@@ -103,7 +105,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     };
 
     // Dry run: report the numbers without emailing (used for testing).
-    if (req.query.dry === "1" && !isVercelCron && !hasSecret) {
+    if (dryRun) {
       return res.status(200).json({ sent: false, dryRun: true, ...summary });
     }
 
