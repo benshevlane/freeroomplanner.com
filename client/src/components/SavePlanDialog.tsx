@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Check, Copy, Link2, Loader2 } from "lucide-react";
+import { Check, Copy, Download, Link2, Loader2 } from "lucide-react";
 import { trackEvent } from "@/lib/analytics";
 import {
   savePlanToCloud,
@@ -41,6 +41,8 @@ interface SavePlanDialogProps {
   existingCode: string | null;
   /** Called after a successful save so the page URL can reflect the code. */
   onSaved?: (result: SharedPlanResult) => void;
+  /** Downloads the plan as a PNG image (same as Export > Image). */
+  onDownloadImage?: () => void;
 }
 
 type Phase = "saving" | "done" | "error";
@@ -73,6 +75,7 @@ export default function SavePlanDialog({
   planName,
   existingCode,
   onSaved,
+  onDownloadImage,
 }: SavePlanDialogProps) {
   const [phase, setPhase] = useState<Phase>("saving");
   const [result, setResult] = useState<SharedPlanResult | null>(null);
@@ -178,6 +181,21 @@ export default function SavePlanDialog({
             <p className="mt-2 text-xs text-muted-foreground">
               Tip: send it to your partner, builder, or future self.
             </p>
+
+            {onDownloadImage && (
+              <Button
+                variant="outline"
+                className="mt-3 w-full"
+                onClick={() => {
+                  onDownloadImage();
+                  trackEvent("plan_image_downloaded", { plan_code: result.code });
+                }}
+                data-testid="save-plan-download"
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Download plan image (PNG)
+              </Button>
+            )}
 
             <AffiliateNextSteps
               country={overrideCountry(result.country)}

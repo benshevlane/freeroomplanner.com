@@ -827,6 +827,7 @@ export default function EditorCore({
         planName={state.roomName}
         existingCode={currentPlanCode}
         onSaved={handlePlanSaved}
+        onDownloadImage={handleSavePlan}
       />
 
       {/* Toast notification */}
