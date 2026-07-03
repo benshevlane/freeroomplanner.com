@@ -14,7 +14,7 @@ import { trackEvent } from "@/lib/analytics";
 
 // Where 5-star raters are invited to leave a public review.
 // Free Trustpilot review page for the claimed freeroomplanner.com domain.
-const REVIEW_URL = "https://uk.trustpilot.com/review/freeroomplanner.com";
+const REVIEW_URL = "https://uk.trustpilot.com/evaluate/freeroomplanner.com";
 const REVIEW_SITE_NAME = "Trustpilot";
 
 interface RatingPromptDialogProps {
