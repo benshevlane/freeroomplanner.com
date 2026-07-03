@@ -26,6 +26,7 @@ import {
   drawWallLabelsWithDiscrepancy,
   computeRoomLabelPositions,
   collectDistanceMeasurementRects,
+  snapFurnitureToNearest,
 } from "../lib/canvas-renderer";
 import { detectRooms } from "../lib/room-detection";
 import { safeGetItem, safeSetItem } from "../lib/safe-storage";
@@ -700,9 +701,24 @@ export default function EditorCore({
 
   const handleUpdateFurniture = useCallback(
     (id: string, updates: Partial<FurnitureItem>) => {
+      // When a size change comes through, re-apply the same edge magnetism used
+      // on drag so the piece stays flush with its neighbours/walls instead of
+      // drifting out of a run when it's resized from the centre.
+      if (updates.width != null || updates.height != null) {
+        const current = state.furniture.find((f) => f.id === id);
+        if (current) {
+          const resized = { ...current, ...updates } as FurnitureItem;
+          const others = state.furniture.filter((f) => f.id !== id);
+          const snap = snapFurnitureToNearest(resized, state.walls, others, 8);
+          if (snap.didSnap) {
+            editor.updateFurniture(id, { ...updates, x: snap.x, y: snap.y });
+            return;
+          }
+        }
+      }
       editor.updateFurniture(id, updates);
     },
-    [editor]
+    [editor, state.furniture, state.walls]
   );
 
   return (
