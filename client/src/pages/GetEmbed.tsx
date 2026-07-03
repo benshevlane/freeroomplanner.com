@@ -80,7 +80,7 @@ function buildHomepageLinkSnippet(form: FormState): string {
   return `<!-- Free Room Planner — Homepage Link -->
 <!-- Free to use. Powered by freeroomplanner.com -->
 <div style="max-width: 560px; margin: 0 auto; font-family: 'DM Sans', system-ui, -apple-system, sans-serif; box-sizing: border-box;">
-  <div style="border: 1px solid #e8e3d8; border-radius: 12px; padding: 20px 24px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; background: #fff;">
+  <div style="border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px 24px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; background: #fff;">
     <img
       src="${LOGO_URL}"
       alt="Free Room Planner"
@@ -89,16 +89,16 @@ function buildHomepageLinkSnippet(form: FormState): string {
       style="flex-shrink: 0; border-radius: 6px;"
     />
     <div style="flex: 1; min-width: 160px;">
-      <div style="font-size: 16px; font-weight: 700; color: #1a1a18; margin: 0 0 2px; line-height: 1.3;">Plan your room layout</div>
-      <div style="font-size: 13px; color: #6b6457; line-height: 1.4; margin: 0;">Design your space with our free drag-and-drop room planner.</div>
+      <div style="font-size: 16px; font-weight: 700; color: #0f172a; margin: 0 0 2px; line-height: 1.3;">Plan your room layout</div>
+      <div style="font-size: 13px; color: #64748b; line-height: 1.4; margin: 0;">Design your space with our free drag-and-drop room planner.</div>
     </div>
     <a
       href="${plannerUrl}"
       style="display: inline-flex; align-items: center; gap: 6px; padding: 10px 20px; font-size: 14px; font-weight: 600; color: #fff; background: ${brandColor}; border-radius: 10px; text-decoration: none; white-space: nowrap; flex-shrink: 0; font-family: inherit;"
-    >Start planning &#x2192;</a>
+    >Start drawing &#x2192;</a>
   </div>
-  <div style="text-align: center; margin-top: 6px; font-size: 11px; color: #a09a8c;">
-    Powered by <a href="https://freeroomplanner.com" style="color: #a09a8c; text-decoration: underline;" target="_blank" rel="noopener">freeroomplanner.com</a>
+  <div style="text-align: center; margin-top: 6px; font-size: 11px; color: #94a3b8;">
+    Powered by <a href="https://freeroomplanner.com" style="color: #94a3b8; text-decoration: underline;" target="_blank" rel="noopener">freeroomplanner.com</a>
   </div>
 </div>`;
 }
@@ -180,7 +180,7 @@ function buildHomepageEmbedSnippet(partnerId: string, form: FormState): string {
         '<p id="frp-title">Plan your room layout</p>' +
         '<p id="frp-desc">Design your space with our free drag-and-drop room planner.</p>' +
       '</div>' +
-      '<button id="frp-cta">Start planning &#8594;</button>' +
+      '<button id="frp-cta">Start drawing &#8594;</button>' +
       '<p id="frp-attr">Powered by <a href="https://freeroomplanner.com" target="_blank" rel="noopener">freeroomplanner.com</a></p>' +
     '</div>';
   root.appendChild(card);
@@ -242,7 +242,7 @@ function buildHomepageEmbedSnippet(partnerId: string, form: FormState): string {
 
     var ctaBtn = document.createElement('button');
     ctaBtn.id = 'frp-cta';
-    ctaBtn.innerHTML = 'Start planning &#8594;';
+    ctaBtn.innerHTML = 'Start drawing &#8594;';
     ctaBtn.addEventListener('click', expand);
     header.appendChild(ctaBtn);
 
@@ -515,16 +515,16 @@ export default function GetEmbed() {
   }, []);
 
   /* ---- Shared styles ---- */
-  const bg = isDark ? "bg-[#1a1a18]" : "bg-[#faf8f4]";
-  const text = isDark ? "text-[#f0ede6]" : "text-[#1a1a18]";
-  const muted = isDark ? "text-[#a09a8c]" : "text-[#6b6457]";
-  const cardBg = isDark ? "bg-[#222220]" : "bg-white";
-  const border = isDark ? "border-[#2e2e2a]" : "border-[#e8e3d8]";
-  const teal = isDark ? "text-[#5ba89a]" : "text-[#3d8a7c]";
-  const pillBg = isDark ? "bg-[#2e2e2a] text-[#5ba89a]" : "bg-[#e8f4f1] text-[#3d8a7c]";
+  const bg = isDark ? "bg-[#0f172a]" : "bg-[#f8fafc]";
+  const text = isDark ? "text-[#f1f5f9]" : "text-[#0f172a]";
+  const muted = isDark ? "text-[#94a3b8]" : "text-[#64748b]";
+  const cardBg = isDark ? "bg-[#1e293b]" : "bg-white";
+  const border = isDark ? "border-[#1e293b]" : "border-[#e2e8f0]";
+  const teal = isDark ? "text-[#2dd4bf]" : "text-[#0d9488]";
+  const pillBg = isDark ? "bg-[#1e293b] text-[#2dd4bf]" : "bg-[#e6fffa] text-[#0d9488]";
   const inputBg = isDark
-    ? "bg-[#2e2e2a] border-[#3e3e3a] text-[#f0ede6] placeholder:text-[#6b6457]"
-    : "bg-white border-[#d8d2c4] text-[#1a1a18] placeholder:text-[#a09a8c]";
+    ? "bg-[#1e293b] border-[#3e3e3a] text-[#f1f5f9] placeholder:text-[#64748b]"
+    : "bg-white border-[#d8d2c4] text-[#0f172a] placeholder:text-[#94a3b8]";
 
   /* ================================================================ */
   /*  RENDER                                                          */
@@ -534,7 +534,7 @@ export default function GetEmbed() {
     <div className={`min-h-screen font-sans ${bg} ${text} transition-colors duration-300`}>
       {/* Header */}
       <header
-        className={`sticky top-0 z-50 border-b ${isDark ? "bg-[#1a1a18]/95 border-[#2e2e2a]" : "bg-[#faf8f4]/95 border-[#e8e3d8]"} backdrop-blur-sm`}
+        className={`sticky top-0 z-50 border-b ${isDark ? "bg-[#0f172a]/95 border-[#1e293b]" : "bg-[#f8fafc]/95 border-[#e2e8f0]"} backdrop-blur-sm`}
       >
         <div className="max-w-5xl mx-auto px-5 h-14 flex items-center justify-between">
           <button
@@ -547,7 +547,7 @@ export default function GetEmbed() {
           <div className="flex items-center gap-3">
             <button
               onClick={() => setIsDark((d) => !d)}
-              className={`p-1.5 rounded-md ${isDark ? "hover:bg-[#2e2e2a] text-[#a09a8c]" : "hover:bg-[#f0ede6] text-[#6b6457]"} transition-colors`}
+              className={`p-1.5 rounded-md ${isDark ? "hover:bg-[#1e293b] text-[#94a3b8]" : "hover:bg-[#f1f5f9] text-[#64748b]"} transition-colors`}
               aria-label="Toggle dark mode"
             >
               {isDark ? (
@@ -558,9 +558,9 @@ export default function GetEmbed() {
             </button>
             <button
               onClick={() => navigate("/app")}
-              className="px-4 py-1.5 rounded-lg text-sm font-medium bg-[#3d8a7c] hover:bg-[#327368] text-white transition-colors"
+              className="px-4 py-1.5 rounded-lg text-sm font-medium bg-[#0d9488] hover:bg-[#0f766e] text-white transition-colors"
             >
-              Start planning
+              Start drawing
             </button>
           </div>
         </div>
@@ -611,7 +611,7 @@ export default function GetEmbed() {
                   placeholder="Ben Johnson"
                   value={form.contactName}
                   onChange={(e) => setField("contactName", e.target.value)}
-                  className={`w-full px-3 py-2 rounded-lg border text-sm outline-none focus:ring-2 focus:ring-[#3d8a7c]/40 transition ${inputBg}`}
+                  className={`w-full px-3 py-2 rounded-lg border text-sm outline-none focus:ring-2 focus:ring-[#0d9488]/40 transition ${inputBg}`}
                 />
                 {errors.contactName && (
                   <p className="text-red-500 text-xs mt-1">{errors.contactName}</p>
@@ -628,7 +628,7 @@ export default function GetEmbed() {
                   placeholder="Johnson Kitchens"
                   value={form.businessName}
                   onChange={(e) => setField("businessName", e.target.value)}
-                  className={`w-full px-3 py-2 rounded-lg border text-sm outline-none focus:ring-2 focus:ring-[#3d8a7c]/40 transition ${inputBg}`}
+                  className={`w-full px-3 py-2 rounded-lg border text-sm outline-none focus:ring-2 focus:ring-[#0d9488]/40 transition ${inputBg}`}
                 />
                 {errors.businessName && (
                   <p className="text-red-500 text-xs mt-1">{errors.businessName}</p>
@@ -645,7 +645,7 @@ export default function GetEmbed() {
                   placeholder="hello@johnsonkitchens.co.uk"
                   value={form.email}
                   onChange={(e) => setField("email", e.target.value)}
-                  className={`w-full px-3 py-2 rounded-lg border text-sm outline-none focus:ring-2 focus:ring-[#3d8a7c]/40 transition ${inputBg}`}
+                  className={`w-full px-3 py-2 rounded-lg border text-sm outline-none focus:ring-2 focus:ring-[#0d9488]/40 transition ${inputBg}`}
                 />
                 {errors.email && (
                   <p className="text-red-500 text-xs mt-1">{errors.email}</p>
@@ -665,7 +665,7 @@ export default function GetEmbed() {
                   placeholder="yoursite.com"
                   value={form.websiteUrl}
                   onChange={(e) => setField("websiteUrl", e.target.value)}
-                  className={`w-full px-3 py-2 rounded-lg border text-sm outline-none focus:ring-2 focus:ring-[#3d8a7c]/40 transition ${inputBg}`}
+                  className={`w-full px-3 py-2 rounded-lg border text-sm outline-none focus:ring-2 focus:ring-[#0d9488]/40 transition ${inputBg}`}
                 />
                 {errors.websiteUrl && (
                   <p className="text-red-500 text-xs mt-1">{errors.websiteUrl}</p>
@@ -681,7 +681,7 @@ export default function GetEmbed() {
                     value={form.brandColor}
                     onChange={(e) => setField("brandColor", e.target.value)}
                     className="w-10 h-10 rounded-lg border cursor-pointer p-0.5"
-                    style={{ backgroundColor: isDark ? "#2e2e2a" : "#fff" }}
+                    style={{ backgroundColor: isDark ? "#1e293b" : "#fff" }}
                   />
                   <div
                     className="w-10 h-10 rounded-lg border"
@@ -705,8 +705,8 @@ export default function GetEmbed() {
                       onClick={() => setField("units", unit)}
                       className={`px-4 py-2 text-sm font-medium transition-colors ${
                         form.units === unit
-                          ? "bg-[#3d8a7c] text-white"
-                          : `${isDark ? "hover:bg-[#2e2e2a] text-[#a09a8c]" : "hover:bg-[#f0ede6] text-[#6b6457]"}`
+                          ? "bg-[#0d9488] text-white"
+                          : `${isDark ? "hover:bg-[#1e293b] text-[#94a3b8]" : "hover:bg-[#f1f5f9] text-[#64748b]"}`
                       }`}
                     >
                       {unit === "m" ? "Metres" : "Feet"}
@@ -771,16 +771,16 @@ export default function GetEmbed() {
                       onClick={() => setField("embedType", opt.value)}
                       className={`text-center p-4 rounded-lg border transition-colors ${
                         form.embedType === opt.value
-                          ? `border-[#3d8a7c] ${isDark ? "bg-[#1a332e]" : "bg-[#e8f4f1]"}`
-                          : `${border} ${isDark ? "hover:bg-[#2e2e2a]" : "hover:bg-[#f5f3ee]"}`
+                          ? `border-[#0d9488] ${isDark ? "bg-[#1a332e]" : "bg-[#e6fffa]"}`
+                          : `${border} ${isDark ? "hover:bg-[#1e293b]" : "hover:bg-[#f5f3ee]"}`
                       }`}
                     >
-                      <div className={form.embedType === opt.value ? "text-[#3d8a7c]" : muted}>
+                      <div className={form.embedType === opt.value ? "text-[#0d9488]" : muted}>
                         {opt.icon}
                       </div>
                       <span className="text-sm font-semibold block">{opt.title}</span>
                       <p className={`text-xs mt-0.5 ${muted}`}>{opt.desc}</p>
-                      <p className={`text-[11px] mt-1.5 font-medium ${form.embedType === opt.value ? "text-[#3d8a7c]" : muted}`}>
+                      <p className={`text-[11px] mt-1.5 font-medium ${form.embedType === opt.value ? "text-[#0d9488]" : muted}`}>
                         Best for: {opt.bestFor}
                       </p>
                     </button>
@@ -790,7 +790,7 @@ export default function GetEmbed() {
 
               {/* Instructions — contextual per embed type */}
               <div className={`mb-6 rounded-lg border p-4 ${border} ${isDark ? "bg-[#1e1e1c]" : "bg-[#f9f7f3]"}`}>
-                <p className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: "#3d8a7c" }}>
+                <p className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: "#0d9488" }}>
                   Instructions
                 </p>
                 <ol className={`space-y-2 text-sm ${muted} list-decimal list-inside`}>
@@ -805,7 +805,7 @@ export default function GetEmbed() {
                   {form.embedType === "homepage" && (
                     <>
                       <li>Paste the embed code <span className={`font-semibold ${text}`}>wherever you want the planner card</span> to appear on your page</li>
-                      <li>It loads as a compact card with a <span className={`font-semibold ${text}`}>"Start planning"</span> button — no iframe until clicked</li>
+                      <li>It loads as a compact card with a <span className={`font-semibold ${text}`}>"Start drawing"</span> button — no iframe until clicked</li>
                       <li>When a visitor clicks, the card <span className={`font-semibold ${text}`}>expands inline</span> to reveal the full planner</li>
                       <li>Works alongside your existing content — <span className={`font-semibold ${text}`}>no extra pages needed</span></li>
                     </>
@@ -859,7 +859,7 @@ export default function GetEmbed() {
                     placeholder="/room-planner"
                     value={form.plannerPageUrl}
                     onChange={(e) => setField("plannerPageUrl", e.target.value)}
-                    className={`w-full px-3 py-2 rounded-lg border text-sm outline-none focus:ring-2 focus:ring-[#3d8a7c]/40 transition ${inputBg}`}
+                    className={`w-full px-3 py-2 rounded-lg border text-sm outline-none focus:ring-2 focus:ring-[#0d9488]/40 transition ${inputBg}`}
                   />
                   {errors.plannerPageUrl && (
                     <p className="text-red-500 text-xs mt-1">{errors.plannerPageUrl}</p>
@@ -879,7 +879,7 @@ export default function GetEmbed() {
               <button
                 type="submit"
                 disabled={submitting}
-                className="w-full py-3 rounded-xl text-base font-semibold bg-[#3d8a7c] hover:bg-[#327368] text-white transition-colors shadow-sm disabled:opacity-60"
+                className="w-full py-3 rounded-xl text-base font-semibold bg-[#0d9488] hover:bg-[#0f766e] text-white transition-colors shadow-sm disabled:opacity-60"
               >
                 {submitting ? "Generating..." : "Get my free embed code \u2192"}
               </button>
@@ -895,12 +895,12 @@ export default function GetEmbed() {
           <section className="py-10 max-w-3xl mx-auto">
             {/* Confirmation banner */}
             <div
-              className={`rounded-xl px-5 py-4 mb-6 ${isDark ? "bg-[#1a332e] border border-[#2a4a42]" : "bg-[#e8f4f1] border border-[#c0ddd5]"}`}
+              className={`rounded-xl px-5 py-4 mb-6 ${isDark ? "bg-[#1a332e] border border-[#2a4a42]" : "bg-[#e6fffa] border border-[#c0ddd5]"}`}
             >
               <p className={`font-semibold ${teal}`}>
                 Your embed is ready, {resultName}. Partner ID:{" "}
                 <code
-                  className={`text-sm font-mono px-1.5 py-0.5 rounded ${isDark ? "bg-[#2e2e2a]" : "bg-[#d4ece5]"}`}
+                  className={`text-sm font-mono px-1.5 py-0.5 rounded ${isDark ? "bg-[#1e293b]" : "bg-[#d4ece5]"}`}
                 >
                   {partnerId}
                 </code>
@@ -931,7 +931,7 @@ export default function GetEmbed() {
                   <div className="flex items-center gap-2.5 mb-3">
                     <span
                       className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white"
-                      style={{ backgroundColor: "#3d8a7c" }}
+                      style={{ backgroundColor: "#0d9488" }}
                     >
                       1
                     </span>
@@ -941,15 +941,15 @@ export default function GetEmbed() {
                     Paste this banner on your homepage to link visitors to your planner page.
                   </p>
                   <div className="relative">
-                    <pre className="bg-[#1a1a18] text-[#e8e3d8] rounded-lg p-4 text-sm overflow-x-auto font-mono leading-relaxed">
+                    <pre className="bg-[#0f172a] text-[#e2e8f0] rounded-lg p-4 text-sm overflow-x-auto font-mono leading-relaxed">
                       <code>{buildHomepageLinkSnippet(form)}</code>
                     </pre>
                     <button
                       onClick={handleCopy}
                       className={`absolute top-2 right-2 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
                         copied
-                          ? "bg-[#3d8a7c] text-white"
-                          : "bg-[#2e2e2a] hover:bg-[#3e3e3a] text-[#a09a8c]"
+                          ? "bg-[#0d9488] text-white"
+                          : "bg-[#1e293b] hover:bg-[#3e3e3a] text-[#94a3b8]"
                       }`}
                     >
                       {copied ? "Copied! \u2713" : "Copy code"}
@@ -962,7 +962,7 @@ export default function GetEmbed() {
                   <div className="flex items-center gap-2.5 mb-3">
                     <span
                       className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white"
-                      style={{ backgroundColor: "#3d8a7c" }}
+                      style={{ backgroundColor: "#0d9488" }}
                     >
                       2
                     </span>
@@ -970,21 +970,21 @@ export default function GetEmbed() {
                   </div>
                   <p className={`text-sm mb-4 ${muted}`}>
                     Paste this on the dedicated page your banner links to (e.g.{" "}
-                    <code className={`text-xs font-mono px-1 py-0.5 rounded ${isDark ? "bg-[#2e2e2a]" : "bg-[#f0ede6]"}`}>
+                    <code className={`text-xs font-mono px-1 py-0.5 rounded ${isDark ? "bg-[#1e293b]" : "bg-[#f1f5f9]"}`}>
                       {form.plannerPageUrl.trim() || "/room-planner"}
                     </code>
                     ).
                   </p>
                   <div className="relative">
-                    <pre className="bg-[#1a1a18] text-[#e8e3d8] rounded-lg p-4 text-sm overflow-x-auto font-mono leading-relaxed">
+                    <pre className="bg-[#0f172a] text-[#e2e8f0] rounded-lg p-4 text-sm overflow-x-auto font-mono leading-relaxed">
                       <code>{buildFullPageSnippetForLink(partnerId, form)}</code>
                     </pre>
                     <button
                       onClick={handleCopyPlanner}
                       className={`absolute top-2 right-2 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
                         copiedPlanner
-                          ? "bg-[#3d8a7c] text-white"
-                          : "bg-[#2e2e2a] hover:bg-[#3e3e3a] text-[#a09a8c]"
+                          ? "bg-[#0d9488] text-white"
+                          : "bg-[#1e293b] hover:bg-[#3e3e3a] text-[#94a3b8]"
                       }`}
                     >
                       {copiedPlanner ? "Copied! \u2713" : "Copy code"}
@@ -998,7 +998,7 @@ export default function GetEmbed() {
                 <div className="flex items-center gap-2.5 mb-3">
                   <span
                     className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white"
-                    style={{ backgroundColor: "#3d8a7c" }}
+                    style={{ backgroundColor: "#0d9488" }}
                   >
                     1
                   </span>
@@ -1009,15 +1009,15 @@ export default function GetEmbed() {
                 </p>
 
                 <div className="relative">
-                  <pre className="bg-[#1a1a18] text-[#e8e3d8] rounded-lg p-4 text-sm overflow-x-auto font-mono leading-relaxed">
+                  <pre className="bg-[#0f172a] text-[#e2e8f0] rounded-lg p-4 text-sm overflow-x-auto font-mono leading-relaxed">
                     <code>{buildSnippet(partnerId, form)}</code>
                   </pre>
                   <button
                     onClick={handleCopy}
                     className={`absolute top-2 right-2 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
                       copied
-                        ? "bg-[#3d8a7c] text-white"
-                        : "bg-[#2e2e2a] hover:bg-[#3e3e3a] text-[#a09a8c]"
+                        ? "bg-[#0d9488] text-white"
+                        : "bg-[#1e293b] hover:bg-[#3e3e3a] text-[#94a3b8]"
                     }`}
                   >
                     {copied ? "Copied! \u2713" : "Copy code"}
@@ -1032,7 +1032,7 @@ export default function GetEmbed() {
               <div className="flex items-center gap-2.5 mb-3">
                 <span
                   className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white"
-                  style={{ backgroundColor: "#3d8a7c" }}
+                  style={{ backgroundColor: "#0d9488" }}
                 >
                   {form.embedType === "homepage-link" ? 3 : 2}
                 </span>
@@ -1040,7 +1040,7 @@ export default function GetEmbed() {
               </div>
 
               {/* Platform tabs */}
-              <div className={`flex gap-1 mb-4 rounded-lg p-1 ${isDark ? "bg-[#2e2e2a]" : "bg-[#f0ede6]"}`}>
+              <div className={`flex gap-1 mb-4 rounded-lg p-1 ${isDark ? "bg-[#1e293b]" : "bg-[#f1f5f9]"}`}>
                 {(["wordpress", "squarespace", "wix", "html"] as const).map((tab) => (
                   <button
                     key={tab}
@@ -1102,7 +1102,7 @@ export default function GetEmbed() {
               <div className="flex items-center gap-2.5 mb-3">
                 <span
                   className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white"
-                  style={{ backgroundColor: "#3d8a7c" }}
+                  style={{ backgroundColor: "#0d9488" }}
                 >
                   {form.embedType === "homepage-link" ? 4 : 3}
                 </span>
@@ -1121,7 +1121,7 @@ export default function GetEmbed() {
                 <button
                   onClick={() => setShowPreview((v) => !v)}
                   className={`text-sm font-medium px-3 py-1 rounded-lg transition-colors ${
-                    isDark ? "hover:bg-[#2e2e2a]" : "hover:bg-[#f0ede6]"
+                    isDark ? "hover:bg-[#1e293b]" : "hover:bg-[#f1f5f9]"
                   } ${teal}`}
                 >
                   {showPreview ? "Hide preview" : "Show preview"}
@@ -1148,7 +1148,7 @@ export default function GetEmbed() {
                     >
                       {!previewLoaded && (
                         <div className="absolute inset-0 flex items-center justify-center">
-                          <div className="w-8 h-8 border-2 border-[#3d8a7c] border-t-transparent rounded-full animate-spin" />
+                          <div className="w-8 h-8 border-2 border-[#0d9488] border-t-transparent rounded-full animate-spin" />
                         </div>
                       )}
                       <iframe

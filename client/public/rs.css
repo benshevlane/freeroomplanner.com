@@ -1,4 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
 /* Free Room Planner — shared styles for all static SEO pages */
 
 :root {
@@ -73,7 +72,7 @@
 html { scroll-behavior: smooth; font-size: 16px; }
 
 body {
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: 'General Sans', 'DM Sans', system-ui, -apple-system, sans-serif;
   background: var(--bg);
   color: var(--fg);
   line-height: 1.6;
@@ -470,5 +469,5 @@ article .prose.fade-in { opacity: 1; transform: none; }
 .items-center { align-items: center; }
 .flex-wrap { flex-wrap: wrap; }
 
-/* New design typography */
-h1,h2,h3,h4,.hero__title,.card h3,.step__title{font-family:'Space Grotesk','Inter',system-ui,sans-serif;letter-spacing:-0.02em;}
+/* Headings keep General Sans; tighter tracking for the refreshed look */
+h1,h2,h3,h4,.hero__title,.card h3,.step__title{letter-spacing:-0.02em;}

@@ -202,7 +202,7 @@ export default function Landing() {
               onClick={goToApp}
               className="px-4 py-1.5 rounded-lg text-sm font-medium bg-[#3d8a7c] hover:bg-[#327368] text-white transition-colors"
             >
-              Start planning
+              Start drawing
             </button>
           </div>
         </div>
@@ -225,7 +225,7 @@ export default function Landing() {
               onClick={goToApp}
               className="px-7 py-3 rounded-xl text-base font-semibold bg-[#3d8a7c] hover:bg-[#327368] text-white transition-colors shadow-sm"
             >
-              Start planning — no sign-up needed
+              Start drawing — no sign-up needed
             </button>
             <a
               href="#how-it-works"
@@ -540,7 +540,7 @@ export default function Landing() {
             onClick={goToApp}
             className="px-8 py-3.5 rounded-xl text-base font-semibold bg-[#3d8a7c] hover:bg-[#327368] text-white transition-colors shadow-md"
           >
-            Start planning — no sign-up needed
+            Start drawing — no sign-up needed
           </button>
         </div>
       </section>
