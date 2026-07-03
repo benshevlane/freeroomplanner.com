@@ -123,19 +123,22 @@ export default function EditorCore({
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [showRatingPrompt, setShowRatingPrompt] = useState(false);
 
-  // Ask "are you enjoying it?" once, after the user's second save/export —
-  // engaged enough to have an opinion, and never more than once per browser.
-  const maybeShowRatingPrompt = useCallback(() => {
+  // Ask "are you enjoying it?" once per browser, about two minutes into use —
+  // long enough to have formed an opinion, never in an embed, and never tied
+  // to saving (so it can't stack with the share/affiliate window).
+  useEffect(() => {
     try {
       if (window.location.pathname.startsWith("/embed")) return;
       if (safeGetItem("freeroomplanner-rating-prompted")) return;
-      const count = parseInt(safeGetItem("freeroomplanner-save-count") || "0", 10) + 1;
-      safeSetItem("freeroomplanner-save-count", String(count));
-      if (count >= 2) {
+    } catch { return; }
+    const timer = setTimeout(() => {
+      try {
+        if (safeGetItem("freeroomplanner-rating-prompted")) return;
         safeSetItem("freeroomplanner-rating-prompted", new Date().toISOString());
-        setTimeout(() => setShowRatingPrompt(true), 1200);
-      }
-    } catch { /* prompting must never break saving */ }
+      } catch { /* prompting must never break the app */ }
+      setShowRatingPrompt(true);
+    }, 120000);
+    return () => clearTimeout(timer);
   }, []);
   const [currentPlanCode, setCurrentPlanCode] = useState<string | null>(initialShareCode);
 
@@ -147,7 +150,6 @@ export default function EditorCore({
   const handlePlanSaved = useCallback(
     (result: SharedPlanResult) => {
       setCurrentPlanCode(result.code);
-      maybeShowRatingPrompt();
       if (updateUrlOnSave) {
         try {
           window.history.replaceState(null, "", `/p/${result.code}`);
@@ -156,7 +158,7 @@ export default function EditorCore({
         }
       }
     },
-    [updateUrlOnSave, maybeShowRatingPrompt]
+    [updateUrlOnSave]
   );
   const [furniturePanelOpen, setFurniturePanelOpen] = useState(false);
   const [propertiesPanelOpen, setPropertiesPanelOpen] = useState(false);
@@ -560,7 +562,6 @@ export default function EditorCore({
         a.click();
         URL.revokeObjectURL(url);
         showToast("Plan saved as PNG image");
-        maybeShowRatingPrompt();
         try {
           const intent = safeGetItem("freeroomplanner-intent");
           const planType = intent ? JSON.parse(intent)?.intent ?? "room" : "room";
@@ -575,7 +576,7 @@ export default function EditorCore({
     } catch {
       showToast("Failed to save image");
     }
-  }, [state, measureMode, showToast, onExport, editor, maybeShowRatingPrompt]);
+  }, [state, measureMode, showToast, onExport, editor]);
 
   const handleSaveJSON = useCallback(() => {
     try {
