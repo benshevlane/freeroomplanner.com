@@ -1595,8 +1595,9 @@ export default function FloorPlanCanvas({
         const pxPerCm = (state.gridSize * state.zoom) / 100;
         const worldX = (pos.x - dragItemOffset.x - state.panOffset.x) / pxPerCm;
         const worldY = (pos.y - dragItemOffset.y - state.panOffset.y) / pxPerCm;
-        const snappedX = Math.round(worldX);
-        const snappedY = Math.round(worldY);
+        // 1 mm precision so half-centimetre units (e.g. 59.5 cm) can tile flush.
+        const snappedX = Math.round(worldX * 10) / 10;
+        const snappedY = Math.round(worldY * 10) / 10;
 
         // Check if it's furniture or label
         const furn = state.furniture.find((f) => f.id === state.selectedItemId);
@@ -2279,7 +2280,7 @@ export default function FloorPlanCanvas({
         let template: FurnitureTemplate = JSON.parse(data);
         const pos = getCanvasPosMouse(e);
         const world = screenToWorld(pos.x, pos.y, state.gridSize, state.zoom, state.panOffset);
-        const gridSnapped = snapToGrid(world, 10);
+        const gridSnapped = snapToGrid(world, 0.1); // 1 mm grid (was 10 cm) so pieces tile flush
         // Try to snap to walls on drop (all items, not just openings)
         const tempItem: FurnitureItem = {
           id: "", type: template.type, label: template.label,
