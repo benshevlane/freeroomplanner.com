@@ -31,11 +31,27 @@ interface PropertiesPanelProps {
 /** Return the step increment for number inputs: 1cm worth in the active unit */
 function stepForUnit(units: UnitSystem): number {
   switch (units) {
-    case "m": return 0.01;
-    case "cm": return 1;
-    case "mm": return 10;
-    case "ft": return 0.394;
+    case "m": return 0.001;   // 1 mm
+    case "cm": return 0.1;    // 1 mm
+    case "mm": return 1;      // 1 mm
+    case "ft": return 0.0394; // ~1 mm in inches
   }
+}
+
+/** Round a cm value for display in the active unit, keeping 1 mm precision. */
+function displayForUnit(cm: number, units: UnitSystem): number {
+  const d = cmToDisplay(cm, units);
+  switch (units) {
+    case "m": return Math.round(d * 1000) / 1000;
+    case "cm": return Math.round(d * 10) / 10;
+    case "mm": return Math.round(d);
+    case "ft": return Math.round(d * 100) / 100;
+  }
+}
+
+/** Snap a cm value to the nearest millimetre to avoid floating-point noise. */
+function snapToMm(cm: number): number {
+  return Math.round(cm * 10) / 10;
 }
 
 /** Format a cm value for display in the selected units */
@@ -293,16 +309,16 @@ export default function PropertiesPanel({
               type="number"
               step={stepForUnit(units)}
               min={cmToDisplay(minWidth, units)}
-              value={widthFocused ? widthLocal : Math.round(cmToDisplay(selectedFurniture.width, units) * 100) / 100}
+              value={widthFocused ? widthLocal : displayForUnit(selectedFurniture.width, units)}
               onFocus={() => {
-                setWidthLocal(String(Math.round(cmToDisplay(selectedFurniture.width, units) * 100) / 100));
+                setWidthLocal(String(displayForUnit(selectedFurniture.width, units)));
                 setWidthFocused(true);
               }}
               onChange={(e) => {
                 setWidthLocal(e.target.value);
                 const parsed = parseFloat(e.target.value);
                 if (!isNaN(parsed) && parsed > 0) {
-                  const newCm = Math.max(minWidth, displayToCm(parsed, units));
+                  const newCm = snapToMm(Math.max(minWidth, displayToCm(parsed, units)));
                   const delta = newCm - selectedFurniture.width;
                   onUpdateFurniture(selectedFurniture.id, {
                     width: newCm,
@@ -314,7 +330,7 @@ export default function PropertiesPanel({
                 setWidthFocused(false);
                 const parsed = parseFloat(widthLocal);
                 if (!isNaN(parsed) && parsed > 0) {
-                  const newCm = Math.max(minWidth, displayToCm(parsed, units));
+                  const newCm = snapToMm(Math.max(minWidth, displayToCm(parsed, units)));
                   const delta = newCm - selectedFurniture.width;
                   onUpdateFurniture(selectedFurniture.id, {
                     width: newCm,
@@ -336,16 +352,16 @@ export default function PropertiesPanel({
               type="number"
               step={stepForUnit(units)}
               min={cmToDisplay(minHeight, units)}
-              value={heightFocused ? heightLocal : Math.round(cmToDisplay(selectedFurniture.height, units) * 100) / 100}
+              value={heightFocused ? heightLocal : displayForUnit(selectedFurniture.height, units)}
               onFocus={() => {
-                setHeightLocal(String(Math.round(cmToDisplay(selectedFurniture.height, units) * 100) / 100));
+                setHeightLocal(String(displayForUnit(selectedFurniture.height, units)));
                 setHeightFocused(true);
               }}
               onChange={(e) => {
                 setHeightLocal(e.target.value);
                 const parsed = parseFloat(e.target.value);
                 if (!isNaN(parsed) && parsed > 0) {
-                  const newCm = Math.max(minHeight, displayToCm(parsed, units));
+                  const newCm = snapToMm(Math.max(minHeight, displayToCm(parsed, units)));
                   const delta = newCm - selectedFurniture.height;
                   onUpdateFurniture(selectedFurniture.id, {
                     height: newCm,
@@ -357,7 +373,7 @@ export default function PropertiesPanel({
                 setHeightFocused(false);
                 const parsed = parseFloat(heightLocal);
                 if (!isNaN(parsed) && parsed > 0) {
-                  const newCm = Math.max(minHeight, displayToCm(parsed, units));
+                  const newCm = snapToMm(Math.max(minHeight, displayToCm(parsed, units)));
                   const delta = newCm - selectedFurniture.height;
                   onUpdateFurniture(selectedFurniture.id, {
                     height: newCm,
