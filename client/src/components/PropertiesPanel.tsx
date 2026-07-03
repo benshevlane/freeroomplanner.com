@@ -554,6 +554,18 @@ export default function PropertiesPanel({
           )}
         </div>
 
+        {/* Line spacing */}
+        <div className="space-y-1.5">
+          <p className="text-xs text-muted-foreground">Line spacing: {(tb.lineHeight ?? 1.3).toFixed(1)}×</p>
+          <Slider
+            value={[tb.lineHeight ?? 1.3]}
+            min={1}
+            max={2.5}
+            step={0.1}
+            onValueChange={([v]) => onUpdateTextBox(tb.id, { lineHeight: v })}
+          />
+        </div>
+
         {/* Corner Radius */}
         <div className="space-y-1.5">
           <p className="text-xs text-muted-foreground">Corner Radius: {tb.cornerRadius}px</p>

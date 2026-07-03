@@ -8679,7 +8679,7 @@ export function drawTextBoxes(
         ctx.textBaseline = "top";
 
         const maxWidth = w - padding * 2;
-        const lineHeight = fontSize * 1.4;
+        const lineHeight = fontSize * (tb.lineHeight ?? 1.3);
         let cursorY = y + padding;
         const bottomLimit = y + h - padding;
 

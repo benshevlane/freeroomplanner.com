@@ -190,7 +190,7 @@ export default function RichTextBox({
     boxSizing: "border-box",
     wordWrap: "break-word",
     overflowWrap: "break-word",
-    lineHeight: 1.5,
+    lineHeight: textBox.lineHeight ?? 1.3,
     zIndex: textBox.zIndex + (isEditMode ? 100 : isSelected ? 50 : 0),
     userSelect: isEditMode ? "text" : "none",
     ...(textBox.borderEnabled

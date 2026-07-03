@@ -79,6 +79,7 @@ export interface TextBox {
   // Text defaults
   fontSize: number; // px
   fontFamily: string;
+  lineHeight?: number; // line-height multiplier (defaults 1.3)
   zIndex: number;
 }
 
@@ -127,6 +128,7 @@ export const DEFAULT_TEXT_BOX: Omit<TextBox, "id" | "x" | "y"> = {
   shadowOffsetY: 2,
   fontSize: 14,
   fontFamily: "sans-serif",
+  lineHeight: 1.3,
   zIndex: 0,
 };
 
