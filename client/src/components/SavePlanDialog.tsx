@@ -147,7 +147,7 @@ export default function SavePlanDialog({
             <DialogHeader>
               <DialogTitle className="text-center">Saving your plan…</DialogTitle>
               <DialogDescription className="text-center">
-                Creating your shareable link
+                Downloading your plan and creating a shareable link…
               </DialogDescription>
             </DialogHeader>
           </div>
