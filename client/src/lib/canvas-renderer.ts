@@ -6430,7 +6430,7 @@ export function drawEditingDimension(
   const h = item.height * pxPerCm;
   const color = isDark ? "#4f98a3" : "#0f766e";
   const off = 14;
-  const fs = Math.max(11, 12 * zoom);
+  const fs = Math.max(11, Math.min(14, 12 * zoom));
 
   let midX = 0, midY = 0, valueCm = item.width;
   ctx.save();
@@ -6463,7 +6463,13 @@ export function drawEditingDimension(
   const cos = Math.cos(rad), sin = Math.sin(rad);
   const sx = cx + midX * cos - midY * sin;
   const sy = cy + midX * sin + midY * cos;
-  const text = formatLength(valueCm, units);
+  // Precise to the millimetre (formatLength rounds to 1 cm, which hides half-cm sizes).
+  const mm = Math.round(valueCm * 10);
+  const text =
+    units === "mm" ? `${mm}mm`
+    : units === "cm" ? `${mm / 10}cm`
+    : units === "ft" ? formatLength(valueCm, units)
+    : `${parseFloat((mm / 1000).toFixed(3))}m`;
   ctx.font = `600 ${fs}px 'General Sans', 'DM Sans', sans-serif`;
   const tw = ctx.measureText(text).width;
   const pad = 4;
