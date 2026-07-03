@@ -62,36 +62,26 @@
     <link rel="preconnect" href="https://api.fontshare.com" crossorigin>
     <link rel="preload" as="style" href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap">
     <link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
-    <style>/* Anti-FOUC: hide SEO fallback until React mounts */
-    .seo-shell { visibility: hidden; position: absolute; }
-    /* Planner routes (/app, /p): show a clean, styled boot state until React
-       mounts, so opening the planner from a full page load never flashes the
-       marketing fallback text or a bare white screen. */
-    .frp-boot { display: none; }
-    html.frp-app-boot { background: #F9F8F6; }
-    html.frp-app-boot .seo-shell { display: none !important; }
-    html.frp-app-boot .frp-boot {
-      display: flex; position: fixed; inset: 0; z-index: 1;
-      align-items: center; justify-content: center; background: #F9F8F6;
-    }
-    html.frp-app-boot .frp-boot__spinner {
-      width: 34px; height: 34px; border-radius: 50%;
-      border: 3px solid rgba(0,0,0,.12); border-top-color: #3d8a7c;
-      animation: frp-spin .8s linear infinite;
-    }
-    @keyframes frp-spin { to { transform: rotate(360deg); } }
-    @media (prefers-color-scheme: dark) {
-      html.frp-app-boot, html.frp-app-boot .frp-boot { background: #1a1a18; }
-      html.frp-app-boot .frp-boot__spinner {
-        border-color: rgba(255,255,255,.15); border-top-color: #5ba89a;
-      }
-    }
-    </style>
     <script>
-      /* Flag planner routes before first paint so the boot state above applies
-         immediately and no marketing text flashes before the editor loads. */
+      /* Hide the SEO fallback shell and show a clean boot state BEFORE first
+         paint. The CSS is injected from JS on purpose: the bundler strips
+         inline <style> from index.html, which previously left the marketing
+         shell flashing on a cold /app load. This runs in <head> before <body>
+         parses, so the rules apply to the very first paint. */
       (function () {
         try {
+          var css =
+            ".seo-shell{visibility:hidden;position:absolute}"+
+            ".frp-boot{display:none}"+
+            "html.frp-app-boot{background:#F9F8F6}"+
+            "html.frp-app-boot .seo-shell{display:none!important}"+
+            "html.frp-app-boot .frp-boot{display:flex;position:fixed;inset:0;z-index:1;align-items:center;justify-content:center;background:#F9F8F6}"+
+            "html.frp-app-boot .frp-boot__spinner{width:34px;height:34px;border-radius:50%;border:3px solid rgba(0,0,0,.12);border-top-color:#3d8a7c;animation:frp-spin .8s linear infinite}"+
+            "@keyframes frp-spin{to{transform:rotate(360deg)}}"+
+            "@media (prefers-color-scheme:dark){html.frp-app-boot,html.frp-app-boot .frp-boot{background:#1a1a18}html.frp-app-boot .frp-boot__spinner{border-color:rgba(255,255,255,.15);border-top-color:#5ba89a}}";
+          var st = document.createElement('style');
+          st.textContent = css;
+          document.head.appendChild(st);
           if (/^\/(app|p)(\/|$)/.test(location.pathname)) {
             document.documentElement.classList.add('frp-app-boot');
           }
