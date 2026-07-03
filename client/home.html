@@ -112,7 +112,7 @@
 html.frp-anim-hold #top [style*="animation: frp"]{ animation-play-state: paused !important; }
 html.frp-anim-hold.frp-hero-shown #top [style*="animation: frp"]{ animation-play-state: running !important; }
 </style>
-<script>(function(){try{if(window.matchMedia&&window.matchMedia("(max-width:860px)").matches){document.documentElement.classList.add("frp-anim-hold");}}catch(e){}})();</script>
+<script>(function(){try{if("scrollRestoration" in history){history.scrollRestoration="manual";}if(window.matchMedia&&window.matchMedia("(max-width:860px)").matches){document.documentElement.classList.add("frp-anim-hold");}}catch(e){}})();</script>
 </head>
 <body>
 <header style="position: sticky; top: 0; z-index: 50; background: rgba(255,255,255,0.85); backdrop-filter: blur(12px); border-bottom: 1px solid #e2e8f0;">
@@ -516,6 +516,6 @@ html.frp-anim-hold.frp-hero-shown #top [style*="animation: frp"]{ animation-play
     <div style="border-top: 1px solid #1e293b;"><div style="max-width: 1240px; margin: 0 auto; padding: 20px 40px; font-size: 13px; color: #64748b;">© 2026 Free Room Planner. Free to use.</div></div>
   </footer>
 <script>function frpFaq(b){var a=b.parentElement.querySelector(".frp-faq-a"),i=b.querySelector(".frp-faq-i");var o=a.style.display==="block";a.style.display=o?"none":"block";if(i)i.textContent=o?"+":"−";}</script>
-<script>(function(){var de=document.documentElement;if(!de.classList.contains("frp-anim-hold"))return;function go(){de.classList.add("frp-hero-shown");}function init(){var hero=document.getElementById("top");if(!hero){go();return;}try{var io=new IntersectionObserver(function(es){for(var i=0;i<es.length;i++){if(es[i].isIntersecting){go();io.disconnect();break;}}},{threshold:0.2});io.observe(hero);}catch(e){go();}}if(document.readyState!=="loading")init();else document.addEventListener("DOMContentLoaded",init);})();</script>
+<script>(function(){function toTop(){try{window.scrollTo(0,0);}catch(e){}}toTop();window.addEventListener("pageshow",toTop);var de=document.documentElement;if(!de.classList.contains("frp-anim-hold"))return;var shown=false;function go(){if(shown)return;shown=true;de.classList.add("frp-hero-shown");}function init(){toTop();var hero=document.getElementById("top");if(!hero){go();return;}try{var io=new IntersectionObserver(function(es){for(var i=0;i<es.length;i++){if(es[i].isIntersecting){go();io.disconnect();break;}}},{threshold:0});io.observe(hero);}catch(e){go();return;}setTimeout(go,1500);}if(document.readyState!=="loading")init();else document.addEventListener("DOMContentLoaded",init);})();</script>
 </body>
 </html>
