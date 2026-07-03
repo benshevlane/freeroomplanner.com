@@ -173,7 +173,7 @@ export default function Landing() {
     <div className={`min-h-screen font-sans ${isDark ? "bg-[#1a1a18] text-[#f0ede6]" : "bg-[#faf8f4] text-[#1a1a18]"} transition-colors duration-300`}>
 
       {/* Nav */}
-      <header className={`sticky top-0 z-50 border-b ${isDark ? "bg-[#1a1a18]/95 border-[#2e2e2a]" : "bg-[#faf8f4]/95 border-[#e8e3d8]"} backdrop-blur-sm`}>
+      <header className={`sticky top-0 z-50 border-b ${isDark ? "bg-[#1a1a18] border-[#2e2e2a]" : "bg-[#faf8f4] border-[#e8e3d8]"}`}>
         <div className="max-w-5xl mx-auto px-5 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <FreeRoomPlannerLogo size={24} className={isDark ? "text-[#5ba89a]" : "text-[#3d8a7c]"} />

@@ -534,11 +534,11 @@ export default function GetEmbed() {
     <div className={`min-h-screen font-sans ${bg} ${text} transition-colors duration-300`}>
       {/* Header */}
       <header
-        className={`sticky top-0 z-50 border-b ${isDark ? "bg-[#0f172a]/95 border-[#1e293b]" : "bg-[#f8fafc]/95 border-[#e2e8f0]"} backdrop-blur-sm`}
+        className={`sticky top-0 z-50 border-b ${isDark ? "bg-[#0f172a] border-[#1e293b]" : "bg-[#f8fafc] border-[#e2e8f0]"}`}
       >
         <div className="max-w-5xl mx-auto px-5 h-14 flex items-center justify-between">
           <button
-            onClick={() => navigate("/")}
+            onClick={() => { window.location.href = "/"; }}
             className="flex items-center gap-2.5"
           >
             <FreeRoomPlannerLogo size={24} className={teal} />
