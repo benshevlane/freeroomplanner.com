@@ -15,7 +15,7 @@ const features = [
       <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="3" x2="9" y2="9"/></svg>
     ),
     title: "Snap-to-grid",
-    desc: "Every wall snaps to a 10cm grid — so the dimensions you send to a supplier are actually accurate.",
+    desc: "Every wall snaps to a 1cm grid — so the dimensions you send to a supplier are actually accurate.",
   },
   {
     icon: (
@@ -55,7 +55,7 @@ const features = [
 ];
 
 const steps = [
-  { num: "1", title: "Draw your walls", desc: "Click to place points and connect them. Walls snap to a 10cm grid automatically." },
+  { num: "1", title: "Draw your walls", desc: "Click to place points and connect them. Walls snap to a 1cm grid automatically." },
   { num: "2", title: "Add furniture", desc: "Drag sofas, units, appliances, and doors from the library. Resize to your exact dimensions." },
   { num: "3", title: "Export and send", desc: "Download a clean PNG and send it to your fitter, supplier, or architect. They don't need an account." },
 ];
@@ -73,7 +73,7 @@ const faqs = [
   { q: "Do I need to give my email?", a: "No. Open the planner and start immediately. We don't ask for your email, your name, or anything else." },
   { q: "Does it work on mobile?", a: "Designed for desktop and tablet, where you have the space to work properly — though it runs on mobile too." },
   { q: "Can I save my plan?", a: "Yes — export it as a PNG to save locally or share directly with whoever needs it." },
-  { q: "Is it accurate enough to share with a professional?", a: "Yes. Everything snaps to a 10cm grid and measurements display in real time. Export as a PNG and send it directly — they don't need an account to view it." },
+  { q: "Is it accurate enough to share with a professional?", a: "Yes. Everything snaps to a 1cm grid and measurements display in real time. Export as a PNG and send it directly — they don't need an account to view it." },
   { q: "What units does it support?", a: "Metres, centimetres, millimetres, and feet." },
   { q: "Do I need to install anything?", a: "Nothing. It runs entirely in your browser — no app, no download, no plugin." },
   { q: "Can I add doors and windows?", a: "Yes. Doors and windows are in the furniture library — drag, drop, and resize to match your actual room." },
@@ -579,7 +579,7 @@ export default function Landing() {
           {"@type":"Question","name":"Is it really free?","acceptedAnswer":{"@type":"Answer","text":"Yes. No trial period, no credit card, no premium tier. Free means free."}},
           {"@type":"Question","name":"Do I need to give my email?","acceptedAnswer":{"@type":"Answer","text":"No. Open the planner and start immediately. We don't ask for your email, your name, or anything else."}},
           {"@type":"Question","name":"Does it work on mobile?","acceptedAnswer":{"@type":"Answer","text":"Designed for desktop and tablet, where you have the space to work properly — though it runs on mobile too."}},
-          {"@type":"Question","name":"Is it accurate enough to share with a professional?","acceptedAnswer":{"@type":"Answer","text":"Yes. Everything snaps to a 10cm grid and measurements display in real time. Export as a PNG and send it directly."}},
+          {"@type":"Question","name":"Is it accurate enough to share with a professional?","acceptedAnswer":{"@type":"Answer","text":"Yes. Everything snaps to a 1cm grid and measurements display in real time. Export as a PNG and send it directly."}},
           {"@type":"Question","name":"Do I need to install anything?","acceptedAnswer":{"@type":"Answer","text":"Nothing. It runs entirely in your browser — no app, no download, no plugin."}}
         ]
       }) }} />
