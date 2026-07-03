@@ -307,7 +307,9 @@ export default function PropertiesPanel({
             />
           </div>
         ) : (
-          <p className="text-sm font-semibold">{selectedFurniture.label}</p>
+          selectedFurniture.customName ? (
+            <p className="text-xs text-muted-foreground">{selectedFurniture.label}</p>
+          ) : null
         )}
         <div className="space-y-2 text-sm">
           <div className="flex items-center gap-2">
