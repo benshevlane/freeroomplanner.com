@@ -83,24 +83,18 @@ export default function RichTextBox({
     const savedW = parent.style.width;
     const savedMinH = parent.style.minHeight;
 
-    // Measure natural (unwrapped) content width
-    parent.style.width = 'max-content';
+    // Keep the user's box width fixed while typing and only grow/shrink the
+    // height to fit the content. (Re-measuring width per keystroke made boxes
+    // collapse into a one-word-per-line column.)
     parent.style.minHeight = '0px';
-    const naturalW = parent.offsetWidth;
-
-    // Set width to min(current, natural), then measure height at that width
-    const minW = 60 * pxPerCm; // minimum 60cm
-    const targetW = Math.min(screenW, Math.max(minW, naturalW));
-    parent.style.width = targetW + 'px';
     const naturalH = parent.scrollHeight;
 
     // Restore original styles before React re-renders
     parent.style.width = savedW;
     parent.style.minHeight = savedMinH;
 
-    const newWidthCm = Math.max(20, targetW / pxPerCm);
     const newHeightCm = Math.max(20, naturalH / pxPerCm);
-    onAutoFit(textBox.id, newWidthCm, newHeightCm);
+    onAutoFit(textBox.id, textBox.width, newHeightCm);
   }, [textBox.id, screenW, pxPerCm, onContentChange, onAutoFit]);
 
   const handlePointerDown = useCallback(

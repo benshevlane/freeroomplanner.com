@@ -10,6 +10,8 @@ import RoomGeneratorWizard from "../components/RoomGeneratorWizard";
 import { PerplexityAttribution } from "../components/PerplexityAttribution";
 import IntentCapture from "../components/IntentCapture";
 import { FurnitureItem } from "../lib/types";
+import { detectRooms } from "../lib/room-detection";
+import { getRoomKey } from "../lib/canvas-renderer";
 import { safeGetItem } from "../lib/safe-storage";
 import { fetchSharedPlan, intentToRoomType, type FetchedPlan } from "../lib/plan-share";
 import { safeSessionGetItem, safeSessionSetItem } from "../lib/safe-storage";
@@ -131,17 +133,27 @@ export default function Editor() {
   }, [sharedPlan]);
 
   const handleGenerateRoom = useCallback(
-    (plan: { walls: import("@/lib/types").Wall[]; furniture: FurnitureItem[] }) => {
+    (plan: { walls: import("@/lib/types").Wall[]; furniture: FurnitureItem[]; name?: string }) => {
       const editor = editorRef.current;
       if (!editor) return;
+      const name = (plan.name || "").trim() || editor.state.roomName;
+      // Use the wizard's room name for the in-plan label too.
+      let roomNames: Record<string, string> = {};
+      try {
+        const detected = detectRooms(plan.walls);
+        if (detected.length > 0) {
+          const largest = detected.reduce((a, b) => (b.area > a.area ? b : a));
+          roomNames = { [getRoomKey(largest)]: name };
+        }
+      } catch { /* label fallback is fine */ }
       editor.pushUndo();
       editor.importState({
         version: 1,
-        roomName: editor.state.roomName,
+        roomName: name,
         walls: plan.walls,
         furniture: plan.furniture,
         labels: [],
-        roomNames: {},
+        roomNames,
         componentLabelsVisible: true,
       });
       editor.setTool("select");

@@ -19,6 +19,7 @@ import {
   Redo2,
   ZoomIn,
   ZoomOut,
+  Maximize,
   RotateCw,
   Trash2,
   Trash,
@@ -44,6 +45,7 @@ interface EditorToolbarProps {
   canRedo: boolean;
   onZoomIn: () => void;
   onZoomOut: () => void;
+  onZoomFit: () => void;
   onRotateSelected: () => void;
   onDeleteSelected: () => void;
   hasSelection: boolean;
@@ -85,6 +87,7 @@ export default function EditorToolbar({
   canRedo,
   onZoomIn,
   onZoomOut,
+  onZoomFit,
   onRotateSelected,
   onDeleteSelected,
   hasSelection,
@@ -164,6 +167,9 @@ export default function EditorToolbar({
           </span>
           <Button size="icon" variant="ghost" className={btnClass} onClick={onZoomIn} data-testid="btn-zoom-in">
             <ZoomIn className="h-5 w-5" />
+          </Button>
+          <Button size="icon" variant="ghost" className={btnClass} onClick={onZoomFit} data-testid="btn-zoom-fit-mobile">
+            <Maximize className="h-5 w-5" />
           </Button>
 
           {hasSelection && (
@@ -339,6 +345,14 @@ export default function EditorToolbar({
             </Button>
           </TooltipTrigger>
           <TooltipContent><p>Zoom In</p></TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button size="icon" variant="ghost" onClick={onZoomFit} data-testid="btn-zoom-fit">
+              <Maximize className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent><p>Fit plan to view</p></TooltipContent>
         </Tooltip>
       </div>
 

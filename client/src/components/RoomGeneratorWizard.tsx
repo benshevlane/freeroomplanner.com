@@ -34,6 +34,7 @@ interface WallFeature {
 interface GeneratedPlan {
   walls: Wall[];
   furniture: FurnitureItem[];
+  name: string;
 }
 
 interface RoomGeneratorWizardProps {
@@ -78,9 +79,9 @@ export default function RoomGeneratorWizard({
       ...f,
       {
         id: genId(),
-        wall: "top",
-        type: "window",
-        widthCm: 100,
+        wall: "bottom",
+        type: "door",
+        widthCm: 90,
         position: "center",
         offsetCm: 0,
       },
@@ -108,6 +109,11 @@ export default function RoomGeneratorWizard({
     const wallThickness = DEFAULT_WALL_THICKNESS;
     const halfT = wallThickness / 2;
 
+    // Walls are stored as centre-lines. Widen the rectangle by one wall
+    // thickness so the INSIDE faces match the entered interior dimensions.
+    const spanW = wCm + wallThickness;
+    const spanD = dCm + wallThickness;
+
     // Origin: top-left outer corner of the room at (100, 100)
     // Walls are drawn center-to-center, so the outer boundary starts at origin
     // and the inner boundary is inset by half the wall thickness.
@@ -116,9 +122,9 @@ export default function RoomGeneratorWizard({
 
     // Corner points (wall center-line coordinates)
     const tl: Point = { x: ox, y: oy };
-    const tr: Point = { x: ox + wCm, y: oy };
-    const br: Point = { x: ox + wCm, y: oy + dCm };
-    const bl: Point = { x: ox, y: oy + dCm };
+    const tr: Point = { x: ox + spanW, y: oy };
+    const br: Point = { x: ox + spanW, y: oy + spanD };
+    const bl: Point = { x: ox, y: oy + spanD };
 
     // Create 4 walls forming a closed rectangle (clockwise)
     const walls: Wall[] = [
@@ -133,7 +139,7 @@ export default function RoomGeneratorWizard({
 
     for (const feat of features) {
       const isHorizontal = feat.wall === "top" || feat.wall === "bottom";
-      const wallLengthCm = isHorizontal ? wCm : dCm;
+      const wallLengthCm = isHorizontal ? spanW : spanD;
 
       // Calculate center position along the wall
       let alongOffset: number; // distance from start of wall to center of feature
@@ -159,7 +165,7 @@ export default function RoomGeneratorWizard({
         rotation = 0;
       } else if (feat.wall === "bottom") {
         fx = ox + alongOffset - feat.widthCm / 2;
-        fy = oy + dCm - featureDepth / 2;
+        fy = oy + spanD - featureDepth / 2;
         rotation = 0;
       } else if (feat.wall === "left") {
         // Rotated 90°: width and height swap
@@ -168,7 +174,7 @@ export default function RoomGeneratorWizard({
         rotation = 90;
       } else {
         // right wall
-        fx = ox + wCm - featureDepth / 2;
+        fx = ox + spanW - featureDepth / 2;
         fy = oy + alongOffset - feat.widthCm / 2;
         rotation = 90;
       }
@@ -189,9 +195,9 @@ export default function RoomGeneratorWizard({
       });
     }
 
-    onGenerate({ walls, furniture });
+    onGenerate({ walls, furniture, name: roomName.trim() || "Room" });
     handleClose();
-  }, [widthM, depthM, features, onGenerate]);
+  }, [widthM, depthM, features, roomName, onGenerate]);
 
   const handleClose = () => {
     setStep(0);

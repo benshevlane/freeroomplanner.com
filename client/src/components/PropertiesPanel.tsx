@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
-import { RotateCw, Trash2, Ruler, Copy, Bold, Square, FlipHorizontal, ArrowUp, ArrowDown, ArrowLeft, ArrowRight } from "lucide-react";
+import { RotateCw, Trash2, Ruler, Copy, Bold, Square, FlipHorizontal, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Pencil } from "lucide-react";
 
 interface PropertiesPanelProps {
   selectedWall: Wall | null;
@@ -193,10 +193,12 @@ export default function PropertiesPanel({
               />
             ) : (
               <span
-                className="font-medium cursor-pointer hover:border-b hover:border-teal-500/50 transition-colors"
+                className="font-medium cursor-pointer border-b border-dashed border-teal-500/60 hover:border-teal-500 transition-colors inline-flex items-center gap-1"
                 onClick={() => { setLengthInput((displayLengthCm / 100).toFixed(2)); setEditingLength(true); }}
+                title="Click to type an exact length"
               >
                 {formatDimension(displayLengthCm, units)}
+                <Pencil className="h-3 w-3 text-muted-foreground" />
               </span>
             )}
           </div>
@@ -215,10 +217,12 @@ export default function PropertiesPanel({
               />
             ) : (
               <span
-                className="font-medium cursor-pointer hover:border-b hover:border-teal-500/50 transition-colors"
+                className="font-medium cursor-pointer border-b border-dashed border-teal-500/60 hover:border-teal-500 transition-colors inline-flex items-center gap-1"
                 onClick={() => { setThicknessInput((selectedWall.thickness / 100).toFixed(2)); setEditingThickness(true); }}
+                title="Click to type an exact thickness"
               >
                 {formatDimension(selectedWall.thickness, units)}
+                <Pencil className="h-3 w-3 text-muted-foreground" />
               </span>
             )}
           </div>
@@ -257,7 +261,7 @@ export default function PropertiesPanel({
     const isStructural = selectedFurniture.type === "door" || selectedFurniture.type === "door_double" || selectedFurniture.type === "window" || selectedFurniture.type === "radiator";
     const isWallCup = isWallCupboard(selectedFurniture.type);
     const widthLabel = isStructural ? "Length:" : "Width:";
-    const heightLabel = isStructural ? "Thickness:" : "Height:";
+    const heightLabel = isStructural ? "Thickness:" : "Depth:";
     const minWidth = 2;
     const minHeight = 2;
 

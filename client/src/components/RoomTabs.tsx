@@ -207,17 +207,17 @@ export default function RoomTabs({
               </div>
             );
           })}
-        </div>
 
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-7 w-7 p-0 ml-1 shrink-0"
-          onClick={onAddRoom}
-          title="Add room"
-        >
-          <Plus className="h-4 w-4" />
-        </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 w-7 p-0 ml-1 shrink-0"
+            onClick={onAddRoom}
+            title="Add room"
+          >
+            <Plus className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
       {/* Delete confirmation dialog */}

@@ -84,6 +84,7 @@ interface FloorPlanCanvasProps {
   onRemoveLabel: (id: string) => void;
   onSetZoom: (zoom: number) => void;
   onSetPan: (offset: Point) => void;
+  fitRequestId?: number;
   onSetWallDrawing: (drawing: { start: Point } | null) => void;
   onAddLabel: (text: string, position: Point) => void;
   onUpdateLabel: (id: string, updates: Partial<RoomLabel>) => void;
@@ -123,6 +124,7 @@ export default function FloorPlanCanvas({
   onRemoveLabel,
   onSetZoom,
   onSetPan,
+  fitRequestId,
   onSetWallDrawing,
   onAddLabel,
   onUpdateLabel,
@@ -2248,12 +2250,55 @@ export default function FloorPlanCanvas({
     [state, getCanvasPosMouse, onDropFurniture]
   );
 
+  // --- Fit the viewport to the plan content ---
+  const fitViewToContent = useCallback(() => {
+    const container = containerRef.current;
+    if (!container || container.clientWidth < 50 || container.clientHeight < 50) return;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    const include = (x: number, y: number) => {
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    };
+    for (const w of state.walls) { include(w.start.x, w.start.y); include(w.end.x, w.end.y); }
+    for (const f of state.furniture) { include(f.x, f.y); include(f.x + f.width, f.y + f.height); }
+    for (const t of state.textBoxes) { include(t.x, t.y); include(t.x + t.width, t.y + t.height); }
+    for (const l of state.labels) { include(l.x - 50, l.y - 20); include(l.x + 50, l.y + 20); }
+    for (const a of state.arrows) { include(a.startX, a.startY); include(a.endX, a.endY); }
+    if (!isFinite(minX) || maxX - minX < 1 || maxY - minY < 1) return;
+    const margin = 100; // cm of breathing room around the plan
+    minX -= margin; minY -= margin; maxX += margin; maxY += margin;
+    const cw = container.clientWidth;
+    const ch = container.clientHeight;
+    const pxPerCmNeeded = Math.min(cw / (maxX - minX), ch / (maxY - minY));
+    const newZoom = Math.min(1.2, Math.max(0.2, (pxPerCmNeeded * 100) / state.gridSize));
+    const pxPerCm = (state.gridSize * newZoom) / 100;
+    const centerX = (minX + maxX) / 2;
+    const centerY = (minY + maxY) / 2;
+    onSetZoom(newZoom);
+    onSetPan({ x: cw / 2 - centerX * pxPerCm, y: ch / 2 - centerY * pxPerCm });
+  }, [state.walls, state.furniture, state.textBoxes, state.labels, state.arrows, state.gridSize, onSetZoom, onSetPan]);
+
+  const fitViewRef = useRef(fitViewToContent);
+  fitViewRef.current = fitViewToContent;
+
+  // Fit on first load and whenever the active room changes or a fit is requested,
+  // so saved plans are never hiding off-screen.
+  useEffect(() => {
+    const t = setTimeout(() => fitViewRef.current(), 60);
+    return () => clearTimeout(t);
+  }, [state.activeRoomId, fitRequestId]);
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      const ae = document.activeElement;
+      if (ae instanceof HTMLInputElement || ae instanceof HTMLTextAreaElement) return;
       // Skip shortcuts when editing a contenteditable text box (except Escape)
-      const isContentEditable = e.target instanceof HTMLElement && e.target.isContentEditable;
+      const isContentEditable = (e.target instanceof HTMLElement && e.target.isContentEditable) ||
+        (ae instanceof HTMLElement && ae.isContentEditable);
       if (isContentEditable && e.key !== "Escape") return;
 
       if (e.key === "Escape") {
@@ -2325,6 +2370,26 @@ export default function FloorPlanCanvas({
 
   const isEditingLabel = editingLabel.id !== null || editingLabel.isNew || editingLabel.isRoomLabel;
 
+  // Keep keyboard focus pinned to the label input while it is open so
+  // keystrokes can never fall through to canvas shortcuts.
+  useEffect(() => {
+    if (!isEditingLabel) return;
+    const t = setTimeout(() => {
+      const el = labelInputRef.current;
+      if (el && document.activeElement !== el) el.focus();
+    }, 0);
+    return () => clearTimeout(t);
+  }, [isEditingLabel]);
+
+  // Flag any inline text editing globally so other shortcut handlers
+  // (e.g. tool hotkeys in EditorCore) stand down while the user types.
+  useEffect(() => {
+    if (isEditingLabel || editingTextBoxId) {
+      document.body.dataset.frpTextEditing = "1";
+      return () => { delete document.body.dataset.frpTextEditing; };
+    }
+  }, [isEditingLabel, editingTextBoxId]);
+
   return (
     <div
       ref={containerRef}
@@ -2371,6 +2436,7 @@ export default function FloorPlanCanvas({
       {isEditingLabel && (
         <input
           ref={labelInputRef}
+          autoFocus
           type="text"
           value={editingLabel.text}
           onChange={(e) => setEditingLabel((prev) => ({ ...prev, text: e.target.value }))}

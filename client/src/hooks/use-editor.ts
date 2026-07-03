@@ -163,6 +163,10 @@ function roomHasContent(room: RoomData): boolean {
     room.labels.length > 0 || room.textBoxes.length > 0 || room.arrows.length > 0;
 }
 
+function hasRealText(t: TextBox): boolean {
+  return !!(t.content && t.content.replace(/<[^>]*>/g, "").trim());
+}
+
 function getInitialState(storageKey: string): EditorState {
   const saved = loadSavedState(storageKey);
   if (!saved) return makeDefaultState();
@@ -175,7 +179,8 @@ function getInitialState(storageKey: string): EditorState {
     furniture: normalizeFurniture(r.furniture ?? []),
     walls: normalizeWalls(r.walls ?? []),
     labels: r.labels ?? [],
-    textBoxes: r.textBoxes ?? [],
+    // Drop abandoned empty text boxes so they don't linger between sessions
+    textBoxes: (r.textBoxes ?? []).filter(hasRealText),
     arrows: r.arrows ?? [],
     roomNames: r.roomNames ?? {},
     roomLabelOffsets: r.roomLabelOffsets ?? {},
@@ -193,7 +198,7 @@ function getInitialState(storageKey: string): EditorState {
     walls: activeRoom?.walls ?? [],
     furniture: normalizeFurniture(activeRoom?.furniture ?? []),
     labels: activeRoom?.labels ?? [],
-    textBoxes: activeRoom?.textBoxes ?? [],
+    textBoxes: (activeRoom?.textBoxes ?? []).filter(hasRealText),
     arrows: activeRoom?.arrows ?? [],
     roomNames: activeRoom?.roomNames ?? {},
     roomLabelOffsets: activeRoom?.roomLabelOffsets ?? {},
@@ -897,20 +902,55 @@ export function useEditor(storageKey: string = DEFAULT_AUTOSAVE_KEY) {
     // Single-room v1 import
     if (plan.version && plan.walls && plan.furniture) {
       pushUndo();
-      setState((s) => ({
-        ...s,
-        roomName: plan.roomName || s.roomName,
-        walls: normalizeWalls(plan.walls),
-        furniture: normalizeFurniture(plan.furniture),
-        labels: plan.labels || [],
-        textBoxes: plan.textBoxes || [],
-        arrows: plan.arrows || [],
-        roomNames: plan.roomNames || {},
-        roomLabelOffsets: plan.roomLabelOffsets || {},
-        componentLabelsVisible: plan.componentLabelsVisible ?? true,
-        selectedItemId: null,
-        wallDrawing: null,
-      }));
+      setState((s) => {
+        const imported = {
+          roomName: plan.roomName || s.roomName,
+          walls: normalizeWalls(plan.walls),
+          furniture: normalizeFurniture(plan.furniture),
+          labels: plan.labels || [],
+          textBoxes: plan.textBoxes || [],
+          arrows: plan.arrows || [],
+          roomNames: plan.roomNames || {},
+          roomLabelOffsets: plan.roomLabelOffsets || {},
+          componentLabelsVisible: plan.componentLabelsVisible ?? true,
+        };
+        const activeHasContent =
+          s.walls.length > 0 || s.furniture.length > 0 || s.labels.length > 0 ||
+          s.textBoxes.length > 0 || s.arrows.length > 0;
+        if (activeHasContent) {
+          // Don't clobber the room being edited — load into a new tab instead.
+          const syncedRooms = syncActiveRoomToRooms(s);
+          const newRoom: RoomData = {
+            id: generateId(),
+            name: imported.roomName,
+            walls: imported.walls,
+            furniture: imported.furniture,
+            labels: imported.labels,
+            textBoxes: imported.textBoxes,
+            arrows: imported.arrows,
+            roomNames: imported.roomNames,
+            roomLabelOffsets: imported.roomLabelOffsets,
+            componentLabelsVisible: imported.componentLabelsVisible,
+          };
+          const baseOrder = s.roomOrder && s.roomOrder.length ? s.roomOrder : syncedRooms.map((r) => r.id);
+          return {
+            ...s,
+            rooms: [...syncedRooms, newRoom],
+            roomOrder: [...baseOrder, newRoom.id],
+            activeRoomId: newRoom.id,
+            ...imported,
+            selectedItemId: null,
+            wallDrawing: null,
+            selectedTool: "select" as EditorTool,
+          };
+        }
+        return {
+          ...s,
+          ...imported,
+          selectedItemId: null,
+          wallDrawing: null,
+        };
+      });
     }
   }, [pushUndo]);
 

@@ -4134,7 +4134,7 @@ export function drawRoomAreas(
     const cx = labelPos.x * pxPerCm + panOffset.x;
     const cy = labelPos.y * pxPerCm + panOffset.y;
     const roomName = roomNames[roomKey] || "Room";
-    const areaText = formatArea(room.area, units);
+    let areaText = formatArea(room.area, units);
     const isSelected = roomKey === selectedRoomKey;
 
     // Compute cavity dimensions text if in inside measure mode
@@ -4184,6 +4184,16 @@ export function drawRoomAreas(
           const cavityD = Math.max(0, maxY - minY);
           if (cavityW >= 5 && cavityD >= 5) {
             dimsText = `${formatLength(cavityW, units)} × ${formatLength(cavityD, units)}`;
+            // Keep the displayed area consistent with the inside dimensions
+            // (room.area is measured on wall centre-lines, which overstates it).
+            let signed2 = 0;
+            for (let i = 0; i < innerPoints.length; i++) {
+              const ip = innerPoints[i];
+              const iq = innerPoints[(i + 1) % innerPoints.length];
+              signed2 += ip.x * iq.y - iq.x * ip.y;
+            }
+            const innerAreaM2 = Math.abs(signed2) / 2 / 10000;
+            if (innerAreaM2 > 0.01) areaText = formatArea(innerAreaM2, units);
           }
         }
       }

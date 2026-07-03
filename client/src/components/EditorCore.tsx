@@ -117,6 +117,7 @@ export default function EditorCore({
   const [droppingFurniture, setDroppingFurniture] = useState<FurnitureTemplate | null>(null);
   const [autoEditTextBoxId, setAutoEditTextBoxId] = useState<string | null>(null);
   const [showClearDialog, setShowClearDialog] = useState(false);
+  const [fitRequestId, setFitRequestId] = useState(0);
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [currentPlanCode, setCurrentPlanCode] = useState<string | null>(initialShareCode);
 
@@ -246,6 +247,16 @@ export default function EditorCore({
   }, [selectedFurniture, selectedLabel, selectedTextBox, selectedArrow, editor]);
 
   const handleAddTextBox = useCallback(() => {
+    // If an empty text box is already on the canvas (e.g. from a repeated
+    // "t" press), re-use it instead of stacking new empty boxes.
+    const existingEmpty = state.textBoxes.find(
+      (t) => !(t.content && t.content.replace(/<[^>]*>/g, "").trim())
+    );
+    if (existingEmpty) {
+      editor.setSelectedItem(existingEmpty.id);
+      setAutoEditTextBoxId(existingEmpty.id);
+      return;
+    }
     const canvasEl = document.querySelector('[data-testid="floor-plan-canvas"]');
     const cx = canvasEl ? canvasEl.clientWidth / 2 : 400;
     const cy = canvasEl ? canvasEl.clientHeight / 2 : 300;
@@ -270,6 +281,13 @@ export default function EditorCore({
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       if (e.target instanceof HTMLElement && e.target.isContentEditable) return;
+      // Belt-and-braces: while any text field has focus, or an inline text
+      // editor (label / text box / tab rename) is open, never run tool
+      // shortcuts — otherwise typing can switch tools or spawn items.
+      const activeEl = document.activeElement;
+      if (activeEl instanceof HTMLInputElement || activeEl instanceof HTMLTextAreaElement) return;
+      if (activeEl instanceof HTMLElement && activeEl.isContentEditable) return;
+      if (document.body.dataset.frpTextEditing) return;
 
       if (e.key === "v" || e.key === "V") {
         if (!e.ctrlKey && !e.metaKey) editor.setTool("select");
@@ -577,17 +595,35 @@ export default function EditorCore({
         try {
           const plan = JSON.parse(ev.target?.result as string);
           // Multi-tab format: { version: 2, tabs: [...] }
-          if (plan.version === 2 && Array.isArray(plan.tabs)) {
+          if (plan && plan.version === 2 && Array.isArray(plan.tabs)) {
             editor.importState(plan);
             showToast(`Loaded ${plan.tabs.length} rooms`);
+            setFitRequestId((n) => n + 1);
             return;
           }
-          // Single-room v1 format
-          if (plan.version && plan.walls && plan.furniture) {
-            editor.importState(plan);
+          // Single-room plans — current and older exports. Accept anything
+          // with a walls/furniture array and default the missing fields.
+          if (plan && (Array.isArray(plan.walls) || Array.isArray(plan.furniture))) {
+            editor.importState({
+              version: plan.version ?? 1,
+              roomName: plan.roomName || plan.name || "Loaded Plan",
+              walls: Array.isArray(plan.walls) ? plan.walls : [],
+              furniture: Array.isArray(plan.furniture) ? plan.furniture : [],
+              labels: Array.isArray(plan.labels) ? plan.labels : [],
+              textBoxes: Array.isArray(plan.textBoxes) ? plan.textBoxes : [],
+              arrows: Array.isArray(plan.arrows) ? plan.arrows : [],
+              roomNames: plan.roomNames || {},
+              roomLabelOffsets: plan.roomLabelOffsets || {},
+              componentLabelsVisible: plan.componentLabelsVisible ?? true,
+            });
             showToast("Plan loaded");
+            setFitRequestId((n) => n + 1);
+            return;
           }
-        } catch {}
+          showToast("That file doesn't look like a saved room plan");
+        } catch {
+          showToast("Couldn't read that file — please choose a plan saved as JSON");
+        }
       };
       reader.readAsText(file);
     };
@@ -640,6 +676,7 @@ export default function EditorCore({
           canRedo={editor.canRedo}
           onZoomIn={() => editor.setZoom(state.zoom * 1.2)}
           onZoomOut={() => editor.setZoom(state.zoom / 1.2)}
+          onZoomFit={() => setFitRequestId((n) => n + 1)}
           onRotateSelected={handleRotateSelected}
           onDeleteSelected={handleDeleteSelected}
           hasSelection={hasSelection}
@@ -747,6 +784,7 @@ export default function EditorCore({
           onRemoveLabel={editor.removeLabel}
           onSetZoom={editor.setZoom}
           onSetPan={editor.setPan}
+          fitRequestId={fitRequestId}
           onSetWallDrawing={editor.setWallDrawing}
           onAddLabel={editor.addLabel}
           onUpdateLabel={editor.updateLabel}
