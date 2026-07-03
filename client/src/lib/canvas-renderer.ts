@@ -7647,17 +7647,25 @@ function drawInsideComponentLabel(
   const nameY = -totalTextH / 2 + offsetPx.y;
   const labelX = offsetPx.x;
 
-  // Name
+  // Name (transparent text with a soft halo for legibility)
   const nameWeight = info.isSelected ? "600" : isHovered ? "600" : "500";
-  ctx.font = `${nameWeight} ${info.nameFontSize}px 'General Sans', 'DM Sans', sans-serif`;
-  ctx.fillStyle = info.nameColor;
+  const haloStyle = isDark ? "rgba(23, 22, 20, 0.78)" : "rgba(247, 246, 242, 0.9)";
+  ctx.lineJoin = "round";
   ctx.textAlign = "center";
   ctx.textBaseline = "top";
+  ctx.font = `${nameWeight} ${info.nameFontSize}px 'General Sans', 'DM Sans', sans-serif`;
+  ctx.strokeStyle = haloStyle;
+  ctx.lineWidth = Math.max(2.5, info.nameFontSize * 0.28);
+  ctx.strokeText(info.displayName, labelX, nameY);
+  ctx.fillStyle = info.nameColor;
   ctx.fillText(info.displayName, labelX, nameY);
 
   // Dimensions
   ctx.font = `400 ${info.dimFontSize}px 'General Sans', 'DM Sans', sans-serif`;
-  ctx.fillStyle = isDark ? "rgba(121, 120, 118, 0.8)" : "rgba(122, 121, 116, 0.7)";
+  ctx.strokeStyle = haloStyle;
+  ctx.lineWidth = Math.max(2, info.dimFontSize * 0.28);
+  ctx.strokeText(info.dimText, labelX, nameY + info.nameFontSize + 2);
+  ctx.fillStyle = isDark ? "rgba(121, 120, 118, 0.85)" : "rgba(122, 121, 116, 0.8)";
   ctx.fillText(info.dimText, labelX, nameY + info.nameFontSize + 2);
 
   ctx.restore();
@@ -7846,38 +7854,26 @@ function drawSingleComponentLabel(
     ctx.translate(-labelCenterX, -labelCenterY);
   }
 
-  // Background pill
-  const pillX = drawX - pillW / 2;
-  const pillY = drawY - 2;
-  if (isHovered) {
-    ctx.fillStyle = isDark ? "rgba(23, 22, 20, 0.85)" : "rgba(237, 235, 229, 0.92)";
-  } else {
-    ctx.fillStyle = isDark ? "rgba(23, 22, 20, 0.7)" : "rgba(247, 246, 242, 0.75)";
-  }
-  ctx.beginPath();
-  const r = 4;
-  ctx.moveTo(pillX + r, pillY);
-  ctx.lineTo(pillX + pillW - r, pillY);
-  ctx.arcTo(pillX + pillW, pillY, pillX + pillW, pillY + r, r);
-  ctx.lineTo(pillX + pillW, pillY + pillH - r);
-  ctx.arcTo(pillX + pillW, pillY + pillH, pillX + pillW - r, pillY + pillH, r);
-  ctx.lineTo(pillX + r, pillY + pillH);
-  ctx.arcTo(pillX, pillY + pillH, pillX, pillY + pillH - r, r);
-  ctx.lineTo(pillX, pillY + r);
-  ctx.arcTo(pillX, pillY, pillX + r, pillY, r);
-  ctx.closePath();
-  ctx.fill();
-
-  // Name
-  ctx.font = `${isSelected ? "600" : "500"} ${nameFontSize}px 'General Sans', 'DM Sans', sans-serif`;
-  ctx.fillStyle = nameColor;
+  // Transparent text with a soft halo for legibility — no pill background.
+  const haloStyle = isDark ? "rgba(23, 22, 20, 0.78)" : "rgba(247, 246, 242, 0.9)";
+  ctx.lineJoin = "round";
   ctx.textAlign = "center";
   ctx.textBaseline = "top";
+
+  // Name
+  ctx.font = `${isSelected || isHovered ? "600" : "500"} ${nameFontSize}px 'General Sans', 'DM Sans', sans-serif`;
+  ctx.strokeStyle = haloStyle;
+  ctx.lineWidth = Math.max(2.5, nameFontSize * 0.28);
+  ctx.strokeText(displayName, drawX, drawY);
+  ctx.fillStyle = nameColor;
   ctx.fillText(displayName, drawX, drawY);
 
   // Dimensions
   ctx.font = `400 ${dimFontSize}px 'General Sans', 'DM Sans', sans-serif`;
-  ctx.fillStyle = isDark ? "rgba(121, 120, 118, 0.8)" : "rgba(122, 121, 116, 0.7)";
+  ctx.strokeStyle = haloStyle;
+  ctx.lineWidth = Math.max(2, dimFontSize * 0.28);
+  ctx.strokeText(dimText, drawX, drawY + nameFontSize + 2);
+  ctx.fillStyle = isDark ? "rgba(121, 120, 118, 0.9)" : "rgba(122, 121, 116, 0.85)";
   ctx.fillText(dimText, drawX, drawY + nameFontSize + 2);
 
   ctx.restore();
