@@ -151,6 +151,11 @@ export default function FloorPlanCanvas({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [mousePos, setMousePos] = useState<Point>({ x: 0, y: 0 });
+  // The render effect below has no dependency array, so it repaints on every
+  // React render. forceRedraw() triggers a render on demand — used to recover
+  // the canvas if the browser clears/loses its bitmap after a period of idle.
+  const [, setRedrawNonce] = useState(0);
+  const forceRedraw = useCallback(() => setRedrawNonce((n) => n + 1), []);
   // Hover-based wall label cluster: when the cursor is over (or inside the
   // bounding box of) a cluster of short walls, surface every label in that
   // cluster as a tooltip. Persists for 200 ms after the cursor leaves.
@@ -290,6 +295,8 @@ export default function FloorPlanCanvas({
       canvas.height = container.clientHeight * dpr;
       canvas.style.width = `${container.clientWidth}px`;
       canvas.style.height = `${container.clientHeight}px`;
+      // Resizing the backing store clears it — repaint so it can't stay blank.
+      forceRedraw();
     };
 
     if (typeof ResizeObserver === "undefined") {
@@ -302,6 +309,28 @@ export default function FloorPlanCanvas({
     observer.observe(container);
     return () => observer.disconnect();
   }, []);
+
+  // Recover from a blanked canvas after inactivity. The browser can discard the
+  // canvas bitmap (context loss) or clear it when the tab is backgrounded; since
+  // we only repaint on change, force a repaint when any of these recovery
+  // signals fire so the plan never stays stuck on a blank white screen.
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const onContextLost = (e: Event) => { e.preventDefault(); };
+    const onVisible = () => { if (document.visibilityState === "visible") forceRedraw(); };
+    canvas?.addEventListener("contextlost", onContextLost as EventListener);
+    canvas?.addEventListener("contextrestored", forceRedraw as EventListener);
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", forceRedraw);
+    window.addEventListener("pageshow", forceRedraw as EventListener);
+    return () => {
+      canvas?.removeEventListener("contextlost", onContextLost as EventListener);
+      canvas?.removeEventListener("contextrestored", forceRedraw as EventListener);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", forceRedraw);
+      window.removeEventListener("pageshow", forceRedraw as EventListener);
+    };
+  }, [forceRedraw]);
 
   // Memoize room detection so DFS only reruns when walls change
   const detectedRooms = useMemo(() => detectRooms(state.walls), [state.walls]);
