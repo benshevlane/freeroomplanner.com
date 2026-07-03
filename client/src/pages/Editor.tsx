@@ -7,7 +7,6 @@ import FreeRoomPlannerLogo from "../components/FreeRoomPlannerLogo";
 import MobileWizard from "../components/MobileWizard";
 import DesktopWizard from "../components/DesktopWizard";
 import RoomGeneratorWizard from "../components/RoomGeneratorWizard";
-import { PerplexityAttribution } from "../components/PerplexityAttribution";
 import IntentCapture from "../components/IntentCapture";
 import { FurnitureItem } from "../lib/types";
 import { detectRooms } from "../lib/room-detection";
@@ -346,10 +345,6 @@ export default function Editor() {
               )}
             </div>
 
-            {/* Attribution */}
-            <div className="border-t border-border p-2">
-              <PerplexityAttribution />
-            </div>
           </>
         )}
       />
