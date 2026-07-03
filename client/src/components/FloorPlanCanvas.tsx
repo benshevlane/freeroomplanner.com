@@ -1431,7 +1431,7 @@ export default function FloorPlanCanvas({
         const newX = Math.round(anchorWx - newW / 2 - aNewX * cosR + aNewY * sinR);
         const newY = Math.round(anchorWy - newH / 2 - aNewX * sinR - aNewY * cosR);
 
-        onUpdateFurniture(state.selectedItemId, { width: newW, height: newH, x: newX, y: newY });
+        onUpdateFurniture(state.selectedItemId, { width: Math.round(newW * 10) / 10, height: Math.round(newH * 10) / 10, x: newX, y: newY });
         return;
       }
 

@@ -4670,7 +4670,7 @@ export function drawComponentLabels(
     const labelY = centerY + h / 2 + 14 * zoom;
 
     const displayName = item.customName || item.label;
-    const dimText = `${item.width} \u00D7 ${item.height} cm`;
+    const dimText = `${Math.round(item.width * 10) / 10} \u00D7 ${Math.round(item.height * 10) / 10} cm`;
 
     const nameFontSize = Math.max(9, 11 * zoom);
     const dimFontSize = Math.max(8, 9 * zoom);
@@ -7449,7 +7449,7 @@ export function collectComponentLabelRects(
     const outsideNormal = isDoorOrWindow ? computeOutsideLabelOffset(item, walls, rooms) : null;
 
     const displayName = item.customName || item.label;
-    const dimText = `${item.width} \u00D7 ${item.height} cm`;
+    const dimText = `${Math.round(item.width * 10) / 10} \u00D7 ${Math.round(item.height * 10) / 10} cm`;
 
     const labelRotation = item.labelRotation ?? 0;
 
