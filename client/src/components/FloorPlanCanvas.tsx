@@ -1968,6 +1968,19 @@ export default function FloorPlanCanvas({
     [state.zoom, state.panOffset, state.selectedTool, state.wallDrawing, getCanvasPosMouse, onSetZoom, onSetPan]
   );
 
+  // Attach the wheel handler as a NON-PASSIVE native listener. React's onWheel is
+  // registered passively, so its preventDefault() is ignored and a trackpad pinch /
+  // ctrl+wheel zooms the whole page (side panels included) instead of just the plan.
+  const handleWheelRef = useRef(handleWheel);
+  useEffect(() => { handleWheelRef.current = handleWheel; }, [handleWheel]);
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const native = (e: WheelEvent) => handleWheelRef.current(e as unknown as React.WheelEvent);
+    canvas.addEventListener("wheel", native, { passive: false });
+    return () => canvas.removeEventListener("wheel", native);
+  }, []);
+
   const handleDoubleClick = useCallback(
     (e: React.MouseEvent) => {
       if (state.selectedTool === "wall" && wallDrawingRef.current) {
@@ -2442,7 +2455,6 @@ export default function FloorPlanCanvas({
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerLeave={handlePointerUp}
-        onWheel={handleWheel}
         onDoubleClick={handleDoubleClick}
         onDragOver={handleDragOver}
         onDrop={handleDrop}
