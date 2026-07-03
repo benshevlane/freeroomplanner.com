@@ -6262,6 +6262,110 @@ function computeAlongWallDistances(
   return results;
 }
 
+/**
+ * Directional clearance rule for a selected unit. For each of the four
+ * directions we look at the SINGLE nearest obstacle (wall or unit) — never
+ * measuring past a touching neighbour to something behind it — then:
+ *   - skip a side the unit is flush against (touching a wall or unit),
+ *   - skip a side pointing "into the room" (the opposite side is flush against a
+ *     wall, so a wall-hugging unit is not measured away from its wall),
+ *   - otherwise show the gap to whatever is nearest (an open wall clearance, or a
+ *     real slot between two units).
+ */
+function computeSelectedItemClearances(
+  item: FurnitureItem,
+  walls: Wall[],
+  furniture: FurnitureItem[]
+): { dist: number; furnitureEdgePt: Point; wallPt: Point; axis: "h" | "v" }[] {
+  const bb = furnBBox(item);
+  const TOUCH = 2; // cm — treat as flush/touching
+  const MAX = 300; // cm — ignore anything further away
+
+  type Cand = { gap: number; type: "wall" | "unit" | null; from: Point; to: Point; axis: "h" | "v" };
+  const mk = (axis: "h" | "v"): Cand => ({ gap: Infinity, type: null, from: { x: 0, y: 0 }, to: { x: 0, y: 0 }, axis });
+  const dir: Record<"left" | "right" | "up" | "down", Cand> = { left: mk("h"), right: mk("h"), up: mk("v"), down: mk("v") };
+
+  for (const wall of walls) {
+    const wdx = wall.end.x - wall.start.x;
+    const wdy = wall.end.y - wall.start.y;
+    const wlen = Math.sqrt(wdx * wdx + wdy * wdy);
+    if (wlen < 1) continue;
+    const halfThick = (wall.thickness || DEFAULT_WALL_THICKNESS) / 2;
+    const isH = Math.abs(wdy / wlen) < 0.15;
+    const isV = Math.abs(wdx / wlen) < 0.15;
+    if (isH) {
+      const wallY = (wall.start.y + wall.end.y) / 2;
+      const minX = Math.min(wall.start.x, wall.end.x);
+      const maxX = Math.max(wall.start.x, wall.end.x);
+      if (bb.right > minX && bb.left < maxX) {
+        const midX = Math.max(bb.left, minX) + (Math.min(bb.right, maxX) - Math.max(bb.left, minX)) / 2;
+        if (wallY <= bb.top) {
+          const gap = bb.top - wallY - halfThick;
+          if (gap < dir.up.gap) dir.up = { gap, type: "wall", axis: "v", from: { x: midX, y: bb.top }, to: { x: midX, y: wallY + halfThick } };
+        } else if (wallY >= bb.bottom) {
+          const gap = wallY - bb.bottom - halfThick;
+          if (gap < dir.down.gap) dir.down = { gap, type: "wall", axis: "v", from: { x: midX, y: bb.bottom }, to: { x: midX, y: wallY - halfThick } };
+        }
+      }
+    }
+    if (isV) {
+      const wallX = (wall.start.x + wall.end.x) / 2;
+      const minY = Math.min(wall.start.y, wall.end.y);
+      const maxY = Math.max(wall.start.y, wall.end.y);
+      if (bb.bottom > minY && bb.top < maxY) {
+        const midY = Math.max(bb.top, minY) + (Math.min(bb.bottom, maxY) - Math.max(bb.top, minY)) / 2;
+        if (wallX <= bb.left) {
+          const gap = bb.left - wallX - halfThick;
+          if (gap < dir.left.gap) dir.left = { gap, type: "wall", axis: "h", from: { x: bb.left, y: midY }, to: { x: wallX + halfThick, y: midY } };
+        } else if (wallX >= bb.right) {
+          const gap = wallX - bb.right - halfThick;
+          if (gap < dir.right.gap) dir.right = { gap, type: "wall", axis: "h", from: { x: bb.right, y: midY }, to: { x: wallX - halfThick, y: midY } };
+        }
+      }
+    }
+  }
+
+  for (const other of furniture) {
+    if (other.id === item.id) continue;
+    const ob = furnBBox(other);
+    const yOv = Math.min(bb.bottom, ob.bottom) - Math.max(bb.top, ob.top);
+    if (yOv > 5) {
+      const midY = Math.max(bb.top, ob.top) + yOv / 2;
+      if (ob.right <= bb.left) {
+        const gap = bb.left - ob.right;
+        if (gap < dir.left.gap) dir.left = { gap, type: "unit", axis: "h", from: { x: bb.left, y: midY }, to: { x: ob.right, y: midY } };
+      } else if (ob.left >= bb.right) {
+        const gap = ob.left - bb.right;
+        if (gap < dir.right.gap) dir.right = { gap, type: "unit", axis: "h", from: { x: bb.right, y: midY }, to: { x: ob.left, y: midY } };
+      }
+    }
+    const xOv = Math.min(bb.right, ob.right) - Math.max(bb.left, ob.left);
+    if (xOv > 5) {
+      const midX = Math.max(bb.left, ob.left) + xOv / 2;
+      if (ob.bottom <= bb.top) {
+        const gap = bb.top - ob.bottom;
+        if (gap < dir.up.gap) dir.up = { gap, type: "unit", axis: "v", from: { x: midX, y: bb.top }, to: { x: midX, y: ob.bottom } };
+      } else if (ob.top >= bb.bottom) {
+        const gap = ob.top - bb.bottom;
+        if (gap < dir.down.gap) dir.down = { gap, type: "unit", axis: "v", from: { x: midX, y: bb.bottom }, to: { x: midX, y: ob.top } };
+      }
+    }
+  }
+
+  const flushWall = (c: Cand) => c.type === "wall" && c.gap <= TOUCH;
+  const opp = { left: "right", right: "left", up: "down", down: "up" } as const;
+  const out: { dist: number; furnitureEdgePt: Point; wallPt: Point; axis: "h" | "v" }[] = [];
+  (["left", "right", "up", "down"] as const).forEach((k) => {
+    const c = dir[k];
+    if (!c.type) return;
+    if (c.gap <= TOUCH) return;
+    if (c.gap > MAX) return;
+    if (flushWall(dir[opp[k]])) return;
+    out.push({ dist: c.gap, furnitureEdgePt: c.from, wallPt: c.to, axis: c.axis });
+  });
+  return out;
+}
+
 /** Draw distance measurement lines from selected furniture to nearby walls and objects */
 export function drawDistanceMeasurements(
   ctx: CanvasRenderingContext2D,
@@ -6344,14 +6448,9 @@ export function drawDistanceMeasurements(
   }
 
   // Gather all distances
-  const wallDists = computeEdgeToWallDistances(selectedItem, walls);
-  const furnDists = computeFurnitureToFurnitureDistances(selectedItem, furniture);
-  const allDists = [...wallDists, ...furnDists.map(d => ({ dist: d.dist, furnitureEdgePt: d.fromPt, wallPt: d.toPt, axis: d.axis }))];
 
   // Keep only the closest distance per axis direction (1 horizontal, 1 vertical)
-  const hDists = allDists.filter(d => d.axis === "h").sort((a, b) => a.dist - b.dist).slice(0, 1);
-  const vDists = allDists.filter(d => d.axis === "v").sort((a, b) => a.dist - b.dist).slice(0, 1);
-  const toDraw = [...hDists, ...vDists];
+  const toDraw = computeSelectedItemClearances(selectedItem, walls, furniture);
 
   ctx.save();
 
@@ -6464,13 +6563,8 @@ export function collectDistanceMeasurementRects(
   }
 
   // Regular furniture: perpendicular distances to walls/furniture
-  const wallDists = computeEdgeToWallDistances(selectedItem, walls);
-  const furnDists = computeFurnitureToFurnitureDistances(selectedItem, furniture);
-  const allDists = [...wallDists, ...furnDists.map(d => ({ dist: d.dist, furnitureEdgePt: d.fromPt, wallPt: d.toPt, axis: d.axis }))];
 
-  const hDists = allDists.filter(d => d.axis === "h").sort((a, b) => a.dist - b.dist).slice(0, 1);
-  const vDists = allDists.filter(d => d.axis === "v").sort((a, b) => a.dist - b.dist).slice(0, 1);
-  const toDraw = [...hDists, ...vDists];
+  const toDraw = computeSelectedItemClearances(selectedItem, walls, furniture);
 
   for (const d of toDraw) {
     const sx = d.furnitureEdgePt.x * pxPerCm + panOffset.x;
