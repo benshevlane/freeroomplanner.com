@@ -87,24 +87,32 @@
 <style>
 /* --- Mobile responsiveness for the inline-styled homepage --- */
 @media (max-width: 860px){
-  body{ overflow-x: hidden; }
-  nav{ padding-left: 20px !important; padding-right: 20px !important; gap: 12px !important; }
+  html, body{ overflow-x: hidden; }
+  nav{ padding: 14px 18px !important; gap: 10px !important; }
   nav a[href="#how"], nav a[href="#features"], nav a[href="#planners"], nav a[href="#faq"]{ display: none !important; }
-  nav a[href="/app"]{ white-space: nowrap !important; padding-left: 14px !important; padding-right: 14px !important; font-size: 14px !important; }
-  section{ padding-left: 20px !important; padding-right: 20px !important; }
-  /* collapse fixed multi-column grids */
-  [style*="1.02fr"], [style*="repeat(3"], [style*="repeat(2"]{ grid-template-columns: 1fr !important; }
-  [style*="repeat(4"]{ grid-template-columns: repeat(2, 1fr) !important; }
-  /* keep the comparison table 3-up but tighten it */
-  [style*="1.4fr 1fr 1fr"]{ grid-template-columns: 1.4fr 1fr 1fr !important; }
-  [style*="padding: 18px 26px"]{ padding: 12px 10px !important; font-size: 13px !important; }
-  [style*="padding: 20px 26px"]{ padding: 12px 10px !important; }
-  h1{ font-size: 40px !important; line-height: 1.08 !important; }
-  h2{ font-size: 28px !important; }
+  nav a[href="/app"]{ white-space: nowrap !important; padding: 10px 16px !important; font-size: 14px !important; }
+
+  /* collapse every multi-column grid to one column */
+  [style*="grid-template-columns"]{ grid-template-columns: 1fr !important; gap: 18px !important; }
+  [style*="repeat(4, 1fr)"]{ grid-template-columns: repeat(2, 1fr) !important; }
+  /* comparison table keeps its 3 columns but tightens */
+  [style*="1.4fr 1fr 1fr"]{ grid-template-columns: 1.4fr 1fr 1fr !important; gap: 0 !important; }
+  [style*="padding: 18px 26px"], [style*="padding: 20px 26px"]{ padding: 12px 9px !important; font-size: 13px !important; }
+
+  /* tighten section spacing on phones */
+  [style*="padding: 100px 40px"], [style*="padding: 92px 40px"], [style*="padding: 96px 32px"]{ padding: 52px 20px !important; }
+  [style*="padding: 64px 40px 40px"]{ padding: 40px 20px !important; }
+  [style*="padding: 28px 40px"]{ padding: 26px 20px !important; }
+  [style*="padding: 20px 40px"]{ padding: 20px 20px !important; }
+  [style*="padding: 16px 40px"]{ padding: 16px 20px !important; }
+
+  /* hero: remove the dead space, make it bigger */
+  [style*="padding: 80px 40px 88px"]{ padding: 20px 20px 44px !important; gap: 26px !important; }
+  h1{ font-size: 46px !important; line-height: 1.04 !important; }
+  h2{ font-size: 29px !important; line-height: 1.12 !important; }
 }
-@media (max-width: 480px){
-  h1{ font-size: 32px !important; }
-  section{ padding-top: 56px !important; padding-bottom: 56px !important; }
+@media (max-width: 420px){
+  h1{ font-size: 40px !important; }
 }
 </style>
 </head>
