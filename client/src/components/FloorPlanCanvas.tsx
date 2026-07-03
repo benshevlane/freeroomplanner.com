@@ -598,7 +598,6 @@ export default function FloorPlanCanvas({
       drawResizeHandles(ctx, selectedFurn, state.gridSize, state.zoom, state.panOffset);
       drawDistanceMeasurements(ctx, selectedFurn, state.walls, state.furniture, state.gridSize, state.zoom, state.panOffset, isDark, state.units);
       distanceMeasurementRects = collectDistanceMeasurementRects(ctx, selectedFurn, state.walls, state.furniture, state.gridSize, state.zoom, state.panOffset, isDark, state.units);
-      if (dimEditing) drawEditingDimension(ctx, selectedFurn, dimEditing, state.gridSize, state.zoom, state.panOffset, isDark, state.units);
     }
 
     // Collect wall measurement label rects for collision avoidance
