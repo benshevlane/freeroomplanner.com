@@ -7380,8 +7380,11 @@ export function collectComponentLabelRects(
           ({ pillW: autoPillW, pillH: autoPillH } = measurePill(nameFontSize, dimFontSize));
         }
 
-        // If still doesn't fit at minimum font size, move outside
+        // If still doesn't fit at minimum font size, move outside — but only
+        // doors/windows use an outside pill; regular furniture keeps the
+        // on-item transparent label so every item reads the same way.
         if (
+          isDoorOrWindow &&
           !fitsInRect(autoPillW, autoPillH, fitWidthPx, fitHeightPx) &&
           !fitsInRect(autoPillW, autoPillH, fitHeightPx, fitWidthPx)
         ) {
@@ -7398,6 +7401,7 @@ export function collectComponentLabelRects(
       const ph = item.labelHeight != null ? item.labelHeight * pxPerCm : autoPillH;
       // Check both orientations for custom sizes too
       if (
+        isDoorOrWindow &&
         (pw >= fitWidthPx * 0.95 || ph >= fitHeightPx * 0.85) &&
         (pw >= fitHeightPx * 0.95 || ph >= fitWidthPx * 0.85)
       ) {

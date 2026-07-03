@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from "react";
-import { EditorState, RoomData, Wall, FurnitureItem, RoomLabel, TextBox, Arrow, Point, EditorTool, FurnitureTemplate, UnitSystem, DEFAULT_TEXT_BOX, DEFAULT_ARROW, FURNITURE_LIBRARY, DEFAULT_WALL_THICKNESS } from "../lib/types";
+import { EditorState, RoomData, Wall, FurnitureItem, RoomLabel, TextBox, Arrow, Point, EditorTool, FurnitureTemplate, UnitSystem, DEFAULT_TEXT_BOX, DEFAULT_ARROW, FURNITURE_LIBRARY, DEFAULT_WALL_THICKNESS, isWallCupboard } from "../lib/types";
 import { snapToGrid } from "../lib/canvas-renderer";
 
 const DEFAULT_AUTOSAVE_KEY = "freeroomplanner-autosave";
@@ -154,7 +154,7 @@ function normalizeFurniture(furniture: any[]): FurnitureItem[] {
   return furniture.map((f: any) => ({
     ...f,
     labelOffset: f.labelOffset ?? { x: 0, y: 0 },
-    labelInside: f.labelInside ?? LABEL_INSIDE_TYPES.has(f.type),
+    labelInside: isWallCupboard(f.type) ? false : true,
   }));
 }
 
@@ -316,7 +316,7 @@ export function useEditor(storageKey: string = DEFAULT_AUTOSAVE_KEY) {
       category: template.category,
       ...(template.isWallCupboard ? { heightFromFloor: template.defaultHeightFromFloor ?? 145 } : {}),
       labelOffset: { x: 0, y: 0 },
-      labelInside: LABEL_INSIDE_TYPES.has(template.type),
+      labelInside: !isWallCupboard(template.type),
     };
     setState((s) => ({ ...s, furniture: [...s.furniture, item], selectedItemId: item.id }));
   }, [pushUndo]);
