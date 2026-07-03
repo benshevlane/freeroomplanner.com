@@ -66,6 +66,24 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <style>body{font-family:'Inter',system-ui,sans-serif}a{transition:color .15s ease}</style>
+<style>
+@keyframes frp-float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+@keyframes frp-pulse { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.5); opacity: 0.4; } }
+@keyframes frp-dash { to { stroke-dashoffset: -32; } }
+@keyframes frp-rise { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+@keyframes frp-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes frp-pop { from { opacity: 0; transform: scale(0.72); } to { opacity: 1; transform: scale(1); } }
+@keyframes frp-draw { to { stroke-dashoffset: 0; } }
+@keyframes frp-underline { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes frp-letter { from { opacity: 0; transform: translateY(0.5em); } to { opacity: 1; transform: none; } }
+@keyframes frp-drag { 0%, 100% { transform: translateX(-24px); opacity: 0; } 28%, 72% { transform: translateX(0); opacity: 1; } }
+@keyframes frp-nudge { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(4px); } }
+@keyframes frp-checkdraw { 0% { stroke-dashoffset: 24; } 40%, 88% { stroke-dashoffset: 0; } 100% { stroke-dashoffset: 24; } }
+@keyframes frp-bob { 0%, 100% { transform: scale(1); } 45% { transform: scale(1.12); } }
+@keyframes frp-linesdraw { 0% { stroke-dashoffset: 160; } 45%, 90% { stroke-dashoffset: 0; } 100% { stroke-dashoffset: 160; } }
+@keyframes frp-reveal { from { opacity: 0; transform: translateY(32px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce){*{animation-duration:.001ms!important;animation-iteration-count:1!important}}
+</style>
 </head>
 <body>
 <header style="position: sticky; top: 0; z-index: 50; background: rgba(255,255,255,0.85); backdrop-filter: blur(12px); border-bottom: 1px solid #e2e8f0;">
