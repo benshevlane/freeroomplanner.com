@@ -6272,6 +6272,50 @@ function computeAlongWallDistances(
  *   - otherwise show the gap to whatever is nearest (an open wall clearance, or a
  *     real slot between two units).
  */
+/** Perpendicular distance from a selected item's edges to the nearest wall on
+ *  each side (left/right/top/bottom), in cm. null = no wall overlaps that side.
+ *  Used for the side-panel clearance readout. */
+export function computeWallClearances(
+  item: FurnitureItem,
+  walls: Wall[]
+): { left: number | null; right: number | null; top: number | null; bottom: number | null } {
+  const bb = furnBBox(item);
+  const res: { left: number | null; right: number | null; top: number | null; bottom: number | null } =
+    { left: null, right: null, top: null, bottom: null };
+  const setMin = (k: "left" | "right" | "top" | "bottom", v: number) => {
+    const val = Math.max(0, v);
+    if (res[k] === null || val < (res[k] as number)) res[k] = val;
+  };
+  for (const wall of walls) {
+    const wdx = wall.end.x - wall.start.x;
+    const wdy = wall.end.y - wall.start.y;
+    const wlen = Math.sqrt(wdx * wdx + wdy * wdy);
+    if (wlen < 1) continue;
+    const halfThick = (wall.thickness || DEFAULT_WALL_THICKNESS) / 2;
+    const isH = Math.abs(wdy / wlen) < 0.15;
+    const isV = Math.abs(wdx / wlen) < 0.15;
+    if (isH) {
+      const wallY = (wall.start.y + wall.end.y) / 2;
+      const minX = Math.min(wall.start.x, wall.end.x);
+      const maxX = Math.max(wall.start.x, wall.end.x);
+      if (bb.right > minX && bb.left < maxX) {
+        if (wallY <= bb.top) setMin("top", bb.top - wallY - halfThick);
+        else if (wallY >= bb.bottom) setMin("bottom", wallY - bb.bottom - halfThick);
+      }
+    }
+    if (isV) {
+      const wallX = (wall.start.x + wall.end.x) / 2;
+      const minY = Math.min(wall.start.y, wall.end.y);
+      const maxY = Math.max(wall.start.y, wall.end.y);
+      if (bb.bottom > minY && bb.top < maxY) {
+        if (wallX <= bb.left) setMin("left", bb.left - wallX - halfThick);
+        else if (wallX >= bb.right) setMin("right", wallX - bb.right - halfThick);
+      }
+    }
+  }
+  return res;
+}
+
 function computeSelectedItemClearances(
   item: FurnitureItem,
   walls: Wall[],

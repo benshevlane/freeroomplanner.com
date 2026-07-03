@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import { Wall, WallType, FurnitureItem, RoomLabel, TextBox, Arrow, ArrowStyle, ArrowHeadStyle, LabelSize, LabelColor, UnitSystem, MeasureMode, DEFAULT_WALL_THICKNESS, isWallCupboard, cmToDisplay, displayToCm, dimensionSuffix, FURNITURE_LIBRARY } from "../lib/types";
+import { computeWallClearances } from "../lib/canvas-renderer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
@@ -413,6 +414,24 @@ export default function PropertiesPanel({
             <span className="text-muted-foreground">Rotation:</span>
             <span className="font-medium">{selectedFurniture.rotation}°</span>
           </div>
+          {walls.length > 0 && (() => {
+            const c = computeWallClearances(selectedFurniture, walls);
+            const fmt = (v: number | null) => (v == null ? "—" : v <= 2 ? "touching" : formatDimension(v, units));
+            const rows: [string, number | null][] = [["Left", c.left], ["Right", c.right], ["Top", c.top], ["Bottom", c.bottom]];
+            return (
+              <div className="space-y-1 pt-2 mt-1 border-t border-border/60" data-testid="furniture-wall-clearances">
+                <span className="text-muted-foreground text-xs">Distance to walls</span>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs">
+                  {rows.map(([k, v]) => (
+                    <div key={k} className="flex items-center justify-between">
+                      <span className="text-muted-foreground">{k}</span>
+                      <span className="font-medium tabular-nums">{fmt(v)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
           {onNudge && (
             <div className="space-y-1">
               <span className="text-muted-foreground text-xs">Nudge (1cm)</span>
