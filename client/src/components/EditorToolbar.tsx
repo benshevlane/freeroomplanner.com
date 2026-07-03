@@ -29,6 +29,8 @@ import {
   FolderOpen,
   MoreHorizontal,
   Link2,
+  Share2,
+  ChevronDown,
   LayoutList,
   SlidersHorizontal,
   Tags,
@@ -397,42 +399,40 @@ export default function EditorToolbar({
           </TooltipTrigger>
           <TooltipContent><p>Clear all items</p></TooltipContent>
         </Tooltip>
-        {/* Primary action: one Save button -> save & get shareable link. */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button size="sm" onClick={onShareLink} data-testid="btn-save-plan">
-              <Link2 className="h-4 w-4 mr-1" />
-              Save
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent><p>Save your plan &amp; get a shareable link</p></TooltipContent>
-        </Tooltip>
-        {/* Secondary: file exports, tucked away so they don't compete with Save. */}
+        {/* Single consolidated action: the plan auto-saves locally, so this is
+            purely about getting it OUT — a shareable link or a download. */}
         <DropdownMenu>
           <Tooltip>
             <TooltipTrigger asChild>
               <DropdownMenuTrigger asChild>
-                <Button size="sm" variant="ghost" data-testid="btn-export">
-                  <Download className="h-4 w-4 mr-1" />
-                  Export
+                <Button size="sm" data-testid="btn-share">
+                  <Share2 className="h-4 w-4 mr-1" />
+                  Share
+                  <ChevronDown className="h-4 w-4 ml-1 opacity-70" />
                 </Button>
               </DropdownMenuTrigger>
             </TooltipTrigger>
-            <TooltipContent><p>Download as image or file</p></TooltipContent>
+            <TooltipContent><p>Share a link or download your plan</p></TooltipContent>
           </Tooltip>
-          <DropdownMenuContent align="end">
+          <DropdownMenuContent align="end" className="w-60">
+            <DropdownMenuItem onClick={onShareLink} data-testid="menu-share-link">
+              <Link2 className="h-4 w-4 mr-2" />
+              Get shareable link
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
             <DropdownMenuItem onClick={onSavePlan}>
               <Image className="h-4 w-4 mr-2" />
-              Image (PNG)
+              Download PNG image
             </DropdownMenuItem>
             <DropdownMenuItem onClick={onSaveJSON}>
               <FileDown className="h-4 w-4 mr-2" />
-              Room file (JSON)
+              Download editable file
             </DropdownMenuItem>
             <DropdownMenuItem onClick={onSaveAllJSON}>
               <Download className="h-4 w-4 mr-2" />
-              All rooms (JSON)
+              Download all rooms
             </DropdownMenuItem>
+            <DropdownMenuSeparator />
             <DropdownMenuItem onClick={onLoadPlan}>
               <FolderOpen className="h-4 w-4 mr-2" />
               Load a saved file
