@@ -6410,6 +6410,71 @@ function computeSelectedItemClearances(
   return out;
 }
 
+/** Draw a live dimension line along one edge of the selected item (the edge being
+ *  edited in the panel), so users can see which edge a size field controls and
+ *  watch it change as they type. */
+export function drawEditingDimension(
+  ctx: CanvasRenderingContext2D,
+  item: FurnitureItem,
+  axis: "width" | "height",
+  gridSize: number,
+  zoom: number,
+  panOffset: Point,
+  isDark: boolean,
+  units: UnitSystem = "m"
+) {
+  const pxPerCm = (gridSize * zoom) / 100;
+  const cx = (item.x + item.width / 2) * pxPerCm + panOffset.x;
+  const cy = (item.y + item.height / 2) * pxPerCm + panOffset.y;
+  const w = item.width * pxPerCm;
+  const h = item.height * pxPerCm;
+  const color = isDark ? "#4f98a3" : "#0f766e";
+  const off = 14;
+  const fs = Math.max(11, 12 * zoom);
+
+  let midX = 0, midY = 0, valueCm = item.width;
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(((item.rotation || 0) * Math.PI) / 180);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([]);
+  if (axis === "width") {
+    const y = -h / 2 - off;
+    ctx.beginPath();
+    ctx.moveTo(-w / 2, y); ctx.lineTo(w / 2, y);
+    ctx.moveTo(-w / 2, y - 5); ctx.lineTo(-w / 2, y + 5);
+    ctx.moveTo(w / 2, y - 5); ctx.lineTo(w / 2, y + 5);
+    ctx.stroke();
+    midX = 0; midY = y; valueCm = item.width;
+  } else {
+    const x = -w / 2 - off;
+    ctx.beginPath();
+    ctx.moveTo(x, -h / 2); ctx.lineTo(x, h / 2);
+    ctx.moveTo(x - 5, -h / 2); ctx.lineTo(x + 5, -h / 2);
+    ctx.moveTo(x - 5, h / 2); ctx.lineTo(x + 5, h / 2);
+    ctx.stroke();
+    midX = x; midY = 0; valueCm = item.height;
+  }
+  ctx.restore();
+
+  // Draw the value upright in screen space at the edge midpoint.
+  const rad = ((item.rotation || 0) * Math.PI) / 180;
+  const cos = Math.cos(rad), sin = Math.sin(rad);
+  const sx = cx + midX * cos - midY * sin;
+  const sy = cy + midX * sin + midY * cos;
+  const text = formatLength(valueCm, units);
+  ctx.font = `600 ${fs}px 'General Sans', 'DM Sans', sans-serif`;
+  const tw = ctx.measureText(text).width;
+  const pad = 4;
+  ctx.fillStyle = isDark ? "rgba(23, 22, 20, 0.9)" : "rgba(247, 246, 242, 0.95)";
+  ctx.fillRect(sx - tw / 2 - pad, sy - fs / 2 - pad, tw + pad * 2, fs + pad * 2);
+  ctx.fillStyle = color;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(text, sx, sy);
+}
+
 /** Draw distance measurement lines from selected furniture to nearby walls and objects */
 export function drawDistanceMeasurements(
   ctx: CanvasRenderingContext2D,

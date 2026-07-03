@@ -16,6 +16,7 @@ import {
   computeAlignmentGuideSnap,
   finalizeWallEndpoint,
   drawDistanceMeasurements,
+  drawEditingDimension,
   collectDistanceMeasurementRects,
   drawEraserHighlight,
   drawSelectHoverHighlight,
@@ -102,6 +103,7 @@ interface FloorPlanCanvasProps {
   onUpdateArrow: (id: string, updates: Partial<Arrow>) => void;
   onRemoveArrow: (id: string) => void;
   onSetLabelOffset: (id: string, offset: { x: number; y: number }) => void;
+  dimEditing?: "width" | "height" | null;
   onSetTool: (tool: EditorTool) => void;
   onSetRoomLabelOffset: (roomKey: string, offset: Point) => void;
   onUpdateWallLabelOffset: (wallId: string, position: { x: number; y: number } | null) => void;
@@ -142,6 +144,7 @@ export default function FloorPlanCanvas({
   onUpdateArrow,
   onRemoveArrow,
   onSetLabelOffset,
+  dimEditing,
   onSetTool,
   onSetRoomLabelOffset,
   onUpdateWallLabelOffset,
@@ -595,6 +598,7 @@ export default function FloorPlanCanvas({
       drawResizeHandles(ctx, selectedFurn, state.gridSize, state.zoom, state.panOffset);
       drawDistanceMeasurements(ctx, selectedFurn, state.walls, state.furniture, state.gridSize, state.zoom, state.panOffset, isDark, state.units);
       distanceMeasurementRects = collectDistanceMeasurementRects(ctx, selectedFurn, state.walls, state.furniture, state.gridSize, state.zoom, state.panOffset, isDark, state.units);
+      if (dimEditing) drawEditingDimension(ctx, selectedFurn, dimEditing, state.gridSize, state.zoom, state.panOffset, isDark, state.units);
     }
 
     // Collect wall measurement label rects for collision avoidance

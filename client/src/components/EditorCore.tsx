@@ -163,6 +163,7 @@ export default function EditorCore({
   );
   const [furniturePanelOpen, setFurniturePanelOpen] = useState(false);
   const [propertiesPanelOpen, setPropertiesPanelOpen] = useState(false);
+  const [dimEditing, setDimEditing] = useState<"width" | "height" | null>(null);
   const [toast, setToast] = useState<{ message: string; visible: boolean }>({ message: "", visible: false });
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -816,6 +817,7 @@ export default function EditorCore({
                       onUpdateArrow={editor.updateArrow}
                       onNudge={handleNudgeFurniture}
                       walls={state.walls}
+                      onDimEditing={setDimEditing}
                       units={state.units}
                       measureMode={measureMode}
                     />
@@ -832,6 +834,7 @@ export default function EditorCore({
         {/* Canvas */}
         <FloorPlanCanvas
           state={state}
+          dimEditing={dimEditing}
           isDark={isDark}
           measureMode={measureMode}
           showAllMeasurements={showAllMeasurements}
@@ -891,6 +894,7 @@ export default function EditorCore({
                 onUpdateArrow={editor.updateArrow}
                 onNudge={handleNudgeFurniture}
                 walls={state.walls}
+                onDimEditing={setDimEditing}
                 units={state.units}
                 measureMode={measureMode}
               />

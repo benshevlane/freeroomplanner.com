@@ -18,6 +18,7 @@ interface PropertiesPanelProps {
   onDelete: () => void;
   onDuplicate: () => void;
   onUpdateFurniture: (id: string, updates: Partial<FurnitureItem>) => void;
+  onDimEditing?: (dim: "width" | "height" | null) => void;
   onUpdateLabel: (id: string, updates: Partial<RoomLabel>) => void;
   onUpdateTextBox?: (id: string, updates: Partial<TextBox>) => void;
   onUpdateWall?: (id: string, updates: Partial<Wall>) => void;
@@ -95,6 +96,7 @@ export default function PropertiesPanel({
   onDelete,
   onDuplicate,
   onUpdateFurniture,
+  onDimEditing,
   onUpdateLabel,
   onUpdateTextBox,
   onUpdateWall,
@@ -279,6 +281,11 @@ export default function PropertiesPanel({
     const isWallCup = isWallCupboard(selectedFurniture.type);
     const widthLabel = isStructural ? "Length:" : "Width:";
     const heightLabel = isStructural ? "Thickness:" : "Depth:";
+    // On-screen direction of each edge (accounts for 90° rotations) so users
+    // know which field controls the horizontal vs vertical edge.
+    const rotSwap = ((Math.round((selectedFurniture.rotation || 0) / 90) % 2) + 2) % 2 === 1;
+    const widthAxis = rotSwap ? "\u2195" : "\u2194"; // vertical / horizontal
+    const heightAxis = rotSwap ? "\u2194" : "\u2195";
     const minWidth = 2;
     const minHeight = 2;
 
@@ -304,7 +311,7 @@ export default function PropertiesPanel({
         )}
         <div className="space-y-2 text-sm">
           <div className="flex items-center gap-2">
-            <span className="text-muted-foreground">{widthLabel}</span>
+            <span className="text-muted-foreground">{widthLabel.slice(0, -1)} {widthAxis}:</span>
             <Input
               type="number"
               step={stepForUnit(units)}
@@ -312,7 +319,7 @@ export default function PropertiesPanel({
               value={widthFocused ? widthLocal : displayForUnit(selectedFurniture.width, units)}
               onFocus={() => {
                 setWidthLocal(String(displayForUnit(selectedFurniture.width, units)));
-                setWidthFocused(true);
+                setWidthFocused(true); onDimEditing?.("width");
               }}
               onChange={(e) => {
                 setWidthLocal(e.target.value);
@@ -327,7 +334,7 @@ export default function PropertiesPanel({
                 }
               }}
               onBlur={() => {
-                setWidthFocused(false);
+                setWidthFocused(false); onDimEditing?.(null);
                 const parsed = parseFloat(widthLocal);
                 if (!isNaN(parsed) && parsed > 0) {
                   const newCm = snapToMm(Math.max(minWidth, displayToCm(parsed, units)));
@@ -347,7 +354,7 @@ export default function PropertiesPanel({
             <span className="text-muted-foreground text-xs">{dimensionSuffix(units)}</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-muted-foreground">{heightLabel}</span>
+            <span className="text-muted-foreground">{heightLabel.slice(0, -1)} {heightAxis}:</span>
             <Input
               type="number"
               step={stepForUnit(units)}
@@ -355,7 +362,7 @@ export default function PropertiesPanel({
               value={heightFocused ? heightLocal : displayForUnit(selectedFurniture.height, units)}
               onFocus={() => {
                 setHeightLocal(String(displayForUnit(selectedFurniture.height, units)));
-                setHeightFocused(true);
+                setHeightFocused(true); onDimEditing?.("height");
               }}
               onChange={(e) => {
                 setHeightLocal(e.target.value);
@@ -370,7 +377,7 @@ export default function PropertiesPanel({
                 }
               }}
               onBlur={() => {
-                setHeightFocused(false);
+                setHeightFocused(false); onDimEditing?.(null);
                 const parsed = parseFloat(heightLocal);
                 if (!isNaN(parsed) && parsed > 0) {
                   const newCm = snapToMm(Math.max(minHeight, displayToCm(parsed, units)));
