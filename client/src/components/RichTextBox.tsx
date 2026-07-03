@@ -135,6 +135,33 @@ export default function RichTextBox({
     [onExitEdit]
   );
 
+  // Paste as plain text so content inherits the box's font size/line-height
+  // instead of arriving huge with its own formatting.
+  const handlePaste = useCallback(
+    (e: React.ClipboardEvent) => {
+      e.preventDefault();
+      const text = e.clipboardData.getData("text/plain");
+      if (!text) return;
+      document.execCommand("insertText", false, text);
+      handleInput();
+    },
+    [handleInput]
+  );
+
+  // Click anywhere outside the box (and outside its toolbar) exits edit mode.
+  useEffect(() => {
+    if (!isEditMode) return;
+    const onDocDown = (e: PointerEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (!t) return;
+      if (t.closest(`[data-textbox-id="${textBox.id}"]`)) return;
+      if (t.closest("[data-rich-text-toolbar]")) return;
+      onExitEdit();
+    };
+    document.addEventListener("pointerdown", onDocDown, true);
+    return () => document.removeEventListener("pointerdown", onDocDown, true);
+  }, [isEditMode, textBox.id, onExitEdit]);
+
   const bgColor = textBox.backgroundColor || "#ffffff";
   const bgOpacity = textBox.backgroundOpacity ?? 1;
   // Convert hex to rgba
@@ -270,6 +297,7 @@ export default function RichTextBox({
             suppressContentEditableWarning
             onInput={handleInput}
             onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
             className="outline-none w-full h-full rich-text-content"
             style={{
               minHeight: "100%",

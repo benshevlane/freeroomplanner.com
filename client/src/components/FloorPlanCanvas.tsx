@@ -1192,7 +1192,7 @@ export default function FloorPlanCanvas({
         const dy = pointers[0].clientY - pointers[1].clientY;
         const dist = Math.sqrt(dx * dx + dy * dy);
         const scale = dist / prevPinchDist.current;
-        const newZoom = Math.max(0.3, Math.min(3, state.zoom * scale));
+        const newZoom = Math.max(0.1, Math.min(4, state.zoom * scale));
 
         // Current center of the two pointers
         const centerX = (pointers[0].clientX + pointers[1].clientX) / 2;
@@ -1954,7 +1954,7 @@ export default function FloorPlanCanvas({
       }
 
       const delta = e.deltaY > 0 ? 0.9 : 1.1;
-      const newZoom = Math.max(0.3, Math.min(3, state.zoom * delta));
+      const newZoom = Math.max(0.1, Math.min(4, state.zoom * delta));
 
       // Zoom towards mouse
       const pos = getCanvasPosMouse(e);

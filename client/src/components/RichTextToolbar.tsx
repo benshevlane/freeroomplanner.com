@@ -139,6 +139,7 @@ export default function RichTextToolbar({ boxRect, containerRect }: RichTextTool
 
   return (
     <div
+      data-rich-text-toolbar=""
       className="fixed z-50 flex items-center gap-0.5 bg-popover border border-border rounded-lg shadow-lg px-2 py-1"
       style={{ left, top, maxWidth: toolbarWidth }}
       onMouseDown={(e) => e.preventDefault()}

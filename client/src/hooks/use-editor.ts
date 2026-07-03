@@ -430,7 +430,7 @@ export function useEditor(storageKey: string = DEFAULT_AUTOSAVE_KEY) {
   }, [pushUndo]);
 
   const setZoom = useCallback((zoom: number) => {
-    setState((s) => ({ ...s, zoom: Math.max(0.3, Math.min(3, zoom)) }));
+    setState((s) => ({ ...s, zoom: Math.max(0.1, Math.min(4, zoom)) }));
   }, []);
 
   const setPan = useCallback((offset: Point) => {
