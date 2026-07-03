@@ -84,6 +84,28 @@
 @keyframes frp-reveal { from { opacity: 0; transform: translateY(32px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce){*{animation-duration:.001ms!important;animation-iteration-count:1!important}}
 </style>
+<style>
+/* --- Mobile responsiveness for the inline-styled homepage --- */
+@media (max-width: 860px){
+  body{ overflow-x: hidden; }
+  nav{ padding-left: 20px !important; padding-right: 20px !important; gap: 12px !important; }
+  nav a[href="#how"], nav a[href="#features"], nav a[href="#planners"], nav a[href="#faq"]{ display: none !important; }
+  section{ padding-left: 20px !important; padding-right: 20px !important; }
+  /* collapse fixed multi-column grids */
+  [style*="1.02fr"], [style*="repeat(3"], [style*="repeat(2"]{ grid-template-columns: 1fr !important; }
+  [style*="repeat(4"]{ grid-template-columns: repeat(2, 1fr) !important; }
+  /* keep the comparison table 3-up but tighten it */
+  [style*="1.4fr 1fr 1fr"]{ grid-template-columns: 1.4fr 1fr 1fr !important; }
+  [style*="padding: 18px 26px"]{ padding: 12px 10px !important; font-size: 13px !important; }
+  [style*="padding: 20px 26px"]{ padding: 12px 10px !important; }
+  h1{ font-size: 40px !important; line-height: 1.08 !important; }
+  h2{ font-size: 28px !important; }
+}
+@media (max-width: 480px){
+  h1{ font-size: 32px !important; }
+  section{ padding-top: 56px !important; padding-bottom: 56px !important; }
+}
+</style>
 </head>
 <body>
 <header style="position: sticky; top: 0; z-index: 50; background: rgba(255,255,255,0.85); backdrop-filter: blur(12px); border-bottom: 1px solid #e2e8f0;">
@@ -105,7 +127,7 @@
         <a href="#features" style="text-decoration: none; color: #475569; font-size: 15px; font-weight: 500;">Features</a>
         <a href="#planners" style="text-decoration: none; color: #475569; font-size: 15px; font-weight: 500;">Planners</a>
         <a href="#faq" style="text-decoration: none; color: #475569; font-size: 15px; font-weight: 500;">FAQ</a>
-        <a href="/app" style="text-decoration: none; background: #0d9488; color: #fff; padding: 10px 20px; border-radius: 10px; font-size: 15px; font-weight: 600; box-shadow: 0 4px 12px rgba(13,148,136,0.3);">Start planning</a>
+        <a href="/app" style="text-decoration: none; background: #0d9488; color: #fff; padding: 10px 20px; border-radius: 10px; font-size: 15px; font-weight: 600; box-shadow: 0 4px 12px rgba(13,148,136,0.3);">Start drawing</a>
       </div>
     </nav>
   </header>
@@ -127,7 +149,7 @@
         </p>
         <div style="display: flex; align-items: center; gap: 14px; margin-top: 32px; flex-wrap: wrap; animation: frp-rise 0.7s cubic-bezier(0.2,0.7,0.2,1) both; animation-delay: 0.29s;">
           <a href="/app" style="display: inline-flex; align-items: center; gap: 9px; background: #0d9488; color: #fff; padding: 16px 28px; border-radius: 12px; font-size: 17px; font-weight: 700; text-decoration: none; box-shadow: 0 8px 22px rgba(13,148,136,0.35);">
-            Start planning — free
+            Start drawing — free
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg>
           </a>
           <a href="#how" style="display: inline-flex; align-items: center; gap: 8px; color: #0f172a; padding: 16px 22px; border-radius: 12px; font-size: 17px; font-weight: 600; text-decoration: none; border: 1px solid #cbd5e1; background: #fff;">
