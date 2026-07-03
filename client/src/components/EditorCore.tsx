@@ -6,6 +6,7 @@ import EditorToolbar from "./EditorToolbar";
 import FurniturePanel from "./FurniturePanel";
 import PropertiesPanel from "./PropertiesPanel";
 import RoomTabs from "./RoomTabs";
+import { embedPlanInPng, extractPlanFromPng } from "../lib/png-plan";
 import { FurnitureTemplate, FurnitureItem, RoomLabel, TextBox, Arrow, Point, UnitSystem, MeasureMode, isWallCupboard } from "../lib/types";
 import { trackEvent } from "@/lib/analytics";
 import {
@@ -526,9 +527,15 @@ export default function EditorCore({
       ctx.textBaseline = "middle";
       ctx.fillText(badgeText, bx + boxW / 2, by + boxH / 2);
 
-      finalCanvas.toBlob((blob) => {
+      finalCanvas.toBlob(async (blob) => {
         if (!blob) return;
-        const url = URL.createObjectURL(blob);
+        // Embed the plan data inside the PNG so the image itself can be
+        // re-opened later via Load Plan and edited.
+        let outBlob: Blob = blob;
+        try {
+          outBlob = await embedPlanInPng(blob, JSON.stringify(editor.exportState()));
+        } catch { /* fall back to a plain image */ }
+        const url = URL.createObjectURL(outBlob);
         const a = document.createElement("a");
         a.href = url;
         a.download = `${state.roomName.replace(/[^a-zA-Z0-9]/g, "_")}_plan.png`;
@@ -549,7 +556,7 @@ export default function EditorCore({
     } catch {
       showToast("Failed to save image");
     }
-  }, [state, measureMode, showToast, onExport]);
+  }, [state, measureMode, showToast, onExport, editor]);
 
   const handleSaveJSON = useCallback(() => {
     try {
@@ -583,52 +590,70 @@ export default function EditorCore({
     }
   }, [editor, showToast]);
 
+  const applyLoadedPlan = useCallback((plan: any): boolean => {
+    // Multi-tab format: { version: 2, tabs: [...] }
+    if (plan && plan.version === 2 && Array.isArray(plan.tabs)) {
+      editor.importState(plan);
+      showToast(`Loaded ${plan.tabs.length} rooms`);
+      setFitRequestId((n) => n + 1);
+      return true;
+    }
+    // Single-room plans — current and older exports. Accept anything
+    // with a walls/furniture array and default the missing fields.
+    if (plan && (Array.isArray(plan.walls) || Array.isArray(plan.furniture))) {
+      editor.importState({
+        version: plan.version ?? 1,
+        roomName: plan.roomName || plan.name || "Loaded Plan",
+        walls: Array.isArray(plan.walls) ? plan.walls : [],
+        furniture: Array.isArray(plan.furniture) ? plan.furniture : [],
+        labels: Array.isArray(plan.labels) ? plan.labels : [],
+        textBoxes: Array.isArray(plan.textBoxes) ? plan.textBoxes : [],
+        arrows: Array.isArray(plan.arrows) ? plan.arrows : [],
+        roomNames: plan.roomNames || {},
+        roomLabelOffsets: plan.roomLabelOffsets || {},
+        componentLabelsVisible: plan.componentLabelsVisible ?? true,
+      });
+      showToast("Plan loaded");
+      setFitRequestId((n) => n + 1);
+      return true;
+    }
+    return false;
+  }, [editor, showToast]);
+
   const handleLoadPlan = useCallback(() => {
     const input = document.createElement("input");
     input.type = "file";
-    input.accept = ".json";
+    input.accept = ".json,.png";
     input.onchange = (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (!file) return;
+      const isPng = file.type === "image/png" || /\.png$/i.test(file.name);
+      if (isPng) {
+        // PNGs exported by the planner carry the plan data inside the image.
+        extractPlanFromPng(file)
+          .then((plan) => {
+            if (!plan || !applyLoadedPlan(plan)) {
+              showToast("This image doesn't contain plan data — PNGs saved from now on will. For older plans, use the JSON file if you have one.");
+            }
+          })
+          .catch(() => showToast("Couldn't read that image file"));
+        return;
+      }
       const reader = new FileReader();
       reader.onload = (ev) => {
         try {
           const plan = JSON.parse(ev.target?.result as string);
-          // Multi-tab format: { version: 2, tabs: [...] }
-          if (plan && plan.version === 2 && Array.isArray(plan.tabs)) {
-            editor.importState(plan);
-            showToast(`Loaded ${plan.tabs.length} rooms`);
-            setFitRequestId((n) => n + 1);
-            return;
+          if (!applyLoadedPlan(plan)) {
+            showToast("That file doesn't look like a saved room plan");
           }
-          // Single-room plans — current and older exports. Accept anything
-          // with a walls/furniture array and default the missing fields.
-          if (plan && (Array.isArray(plan.walls) || Array.isArray(plan.furniture))) {
-            editor.importState({
-              version: plan.version ?? 1,
-              roomName: plan.roomName || plan.name || "Loaded Plan",
-              walls: Array.isArray(plan.walls) ? plan.walls : [],
-              furniture: Array.isArray(plan.furniture) ? plan.furniture : [],
-              labels: Array.isArray(plan.labels) ? plan.labels : [],
-              textBoxes: Array.isArray(plan.textBoxes) ? plan.textBoxes : [],
-              arrows: Array.isArray(plan.arrows) ? plan.arrows : [],
-              roomNames: plan.roomNames || {},
-              roomLabelOffsets: plan.roomLabelOffsets || {},
-              componentLabelsVisible: plan.componentLabelsVisible ?? true,
-            });
-            showToast("Plan loaded");
-            setFitRequestId((n) => n + 1);
-            return;
-          }
-          showToast("That file doesn't look like a saved room plan");
         } catch {
-          showToast("Couldn't read that file — please choose a plan saved as JSON");
+          showToast("Couldn't read that file — please choose a plan saved from Free Room Planner");
         }
       };
       reader.readAsText(file);
     };
     input.click();
-  }, [editor, showToast]);
+  }, [applyLoadedPlan, showToast]);
 
   const handleSelectFurniture = useCallback(
     (template: FurnitureTemplate) => {
