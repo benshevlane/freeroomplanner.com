@@ -448,6 +448,15 @@ export default function PropertiesPanel({
               </div>
             );
           })()}
+          {(() => {
+            const f = selectedFurniture;
+            const r1 = (v: number) => Math.round(v * 10) / 10;
+            return (
+              <div className="pt-2 mt-1 border-t border-border/60 text-[11px] text-muted-foreground/80 font-mono" data-testid="furniture-debug-pos">
+                pos {r1(f.x)}, {r1(f.y)} · right {r1(f.x + f.width)} · bottom {r1(f.y + f.height)}
+              </div>
+            );
+          })()}
           {onNudge && (
             <div className="space-y-1">
               <span className="text-muted-foreground text-xs">Nudge (1cm)</span>
