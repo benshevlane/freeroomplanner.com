@@ -520,6 +520,20 @@ export default function FloorPlanCanvas({
       }
     }
 
+    // Collect component label positions first so wall measurements can avoid them
+    const componentLabelInfos = state.componentLabelsVisible
+      ? collectComponentLabelRects(ctx, state.furniture, state.gridSize, state.zoom, state.panOffset, isDark, state.selectedItemId, state.units, state.walls, rooms)
+      : [];
+    componentLabelInfosRef.current = componentLabelInfos;
+    for (const info of componentLabelInfos) {
+      wallLabelObstacles.push({
+        left: info.centerX - info.pillW / 2 - 3,
+        top: info.labelY - info.pillH / 2 - 3,
+        right: info.centerX + info.pillW / 2 + 3,
+        bottom: info.labelY + info.pillH + 3,
+      });
+    }
+
     // Segment measurements for walls with doors/windows (drawn after furniture so worktops don't obscure them)
     drawWallSegmentMeasurements(ctx, state.walls, state.furniture, state.gridSize, state.zoom, state.panOffset, isDark, state.units, measureMode, rooms, wallLabelObstacles);
 
@@ -544,11 +558,6 @@ export default function FloorPlanCanvas({
       }
     }
 
-    // Collect component label positions (without drawing) for collision resolution
-    const componentLabelInfos = state.componentLabelsVisible
-      ? collectComponentLabelRects(ctx, state.furniture, state.gridSize, state.zoom, state.panOffset, isDark, state.selectedItemId, state.units, state.walls, rooms)
-      : [];
-    componentLabelInfosRef.current = componentLabelInfos;
 
     // Resize handles and distance measurements for selected furniture
     const selectedFurn = state.furniture.find((f) => f.id === state.selectedItemId);

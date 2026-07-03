@@ -1371,6 +1371,16 @@ export function drawWallSegmentMeasurements(
             }
           }
         }
+        // If the along-wall nudge couldn't clear it, flip the label to the
+        // opposite side of the wall so it never sits on a component label.
+        const stillClashes = obstacleRects.some((obs) =>
+          mx + labelHalfW > obs.left && mx - labelHalfW < obs.right &&
+          my + labelHalfH > obs.top && my - labelHalfH < obs.bottom
+        );
+        if (stillClashes) {
+          mx = (sx + ex) / 2 - normX * offsetDist;
+          my = (sy + ey) / 2 - normY * offsetDist;
+        }
       }
 
       ctx.save();
@@ -7297,7 +7307,7 @@ export function collectComponentLabelRects(
     let labelX = centerX;
     let labelY: number;
 
-    const isDoorOrWindow = item.type === "door" || item.type === "door_double" || item.type === "window";
+    const isDoorOrWindow = item.type === "door" || item.type === "door_double" || item.type === "door_sliding" || item.type === "door_patio" || item.type === "archway" || item.type === "window";
     const outsideNormal = isDoorOrWindow ? computeOutsideLabelOffset(item, walls, rooms) : null;
 
     const displayName = item.customName || item.label;
@@ -7332,7 +7342,10 @@ export function collectComponentLabelRects(
     let { pillW: autoPillW, pillH: autoPillH } = measurePill(nameFontSize, dimFontSize);
 
     // Check if label fits inside the component
-    const isLabelInsideType = item.labelInside ?? LABEL_INSIDE_TYPES.has(item.type);
+    // Default to an inside label whenever it can fit (the shrink-to-fit and
+    // fall-outside logic below handles items that are too small); users can
+    // still override per item via labelInside.
+    const isLabelInsideType = item.labelInside ?? true;
     let isInside = isLabelInsideType && !isWallCupboard(item.type);
 
     // Use the item's actual (unrotated) dimensions for fit checks, since

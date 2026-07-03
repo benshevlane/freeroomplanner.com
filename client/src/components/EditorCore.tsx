@@ -30,6 +30,7 @@ import {
 import { detectRooms } from "../lib/room-detection";
 import { safeGetItem, safeSetItem } from "../lib/safe-storage";
 import SavePlanDialog from "./SavePlanDialog";
+import RatingPromptDialog from "./RatingPromptDialog";
 import type { SharedPlanResult } from "../lib/plan-share";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -120,6 +121,22 @@ export default function EditorCore({
   const [showClearDialog, setShowClearDialog] = useState(false);
   const [fitRequestId, setFitRequestId] = useState(0);
   const [showShareDialog, setShowShareDialog] = useState(false);
+  const [showRatingPrompt, setShowRatingPrompt] = useState(false);
+
+  // Ask "are you enjoying it?" once, after the user's second save/export —
+  // engaged enough to have an opinion, and never more than once per browser.
+  const maybeShowRatingPrompt = useCallback(() => {
+    try {
+      if (window.location.pathname.startsWith("/embed")) return;
+      if (safeGetItem("freeroomplanner-rating-prompted")) return;
+      const count = parseInt(safeGetItem("freeroomplanner-save-count") || "0", 10) + 1;
+      safeSetItem("freeroomplanner-save-count", String(count));
+      if (count >= 2) {
+        safeSetItem("freeroomplanner-rating-prompted", new Date().toISOString());
+        setTimeout(() => setShowRatingPrompt(true), 1200);
+      }
+    } catch { /* prompting must never break saving */ }
+  }, []);
   const [currentPlanCode, setCurrentPlanCode] = useState<string | null>(initialShareCode);
 
   const handleShareLink = useCallback(() => {
@@ -130,6 +147,7 @@ export default function EditorCore({
   const handlePlanSaved = useCallback(
     (result: SharedPlanResult) => {
       setCurrentPlanCode(result.code);
+      maybeShowRatingPrompt();
       if (updateUrlOnSave) {
         try {
           window.history.replaceState(null, "", `/p/${result.code}`);
@@ -138,7 +156,7 @@ export default function EditorCore({
         }
       }
     },
-    [updateUrlOnSave]
+    [updateUrlOnSave, maybeShowRatingPrompt]
   );
   const [furniturePanelOpen, setFurniturePanelOpen] = useState(false);
   const [propertiesPanelOpen, setPropertiesPanelOpen] = useState(false);
@@ -542,6 +560,7 @@ export default function EditorCore({
         a.click();
         URL.revokeObjectURL(url);
         showToast("Plan saved as PNG image");
+        maybeShowRatingPrompt();
         try {
           const intent = safeGetItem("freeroomplanner-intent");
           const planType = intent ? JSON.parse(intent)?.intent ?? "room" : "room";
@@ -556,7 +575,7 @@ export default function EditorCore({
     } catch {
       showToast("Failed to save image");
     }
-  }, [state, measureMode, showToast, onExport, editor]);
+  }, [state, measureMode, showToast, onExport, editor, maybeShowRatingPrompt]);
 
   const handleSaveJSON = useCallback(() => {
     try {
@@ -892,6 +911,9 @@ export default function EditorCore({
         onSaved={handlePlanSaved}
         onDownloadImage={handleSavePlan}
       />
+
+      {/* One-time rating prompt */}
+      <RatingPromptDialog open={showRatingPrompt} onOpenChange={setShowRatingPrompt} />
 
       {/* Toast notification */}
       {toast.visible && (
