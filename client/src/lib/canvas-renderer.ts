@@ -215,8 +215,9 @@ const LABEL_INSIDE_TYPES = new Set([
   "worktop", "island", "fridge", "dishwasher",
   "tumble_dryer", "washing_machine", "kitchen_sink_d",
   "bed_king", "bed_superking",
-  "sofa_3", "sofa_2", "sofa_l",
-  "dining_table_4", "dining_table_6",
+  "sofa_3", "sofa_2", "sofa_l", "sofa_bed",
+  "dining_table_4", "dining_table_6", "dining_table_round",
+  "rug", "fridge_american",
 ]);
 
 /** Ray-casting point-in-polygon test (works for convex and concave polygons) */
@@ -842,7 +843,7 @@ export function drawWalls(
   });
 
   // Identify doors/windows for occupant checks
-  const doorsWindows = furniture.filter((f) => f.type === "door" || f.type === "door_double" || f.type === "window");
+  const doorsWindows = furniture.filter((f) => f.type === "door" || f.type === "door_double" || f.type === "door_sliding" || f.type === "door_patio" || f.type === "archway" || f.type === "window");
 
   // Decide the per-wall label mode given the current display options. The
   // hover cluster overrides showAll for that subset of walls — a wall in the
@@ -1257,10 +1258,10 @@ export function drawWallSegmentMeasurements(
 ) {
   const pxPerCm = (gridSize * zoom) / 100;
   const color = isDark ? DIMENSION_COLOR_DARK : DIMENSION_COLOR_LIGHT;
-  const doorsWindows = furniture.filter((f) => f.type === "door" || f.type === "door_double" || f.type === "window");
+  const doorsWindows = furniture.filter((f) => f.type === "door" || f.type === "door_double" || f.type === "door_sliding" || f.type === "door_patio" || f.type === "archway" || f.type === "window");
 
   // Non-door/window furniture (worktops, etc.) used as label-positioning obstacles for total dimension line
-  const otherFurniture = furniture.filter((f) => f.type !== "door" && f.type !== "door_double" && f.type !== "window" && f.type !== "bay_window");
+  const otherFurniture = furniture.filter((f) => f.type !== "door" && f.type !== "door_double" && f.type !== "door_sliding" && f.type !== "door_patio" && f.type !== "archway" && f.type !== "window" && f.type !== "bay_window");
 
   // Compute a fallback "center" from all wall endpoints for walls not in any room
   let fallbackCenter = { x: 0, y: 0 };
@@ -1829,7 +1830,7 @@ function findComponentsOnWall(
   const occupants: { start: number; end: number }[] = [];
 
   for (const item of furniture) {
-    if (item.type !== "door" && item.type !== "door_double" && item.type !== "window") continue;
+    if (item.type !== "door" && item.type !== "door_double" && item.type !== "door_sliding" && item.type !== "door_patio" && item.type !== "archway" && item.type !== "window") continue;
 
     // Get item center in world coords
     const cx = item.x + item.width / 2;
@@ -2030,7 +2031,7 @@ function findFurnitureNearWallLabel(
 
   for (const item of furniture) {
     // Skip doors/windows — handled separately by findComponentsOnWall
-    if (item.type === "door" || item.type === "door_double" || item.type === "window") continue;
+    if (item.type === "door" || item.type === "door_double" || item.type === "door_sliding" || item.type === "door_patio" || item.type === "archway" || item.type === "window") continue;
 
     const aabb = getFurnitureAABB(item);
 
@@ -2602,7 +2603,7 @@ export function drawFurniture(
       ctx.moveTo(w / 2, -h / 2);
       ctx.lineTo(-w / 2, h / 2);
       ctx.stroke();
-    } else if (item.type === "internal_wall") {
+    } else if (item.type === "internal_wall" || item.type === "chimney_breast") {
       // Internal wall: solid dark fill matching exterior wall color
       ctx.fillStyle = isSelected ? SELECT_COLOR : (isDark ? WALL_COLOR_DARK : WALL_COLOR_LIGHT);
       ctx.fillRect(-w / 2, -h / 2, w, h);
@@ -2614,6 +2615,8 @@ export function drawFurniture(
         "bathtub", "freestanding_bath",
         "basin",
         "side_table",
+        "dining_table_round",
+        "bar_stool",
       ]);
       const isCustomShape = customShapeTypes.has(item.type);
 
@@ -2841,6 +2844,7 @@ function drawFurnitureDetail(
       break;
     }
     case "sofa_3":
+    case "sofa_bed":
     case "sofa_2":
       // Back
       ctx.fillStyle = stroke;
@@ -3994,6 +3998,318 @@ function drawFurnitureDetail(
       ctx.globalAlpha = 1;
       break;
     }
+    case "fridge": {
+      // Inset carcass + door line along the front with a handle tick
+      ctx.strokeRect(-w * 0.42, -h * 0.42, w * 0.84, h * 0.84);
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.42, h * 0.18);
+      ctx.lineTo(w * 0.42, h * 0.18);
+      ctx.stroke();
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.3, h * 0.3);
+      ctx.lineTo(-w * 0.08, h * 0.3);
+      ctx.stroke();
+      ctx.lineWidth = 1;
+      break;
+    }
+    case "fridge_american": {
+      // Double doors: centre split + two handle ticks
+      ctx.strokeRect(-w * 0.44, -h * 0.42, w * 0.88, h * 0.84);
+      ctx.beginPath();
+      ctx.moveTo(0, -h * 0.42);
+      ctx.lineTo(0, h * 0.42);
+      ctx.stroke();
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.07, h * 0.12);
+      ctx.lineTo(-w * 0.07, h * 0.34);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(w * 0.07, h * 0.12);
+      ctx.lineTo(w * 0.07, h * 0.34);
+      ctx.stroke();
+      ctx.lineWidth = 1;
+      break;
+    }
+    case "dishwasher": {
+      // Inset door + two faint rack lines
+      ctx.strokeRect(-w * 0.42, -h * 0.42, w * 0.84, h * 0.84);
+      ctx.globalAlpha = 0.45;
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.3, -h * 0.14);
+      ctx.lineTo(w * 0.3, -h * 0.14);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.3, h * 0.12);
+      ctx.lineTo(w * 0.3, h * 0.12);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      break;
+    }
+    case "larder_unit": {
+      // Tall unit plan convention: inset outline with a single diagonal
+      ctx.strokeRect(-w * 0.42, -h * 0.42, w * 0.84, h * 0.84);
+      ctx.globalAlpha = 0.5;
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.42, -h * 0.42);
+      ctx.lineTo(w * 0.42, h * 0.42);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      break;
+    }
+    case "island": {
+      // Counter overhang edge
+      ctx.strokeRect(-w * 0.46, -h * 0.44, w * 0.92, h * 0.88);
+      break;
+    }
+    case "wardrobe": {
+      // Door split + dashed hanging rail
+      ctx.beginPath();
+      ctx.moveTo(0, -h / 2);
+      ctx.lineTo(0, h / 2);
+      ctx.stroke();
+      ctx.globalAlpha = 0.5;
+      ctx.setLineDash([4, 3]);
+      ctx.beginPath();
+      ctx.moveTo(-w / 2 + 4, 0);
+      ctx.lineTo(w / 2 - 4, 0);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.globalAlpha = 1;
+      break;
+    }
+    case "armchair": {
+      // Back band, arm rests, seat cushion
+      const acBack = -h / 2 + h * 0.18;
+      ctx.beginPath();
+      ctx.moveTo(-w / 2 + 3, acBack);
+      ctx.lineTo(w / 2 - 3, acBack);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(-w / 2 + w * 0.16, acBack);
+      ctx.lineTo(-w / 2 + w * 0.16, h / 2 - 3);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(w / 2 - w * 0.16, acBack);
+      ctx.lineTo(w / 2 - w * 0.16, h / 2 - 3);
+      ctx.stroke();
+      ctx.globalAlpha = 0.4;
+      ctx.beginPath();
+      ctx.roundRect(-w * 0.26, -h * 0.16, w * 0.52, h * 0.52, 4);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      break;
+    }
+    case "coffee_table": {
+      ctx.beginPath();
+      ctx.roundRect(-w * 0.4, -h * 0.36, w * 0.8, h * 0.72, Math.min(w, h) * 0.15);
+      ctx.stroke();
+      break;
+    }
+    case "footstool": {
+      ctx.beginPath();
+      ctx.roundRect(-w * 0.38, -h * 0.38, w * 0.76, h * 0.76, Math.min(w, h) * 0.2);
+      ctx.stroke();
+      break;
+    }
+    case "tv_unit": {
+      // Screen bar on the front edge + shelf line
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.55;
+      ctx.fillRect(-w * 0.32, h * 0.08, w * 0.64, h * 0.18);
+      ctx.globalAlpha = 1;
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.44, -h * 0.1);
+      ctx.lineTo(w * 0.44, -h * 0.1);
+      ctx.stroke();
+      break;
+    }
+    case "bookshelf":
+    case "shelving_unit": {
+      // Vertical shelf dividers
+      ctx.globalAlpha = 0.6;
+      for (let i = 1; i <= 3; i++) {
+        const bx = -w / 2 + (w * i) / 4;
+        ctx.beginPath();
+        ctx.moveTo(bx, -h / 2 + 2);
+        ctx.lineTo(bx, h / 2 - 2);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+      break;
+    }
+    case "rug": {
+      // Soft double border
+      const rgR = Math.min(w, h) * 0.08;
+      ctx.globalAlpha = 0.7;
+      ctx.beginPath();
+      ctx.roundRect(-w * 0.46, -h * 0.46, w * 0.92, h * 0.92, rgR);
+      ctx.stroke();
+      ctx.globalAlpha = 0.35;
+      ctx.beginPath();
+      ctx.roundRect(-w * 0.38, -h * 0.38, w * 0.76, h * 0.76, rgR);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      break;
+    }
+    case "sideboard": {
+      ctx.strokeRect(-w * 0.44, -h * 0.34, w * 0.88, h * 0.68);
+      ctx.globalAlpha = 0.6;
+      for (let i = 1; i <= 2; i++) {
+        const sx = -w * 0.44 + (w * 0.88 * i) / 3;
+        ctx.beginPath();
+        ctx.moveTo(sx, -h * 0.34);
+        ctx.lineTo(sx, h * 0.34);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+      break;
+    }
+    case "bedside_table": {
+      ctx.strokeRect(-w * 0.4, -h * 0.38, w * 0.8, h * 0.76);
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.5;
+      ctx.beginPath();
+      ctx.arc(0, 0, 2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      break;
+    }
+    case "chest_drawers": {
+      ctx.strokeRect(-w * 0.44, -h * 0.38, w * 0.88, h * 0.76);
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.5;
+      ctx.beginPath();
+      ctx.arc(-w * 0.16, 0, 2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(w * 0.16, 0, 2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      break;
+    }
+    case "dressing_table": {
+      ctx.strokeRect(-w * 0.44, -h * 0.34, w * 0.88, h * 0.68);
+      // Mirror arc against the back edge
+      ctx.globalAlpha = 0.6;
+      ctx.beginPath();
+      ctx.arc(0, -h * 0.34, w * 0.18, Math.PI, 0, true);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      break;
+    }
+    case "cot": {
+      // Barred sides + mattress
+      ctx.setLineDash([3, 3]);
+      ctx.strokeRect(-w * 0.42, -h * 0.44, w * 0.84, h * 0.88);
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.roundRect(-w * 0.32, -h * 0.36, w * 0.64, h * 0.72, 4);
+      ctx.stroke();
+      break;
+    }
+    case "dining_table_round": {
+      const dtR = Math.min(w, h) / 2 - 2;
+      ctx.fillStyle = fill;
+      ctx.beginPath();
+      ctx.arc(0, 0, dtR, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = isSelected ? SELECT_COLOR : stroke;
+      ctx.lineWidth = isSelected ? 2 : 1;
+      ctx.beginPath();
+      ctx.arc(0, 0, dtR, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.strokeStyle = stroke;
+      ctx.lineWidth = 1;
+      ctx.globalAlpha = 0.35;
+      ctx.beginPath();
+      ctx.arc(0, 0, dtR * 0.55, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      break;
+    }
+    case "bar_stool": {
+      const bsR = Math.min(w, h) / 2 - 2;
+      ctx.fillStyle = fill;
+      ctx.beginPath();
+      ctx.arc(0, 0, bsR, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = isSelected ? SELECT_COLOR : stroke;
+      ctx.lineWidth = isSelected ? 2 : 1;
+      ctx.beginPath();
+      ctx.arc(0, 0, bsR, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.strokeStyle = stroke;
+      ctx.lineWidth = 1;
+      ctx.globalAlpha = 0.4;
+      ctx.beginPath();
+      ctx.arc(0, 0, bsR * 0.35, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      break;
+    }
+    case "dining_bench": {
+      ctx.globalAlpha = 0.5;
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.42, 0);
+      ctx.lineTo(w * 0.42, 0);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      break;
+    }
+    case "filing_cabinet": {
+      ctx.strokeRect(-w * 0.4, -h * 0.42, w * 0.8, h * 0.84);
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.4, 0);
+      ctx.lineTo(w * 0.4, 0);
+      ctx.stroke();
+      break;
+    }
+    case "door_sliding": {
+      // Two offset panels sliding past each other
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(-w / 2, -h * 0.2);
+      ctx.lineTo(w * 0.08, -h * 0.2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.08, h * 0.2);
+      ctx.lineTo(w / 2, h * 0.2);
+      ctx.stroke();
+      ctx.lineWidth = 1;
+      break;
+    }
+    case "door_patio": {
+      // Glazed sliding patio doors: offset panels + glass tint
+      ctx.fillStyle = isDark ? "rgba(79, 152, 163, 0.1)" : "rgba(1, 105, 111, 0.07)";
+      ctx.fillRect(-w / 2, -h * 0.3, w, h * 0.6);
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(-w / 2, -h * 0.2);
+      ctx.lineTo(w * 0.06, -h * 0.2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.06, h * 0.2);
+      ctx.lineTo(w / 2, h * 0.2);
+      ctx.stroke();
+      ctx.lineWidth = 1;
+      break;
+    }
+    case "archway": {
+      // Open structural gap: dashed lines across both wall faces
+      ctx.setLineDash([5, 4]);
+      ctx.beginPath();
+      ctx.moveTo(-w / 2, -h / 2);
+      ctx.lineTo(w / 2, -h / 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(-w / 2, h / 2);
+      ctx.lineTo(w / 2, h / 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      break;
+    }
     case "internal_wall":
       // No-op: solid fill handled in drawFurniture
       break;
@@ -5031,7 +5347,7 @@ export function hitTestWallMeasurementLabel(
 
   // Fallback: recompute positions (without collision resolution)
   const pxPerCm = (gridSize * zoom) / 100;
-  const doorsWindows = furniture.filter((f) => f.type === "door" || f.type === "door_double" || f.type === "window");
+  const doorsWindows = furniture.filter((f) => f.type === "door" || f.type === "door_double" || f.type === "door_sliding" || f.type === "door_patio" || f.type === "archway" || f.type === "window");
 
   const collinearGroups = findCollinearGroups(walls);
   const mergedWallIds = new Set<string>();
@@ -5137,7 +5453,7 @@ export function hitTestWallLabelResetIcon(
 
   // Fallback: recompute positions
   const pxPerCm = (gridSize * zoom) / 100;
-  const doorsWindows = furniture.filter((f) => f.type === "door" || f.type === "door_double" || f.type === "window");
+  const doorsWindows = furniture.filter((f) => f.type === "door" || f.type === "door_double" || f.type === "door_sliding" || f.type === "door_patio" || f.type === "archway" || f.type === "window");
 
   const collinearGroups = findCollinearGroups(walls);
   const mergedWallIds = new Set<string>();
@@ -5593,7 +5909,7 @@ export function hitTestResizeHandle(
 
   // For structural items (doors/windows), test edge handles first so
   // single-dimension resizing is easier to grab on thin items
-  const isStructural = item.type === "door" || item.type === "door_double" || item.type === "window";
+  const isStructural = item.type === "door" || item.type === "door_double" || item.type === "door_sliding" || item.type === "door_patio" || item.type === "archway" || item.type === "window";
   const first = isStructural ? edgeHandles : corners;
   const second = isStructural ? corners : edgeHandles;
 
@@ -5952,7 +6268,7 @@ export function drawDistanceMeasurements(
   const color = isDark ? "#e8894a" : "#d06220";
 
   // For doors/windows on a wall, show along-wall distances instead of perpendicular
-  if (selectedItem.type === "door" || selectedItem.type === "door_double" || selectedItem.type === "window") {
+  if (selectedItem.type === "door" || selectedItem.type === "door_double" || selectedItem.type === "door_sliding" || selectedItem.type === "door_patio" || selectedItem.type === "archway" || selectedItem.type === "window") {
     const hostWall = findHostWall(selectedItem, walls);
     if (hostWall) {
       const alongDists = computeAlongWallDistances(selectedItem, hostWall);
@@ -6115,7 +6431,7 @@ export function collectDistanceMeasurementRects(
   ctx.font = `500 ${fontSize}px 'General Sans', 'DM Sans', sans-serif`;
 
   // For doors/windows on a wall, compute along-wall distance label positions
-  if (selectedItem.type === "door" || selectedItem.type === "door_double" || selectedItem.type === "window") {
+  if (selectedItem.type === "door" || selectedItem.type === "door_double" || selectedItem.type === "door_sliding" || selectedItem.type === "door_patio" || selectedItem.type === "archway" || selectedItem.type === "window") {
     const hostWall = findHostWall(selectedItem, walls);
     if (hostWall) {
       const alongDists = computeAlongWallDistances(selectedItem, hostWall);

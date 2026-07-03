@@ -258,7 +258,7 @@ export default function PropertiesPanel({
   }
 
   if (selectedFurniture) {
-    const isStructural = selectedFurniture.type === "door" || selectedFurniture.type === "door_double" || selectedFurniture.type === "window" || selectedFurniture.type === "radiator";
+    const isStructural = selectedFurniture.type === "door" || selectedFurniture.type === "door_double" || selectedFurniture.type === "door_sliding" || selectedFurniture.type === "door_patio" || selectedFurniture.type === "archway" || selectedFurniture.type === "window" || selectedFurniture.type === "radiator";
     const isWallCup = isWallCupboard(selectedFurniture.type);
     const widthLabel = isStructural ? "Length:" : "Width:";
     const heightLabel = isStructural ? "Thickness:" : "Depth:";
