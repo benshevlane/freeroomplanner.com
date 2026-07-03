@@ -13,10 +13,9 @@ import { apiRequest } from "@/lib/queryClient";
 import { trackEvent } from "@/lib/analytics";
 
 // Where 5-star raters are invited to leave a public review.
-// Set this once the review profile is live (G2 / Trustpilot / Google).
-// While empty, 5-star raters just get a thank-you (no broken link).
-const REVIEW_URL = "";
-const REVIEW_SITE_NAME = "G2";
+// Free Trustpilot review page for the claimed freeroomplanner.com domain.
+const REVIEW_URL = "https://www.trustpilot.com/evaluate/freeroomplanner.com";
+const REVIEW_SITE_NAME = "Trustpilot";
 
 interface RatingPromptDialogProps {
   open: boolean;
