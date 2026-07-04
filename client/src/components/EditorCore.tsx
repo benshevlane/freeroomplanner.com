@@ -776,6 +776,7 @@ export default function EditorCore({
         onDuplicateRoom={editor.duplicateRoom}
         onDeleteRoom={editor.deleteRoom}
         onReorderRooms={editor.reorderRooms}
+        sharedOpen={!!initialShareCode}
       />
 
       {/* Main area */}

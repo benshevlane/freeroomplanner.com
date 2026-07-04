@@ -21,6 +21,7 @@ interface RoomTabsProps {
   onDeleteRoom: (roomId: string) => void;
   onDuplicateRoom: (roomId: string) => void;
   onReorderRooms: (newOrder: string[]) => void;
+  sharedOpen?: boolean;
 }
 
 export default function RoomTabs({
@@ -33,6 +34,7 @@ export default function RoomTabs({
   onDuplicateRoom,
   onDeleteRoom,
   onReorderRooms,
+  sharedOpen = false,
 }: RoomTabsProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
@@ -41,6 +43,24 @@ export default function RoomTabs({
   const [dragOverId, setDragOverId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // On first open of a shared plan with more than one room, briefly pulse the
+  // other tabs so the recipient notices them, and keep a subtle dot on tabs
+  // they haven't visited yet. Motion is suppressed for reduced-motion users.
+  const [pulse, setPulse] = useState(false);
+  const pulsedRef = useRef(false);
+  const [visited, setVisited] = useState<Set<string>>(() => new Set());
+  useEffect(() => {
+    setVisited((prev) => { const n = new Set(prev); n.add(activeRoomId); return n; });
+  }, [activeRoomId]);
+  useEffect(() => {
+    if (sharedOpen && !pulsedRef.current && rooms.length > 1) {
+      pulsedRef.current = true;
+      setPulse(true);
+      const t = setTimeout(() => setPulse(false), 2700);
+      return () => clearTimeout(t);
+    }
+  }, [sharedOpen, rooms.length]);
 
   const roomMap = new Map(rooms.map((r) => [r.id, r]));
   const orderedRooms = roomOrder.map((id) => roomMap.get(id)).filter(Boolean) as RoomData[];
@@ -117,6 +137,15 @@ export default function RoomTabs({
 
   return (
     <>
+      <style>{`
+        @keyframes frpTabPulse {
+          0%, 100% { box-shadow: 0 0 0 0 rgba(15,118,110,0); }
+          35% { box-shadow: 0 0 0 3px rgba(15,118,110,0.45); }
+        }
+        .frp-tab-pulse { animation: frpTabPulse 0.85s ease-in-out 3; border-radius: 0.375rem; }
+        .frp-tab-dot { width: 6px; height: 6px; border-radius: 9999px; background: #0f766e; display: inline-block; flex-shrink: 0; }
+        @media (prefers-reduced-motion: reduce) { .frp-tab-pulse { animation: none; } }
+      `}</style>
       <div className="flex items-center border-b border-border bg-card/50 px-1 min-h-[36px]">
         <div
           ref={scrollRef}
@@ -143,6 +172,7 @@ export default function RoomTabs({
                   }
                   ${isDragOver ? "ring-2 ring-primary/40" : ""}
                   ${dragId === room.id ? "opacity-50" : ""}
+                  ${pulse && !isActive ? "frp-tab-pulse" : ""}
                 `}
                 onClick={() => {
                   if (editingId !== room.id) onSwitchRoom(room.id);
@@ -165,6 +195,10 @@ export default function RoomTabs({
                   />
                 ) : (
                   <span className="max-w-[120px] truncate">{room.name}</span>
+                )}
+
+                {sharedOpen && !isActive && !visited.has(room.id) && (
+                  <span className="frp-tab-dot" title="This plan has more rooms" />
                 )}
 
                 {/* Tab action buttons — show on hover */}
