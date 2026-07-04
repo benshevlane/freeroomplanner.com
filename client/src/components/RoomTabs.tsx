@@ -57,7 +57,7 @@ export default function RoomTabs({
     if (sharedOpen && !pulsedRef.current && rooms.length > 1) {
       pulsedRef.current = true;
       setPulse(true);
-      const t = setTimeout(() => setPulse(false), 2700);
+      const t = setTimeout(() => setPulse(false), 9000);
       return () => clearTimeout(t);
     }
   }, [sharedOpen, rooms.length]);
@@ -140,9 +140,9 @@ export default function RoomTabs({
       <style>{`
         @keyframes frpTabPulse {
           0%, 100% { box-shadow: 0 0 0 0 rgba(15,118,110,0); }
-          35% { box-shadow: 0 0 0 3px rgba(15,118,110,0.45); }
+          50% { box-shadow: 0 0 11px 1px rgba(15,118,110,0.32); }
         }
-        .frp-tab-pulse { animation: frpTabPulse 0.85s ease-in-out 3; border-radius: 0.375rem; }
+        .frp-tab-pulse { animation: frpTabPulse 2.2s ease-in-out 4; border-radius: 0.375rem; }
         .frp-tab-dot { width: 6px; height: 6px; border-radius: 9999px; background: #0f766e; display: inline-block; flex-shrink: 0; }
         @media (prefers-reduced-motion: reduce) { .frp-tab-pulse { animation: none; } }
       `}</style>
