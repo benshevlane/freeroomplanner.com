@@ -41,6 +41,27 @@ function rememberEditKey(code: string, editKey: string): void {
   safeSetItem(KEYS_STORAGE, JSON.stringify(keys));
 }
 
+// Remember which share code an autosave slot (storageKey) last produced, so the
+// same plan keeps ONE link across page reloads instead of minting a new one.
+const SLOT_CODES_STORAGE = "freeroomplanner-plan-codes";
+function readSlotCodes(): Record<string, string> {
+  try { return JSON.parse(safeGetItem(SLOT_CODES_STORAGE) || "{}") as Record<string, string>; }
+  catch { return {}; }
+}
+export function getPlanCodeForSlot(slot: string): string | null {
+  return readSlotCodes()[slot] ?? null;
+}
+export function rememberPlanCodeForSlot(slot: string, code: string): void {
+  const m = readSlotCodes();
+  m[slot] = code;
+  safeSetItem(SLOT_CODES_STORAGE, JSON.stringify(m));
+}
+export function forgetPlanCodeForSlot(slot: string): void {
+  const m = readSlotCodes();
+  delete m[slot];
+  safeSetItem(SLOT_CODES_STORAGE, JSON.stringify(m));
+}
+
 /** Maps the "What are you planning?" intent to an affiliate-ready category. */
 export function intentToRoomType(): string | null {
   const intent = safeGetItem("freeroomplanner-intent");

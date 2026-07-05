@@ -33,6 +33,7 @@ import { safeGetItem, safeSetItem } from "../lib/safe-storage";
 import SavePlanDialog from "./SavePlanDialog";
 import RatingPromptDialog from "./RatingPromptDialog";
 import type { SharedPlanResult } from "../lib/plan-share";
+import { getPlanCodeForSlot, rememberPlanCodeForSlot, forgetPlanCodeForSlot } from "../lib/plan-share";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -141,7 +142,7 @@ export default function EditorCore({
     }, 120000);
     return () => clearTimeout(timer);
   }, []);
-  const [currentPlanCode, setCurrentPlanCode] = useState<string | null>(initialShareCode);
+  const [currentPlanCode, setCurrentPlanCode] = useState<string | null>(initialShareCode ?? getPlanCodeForSlot(storageKey));
 
   const handleShareLink = useCallback(() => {
     trackEvent("share_dialog_opened");
@@ -151,6 +152,7 @@ export default function EditorCore({
   const handlePlanSaved = useCallback(
     (result: SharedPlanResult) => {
       setCurrentPlanCode(result.code);
+      rememberPlanCodeForSlot(storageKey, result.code);
       if (updateUrlOnSave) {
         try {
           window.history.replaceState(null, "", `/p/${result.code}`);
@@ -159,7 +161,7 @@ export default function EditorCore({
         }
       }
     },
-    [updateUrlOnSave]
+    [updateUrlOnSave, storageKey]
   );
   const [furniturePanelOpen, setFurniturePanelOpen] = useState(false);
   const [propertiesPanelOpen, setPropertiesPanelOpen] = useState(false);
@@ -918,7 +920,7 @@ export default function EditorCore({
           </DialogHeader>
           <DialogFooter className="gap-2 sm:gap-0">
             <Button variant="outline" onClick={() => setShowClearDialog(false)}>Cancel</Button>
-            <Button variant="destructive" onClick={() => { editor.clearAll(); setShowClearDialog(false); }}>Clear All</Button>
+            <Button variant="destructive" onClick={() => { editor.clearAll(); forgetPlanCodeForSlot(storageKey); setCurrentPlanCode(null); setShowClearDialog(false); }}>Clear All</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
