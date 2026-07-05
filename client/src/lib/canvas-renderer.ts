@@ -8670,10 +8670,11 @@ export function drawTextBoxes(
   const ordered = [...textBoxes].sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0));
 
   for (const tb of ordered) {
+    const pxPerCmBase = gridSize / 100;
     const x = tb.x * pxPerCm + panOffset.x;
     const y = tb.y * pxPerCm + panOffset.y;
-    const w = tb.width * pxPerCm;
-    const h = tb.height * pxPerCm;
+    const w = tb.width * pxPerCmBase;
+    const h = tb.height * pxPerCmBase;
 
     ctx.save();
     if (tb.rotation) {
@@ -8743,7 +8744,7 @@ export function drawTextBoxes(
         .replace(/&#39;/g, "'");
       if (textContent.trim()) {
         const padding = (tb.padding ?? 2) * zoom;
-        const fontSize = Math.max(8, (tb.fontSize || 14) * zoom);
+        const fontSize = Math.max(8, tb.fontSize || 14);
         ctx.font = `400 ${fontSize}px ${tb.fontFamily || "sans-serif"}`;
         ctx.fillStyle = "#28251d";
         ctx.textAlign = "left";

@@ -2217,8 +2217,9 @@ export default function FloorPlanCanvas({
       if (textBoxResizing) {
         const dxPx = e.clientX - textBoxResizing.startX;
         const dyPx = e.clientY - textBoxResizing.startY;
-        const dxCm = dxPx / pxPerCm;
-        const dyCm = dyPx / pxPerCm;
+        const pxPerCmBase = state.zoom > 0 ? pxPerCm / state.zoom : pxPerCm;
+        const dxCm = dxPx / pxPerCmBase;
+        const dyCm = dyPx / pxPerCmBase;
         const corner = textBoxResizing.corner;
         const minW = 50;
         const minH = 30;
@@ -2228,13 +2229,13 @@ export default function FloorPlanCanvas({
         let newY = textBoxResizing.origY;
 
         if (corner === "br") { newW = Math.max(minW, textBoxResizing.origW + dxCm); newH = Math.max(minH, textBoxResizing.origH + dyCm); }
-        else if (corner === "bl") { newW = Math.max(minW, textBoxResizing.origW - dxCm); newH = Math.max(minH, textBoxResizing.origH + dyCm); newX = textBoxResizing.origX + textBoxResizing.origW - newW; }
-        else if (corner === "tr") { newW = Math.max(minW, textBoxResizing.origW + dxCm); newH = Math.max(minH, textBoxResizing.origH - dyCm); newY = textBoxResizing.origY + textBoxResizing.origH - newH; }
-        else if (corner === "tl") { newW = Math.max(minW, textBoxResizing.origW - dxCm); newH = Math.max(minH, textBoxResizing.origH - dyCm); newX = textBoxResizing.origX + textBoxResizing.origW - newW; newY = textBoxResizing.origY + textBoxResizing.origH - newH; }
+        else if (corner === "bl") { newW = Math.max(minW, textBoxResizing.origW - dxCm); newH = Math.max(minH, textBoxResizing.origH + dyCm); newX = textBoxResizing.origX + (textBoxResizing.origW - newW) / state.zoom; }
+        else if (corner === "tr") { newW = Math.max(minW, textBoxResizing.origW + dxCm); newH = Math.max(minH, textBoxResizing.origH - dyCm); newY = textBoxResizing.origY + (textBoxResizing.origH - newH) / state.zoom; }
+        else if (corner === "tl") { newW = Math.max(minW, textBoxResizing.origW - dxCm); newH = Math.max(minH, textBoxResizing.origH - dyCm); newX = textBoxResizing.origX + (textBoxResizing.origW - newW) / state.zoom; newY = textBoxResizing.origY + (textBoxResizing.origH - newH) / state.zoom; }
         else if (corner === "r") { newW = Math.max(minW, textBoxResizing.origW + dxCm); }
-        else if (corner === "l") { newW = Math.max(minW, textBoxResizing.origW - dxCm); newX = textBoxResizing.origX + textBoxResizing.origW - newW; }
+        else if (corner === "l") { newW = Math.max(minW, textBoxResizing.origW - dxCm); newX = textBoxResizing.origX + (textBoxResizing.origW - newW) / state.zoom; }
         else if (corner === "b") { newH = Math.max(minH, textBoxResizing.origH + dyCm); }
-        else if (corner === "t") { newH = Math.max(minH, textBoxResizing.origH - dyCm); newY = textBoxResizing.origY + textBoxResizing.origH - newH; }
+        else if (corner === "t") { newH = Math.max(minH, textBoxResizing.origH - dyCm); newY = textBoxResizing.origY + (textBoxResizing.origH - newH) / state.zoom; }
 
         onUpdateTextBox(textBoxResizing.id, { width: Math.round(newW), height: Math.round(newH), x: Math.round(newX), y: Math.round(newY) });
       }

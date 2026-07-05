@@ -43,10 +43,14 @@ export default function RichTextBox({
   const [containerRect, setContainerRect] = useState<DOMRect | null>(null);
 
   // Convert world coordinates to screen pixels
+  // Notes are a fixed on-screen size regardless of zoom: their POSITION is
+  // anchored to the plan (scales with zoom) but their SIZE and font use the
+  // zoom-independent base scale so a note stays the size the user set it to.
+  const pxPerCmBase = zoom > 0 ? pxPerCm / zoom : pxPerCm;
   const screenX = textBox.x * pxPerCm + panOffset.x;
   const screenY = textBox.y * pxPerCm + panOffset.y;
-  const screenW = textBox.width * pxPerCm;
-  const screenH = textBox.height * pxPerCm;
+  const screenW = textBox.width * pxPerCmBase;
+  const screenH = textBox.height * pxPerCmBase;
 
   const hasContent = textBox.content && textBox.content.replace(/<[^>]*>/g, "").trim().length > 0;
 
@@ -93,9 +97,9 @@ export default function RichTextBox({
     parent.style.width = savedW;
     parent.style.minHeight = savedMinH;
 
-    const newHeightCm = Math.max(20, naturalH / pxPerCm);
+    const newHeightCm = Math.max(20, naturalH / pxPerCmBase);
     onAutoFit(textBox.id, textBox.width, newHeightCm);
-  }, [textBox.id, screenW, pxPerCm, onContentChange, onAutoFit]);
+  }, [textBox.id, screenW, pxPerCmBase, onContentChange, onAutoFit]);
 
   const handlePointerDown = useCallback(
     (e: React.PointerEvent) => {
@@ -181,7 +185,7 @@ export default function RichTextBox({
     backgroundColor: bgRgba,
     borderRadius: textBox.cornerRadius,
     padding: textBox.padding,
-    fontSize: textBox.fontSize * zoom,
+    fontSize: textBox.fontSize,
     fontFamily: textBox.fontFamily,
     overflow: isEditMode ? "auto" : "visible",
     cursor: isEditMode ? "text" : isSelected ? "move" : "default",
