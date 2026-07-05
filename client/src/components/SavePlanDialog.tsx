@@ -81,7 +81,6 @@ export default function SavePlanDialog({
   const [result, setResult] = useState<SharedPlanResult | null>(null);
   const [copied, setCopied] = useState(false);
   const runIdRef = useRef(0);
-  const downloadedForRef = useRef<string | null>(null);
   const [linkReady, setLinkReady] = useState(false);
 
   const runSave = useCallback(async () => {
@@ -109,9 +108,9 @@ export default function SavePlanDialog({
       if (runId !== runIdRef.current) return;
       setLinkReady(true);
 
-      // One Save gives the file too: download the plan image once ready.
-      if (onDownloadImage && downloadedForRef.current !== saved.code) {
-        downloadedForRef.current = saved.code;
+      // One Save always downloads the file too — every save, not just the
+      // first — so the user reliably gets an up-to-date image each time.
+      if (onDownloadImage) {
         try { onDownloadImage(); } catch { /* download is best-effort */ }
         trackEvent("plan_image_downloaded", { plan_code: saved.code });
       }
