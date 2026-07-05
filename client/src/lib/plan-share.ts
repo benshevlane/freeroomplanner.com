@@ -117,6 +117,17 @@ export async function savePlanToCloud(
       }
       // If the update is rejected (e.g. plan was deleted), fall through and
       // create a fresh plan instead — the user must never lose a save.
+    } else {
+      // This browser doesn't hold the edit key, so it can't overwrite the
+      // shared plan. Keep the SAME link it was opened on instead of forking a
+      // new one — the user's edits still download locally, and the shared link
+      // stays the owner's version.
+      return {
+        code: existingCode,
+        url: planUrlFor(existingCode),
+        updated: false,
+        country: null,
+      };
     }
   }
 
