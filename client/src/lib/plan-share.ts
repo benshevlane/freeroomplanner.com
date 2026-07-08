@@ -67,7 +67,9 @@ export function intentToRoomType(): string | null {
   const intent = safeGetItem("freeroomplanner-intent");
   if (!intent) return null;
   try {
-    const value = JSON.parse(intent);
+    const parsed = JSON.parse(intent);
+    // IntentCapture stores {"intent":"kitchen_renovation"}; tolerate a bare string too.
+    const value = typeof parsed === "string" ? parsed : parsed?.intent;
     const map: Record<string, string> = {
       kitchen_renovation: "kitchen",
       bathroom_renovation: "bathroom",
