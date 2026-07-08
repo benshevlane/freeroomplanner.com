@@ -28,7 +28,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const { partnerId, contactName, businessName, email, websiteUrl, embedCode } = parsed.data;
-    const fromAddr = process.env.EMAIL_FROM || "Free Room Planner <noreply@send.freeroomplanner.com>";
+    const fromAddr = process.env.EMAIL_FROM || "Free Room Planner <noreply@freeroomplanner.com>";
     const resend = new Resend(apiKey);
 
     // 1. Owner notification

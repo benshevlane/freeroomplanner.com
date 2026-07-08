@@ -213,7 +213,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const resend = new Resend(apiKey);
     const { error } = await resend.emails.send({
-      from: process.env.EMAIL_FROM || "Free Room Planner <noreply@send.freeroomplanner.com>",
+      from: process.env.EMAIL_FROM || "Free Room Planner <noreply@freeroomplanner.com>",
       to: process.env.REPORT_EMAIL || "ben@freeroomplanner.com",
       subject: `Room Planner daily: ${summary.plansSaved} saved / ${summary.plansStarted} started / ${summary.plansDownloaded} downloaded — ${dateLabel}`,
       html,
