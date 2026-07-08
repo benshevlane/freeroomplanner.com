@@ -71,11 +71,11 @@ export function intentToRoomType(): string | null {
     const map: Record<string, string> = {
       kitchen_renovation: "kitchen",
       bathroom_renovation: "bathroom",
-      living_room_refresh: "general",
-      bedroom_refresh: "general",
-      full_home_renovation: "general",
-      new_furniture_shopping: "general",
-      measuring_space: "general",
+      living_room_refresh: "living_room",
+      bedroom_refresh: "bedroom",
+      full_home_renovation: "full_home",
+      new_furniture_shopping: "furniture",
+      measuring_space: "measuring",
     };
     return map[String(value)] ?? null;
   } catch {

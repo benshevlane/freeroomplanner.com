@@ -33,7 +33,7 @@ import { safeGetItem, safeSetItem } from "../lib/safe-storage";
 import SavePlanDialog from "./SavePlanDialog";
 import RatingPromptDialog from "./RatingPromptDialog";
 import type { SharedPlanResult } from "../lib/plan-share";
-import { getPlanCodeForSlot, rememberPlanCodeForSlot, forgetPlanCodeForSlot } from "../lib/plan-share";
+import { getPlanCodeForSlot, rememberPlanCodeForSlot, forgetPlanCodeForSlot, intentToRoomType } from "../lib/plan-share";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -574,6 +574,7 @@ export default function EditorCore({
             room_name: state.roomName,
             timestamp: new Date().toISOString(),
           });
+          fetch("/api/track", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ event: "plan_downloaded", roomType: intentToRoomType() }) }).catch(() => {});
         } catch { /* analytics should never break the app */ }
         try { onExport?.(); } catch { /* never break the app */ }
       }, "image/png");

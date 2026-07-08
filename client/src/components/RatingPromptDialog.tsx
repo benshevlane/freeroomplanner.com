@@ -51,6 +51,8 @@ export default function RatingPromptDialog({ open, onOpenChange }: RatingPromptD
         apiRequest("POST", "/api/feedback", {
           type: "praise",
           message: `In-app rating: 5/5`,
+          rating: 5,
+          page: window.location.pathname,
         }).catch(() => {});
         setStage("thanks");
       }
@@ -65,6 +67,8 @@ export default function RatingPromptDialog({ open, onOpenChange }: RatingPromptD
       await apiRequest("POST", "/api/feedback", {
         type: "general",
         message: `In-app rating: ${rating}/5${feedback.trim() ? `\n\n${feedback.trim()}` : ""}`,
+        rating,
+        page: window.location.pathname,
       });
     } catch {
       /* never block the user on feedback delivery */
@@ -76,7 +80,7 @@ export default function RatingPromptDialog({ open, onOpenChange }: RatingPromptD
   const handleReviewClick = () => {
     trackEvent("review_link_clicked");
     try {
-      apiRequest("POST", "/api/feedback", { type: "praise", message: "In-app rating: 5/5 — sent to review site" }).catch(() => {});
+      apiRequest("POST", "/api/feedback", { type: "praise", message: "In-app rating: 5/5 — sent to review site", rating: 5, page: window.location.pathname }).catch(() => {});
     } catch { /* ignore */ }
     window.open(REVIEW_URL, "_blank", "noopener,noreferrer");
     setStage("thanks");
