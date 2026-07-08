@@ -42,15 +42,18 @@ export default function RichTextBox({
   const contentRef = useRef<HTMLDivElement>(null);
   const [containerRect, setContainerRect] = useState<DOMRect | null>(null);
 
-  // Convert world coordinates to screen pixels
-  // Notes are a fixed on-screen size regardless of zoom: their POSITION is
-  // anchored to the plan (scales with zoom) but their SIZE and font use the
-  // zoom-independent base scale so a note stays the size the user set it to.
-  const pxPerCmBase = zoom > 0 ? pxPerCm / zoom : pxPerCm;
+  // Notes are anchored to the plan and scale WITH it (like furniture): position,
+  // size AND font all use the world scale, so a note keeps its proportion to the
+  // room at every zoom level and the exported image matches what's on screen.
+  // NOTE_FONT_BASE is the editor's px-per-cm at 100% zoom (gridSize 80) — the
+  // reference at which a note's stored fontSize (px) renders 1:1. drawTextBoxes
+  // (export) uses the same constant so box + text stay locked together there too.
+  const NOTE_FONT_BASE = 0.8;
+  const fontScale = pxPerCm > 0 ? pxPerCm / NOTE_FONT_BASE : 1;
   const screenX = textBox.x * pxPerCm + panOffset.x;
   const screenY = textBox.y * pxPerCm + panOffset.y;
-  const screenW = textBox.width * pxPerCmBase;
-  const screenH = textBox.height * pxPerCmBase;
+  const screenW = textBox.width * pxPerCm;
+  const screenH = textBox.height * pxPerCm;
 
   const hasContent = textBox.content && textBox.content.replace(/<[^>]*>/g, "").trim().length > 0;
 
@@ -97,9 +100,9 @@ export default function RichTextBox({
     parent.style.width = savedW;
     parent.style.minHeight = savedMinH;
 
-    const newHeightCm = Math.max(20, naturalH / pxPerCmBase);
+    const newHeightCm = Math.max(20, naturalH / (pxPerCm > 0 ? pxPerCm : 1));
     onAutoFit(textBox.id, textBox.width, newHeightCm);
-  }, [textBox.id, screenW, pxPerCmBase, onContentChange, onAutoFit]);
+  }, [textBox.id, screenW, pxPerCm, onContentChange, onAutoFit]);
 
   const handlePointerDown = useCallback(
     (e: React.PointerEvent) => {
@@ -183,9 +186,9 @@ export default function RichTextBox({
     transform: `rotate(${textBox.rotation}deg)`,
     transformOrigin: "center center",
     backgroundColor: bgRgba,
-    borderRadius: textBox.cornerRadius,
-    padding: textBox.padding,
-    fontSize: textBox.fontSize,
+    borderRadius: textBox.cornerRadius * fontScale,
+    padding: textBox.padding * fontScale,
+    fontSize: textBox.fontSize * fontScale,
     fontFamily: textBox.fontFamily,
     overflow: isEditMode ? "auto" : "visible",
     cursor: isEditMode ? "text" : isSelected ? "move" : "default",
@@ -199,12 +202,12 @@ export default function RichTextBox({
     userSelect: isEditMode ? "text" : "none",
     ...(textBox.borderEnabled
       ? {
-          border: `${textBox.borderWidth}px ${textBox.borderStyle} ${textBox.borderColor}`,
+          border: `${textBox.borderWidth * fontScale}px ${textBox.borderStyle} ${textBox.borderColor}`,
         }
       : {}),
     ...(textBox.shadowEnabled
       ? {
-          boxShadow: `${textBox.shadowOffsetX}px ${textBox.shadowOffsetY}px ${textBox.shadowBlur}px rgba(0,0,0,0.2)`,
+          boxShadow: `${textBox.shadowOffsetX * fontScale}px ${textBox.shadowOffsetY * fontScale}px ${textBox.shadowBlur * fontScale}px rgba(0,0,0,0.2)`,
         }
       : {}),
   };
