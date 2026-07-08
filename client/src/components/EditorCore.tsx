@@ -7,6 +7,7 @@ import FurniturePanel from "./FurniturePanel";
 import PropertiesPanel from "./PropertiesPanel";
 import RoomTabs from "./RoomTabs";
 import { embedPlanInPng, extractPlanFromPng } from "../lib/png-plan";
+import { getRecentPlans, recordRecentPlan, type RecentPlan } from "../lib/recent-plans";
 import { FurnitureTemplate, FurnitureItem, RoomLabel, TextBox, Arrow, Point, UnitSystem, MeasureMode, isWallCupboard } from "../lib/types";
 import { trackEvent } from "@/lib/analytics";
 import {
@@ -117,6 +118,8 @@ export default function EditorCore({
       return next;
     });
   }, []);
+
+  const [recentPlans, setRecentPlans] = useState<RecentPlan[]>(() => getRecentPlans());
 
   const [droppingFurniture, setDroppingFurniture] = useState<FurnitureTemplate | null>(null);
   const [autoEditTextBoxId, setAutoEditTextBoxId] = useState<string | null>(null);
@@ -376,11 +379,12 @@ export default function EditorCore({
         handleDeleteSelected();
       }
 
-      // Arrow keys: nudge selected furniture by 1cm
+      // Arrow keys: nudge selected furniture by 1cm (Shift = 1mm fine step)
       if (selectedFurniture && (e.key === "ArrowUp" || e.key === "ArrowDown" || e.key === "ArrowLeft" || e.key === "ArrowRight")) {
         e.preventDefault();
-        const dx = e.key === "ArrowLeft" ? -1 : e.key === "ArrowRight" ? 1 : 0;
-        const dy = e.key === "ArrowUp" ? -1 : e.key === "ArrowDown" ? 1 : 0;
+        const step = e.shiftKey ? 0.1 : 1; // 0.1cm = 1mm
+        const dx = e.key === "ArrowLeft" ? -step : e.key === "ArrowRight" ? step : 0;
+        const dy = e.key === "ArrowUp" ? -step : e.key === "ArrowDown" ? step : 0;
         editor.nudgeFurniture(selectedFurniture.id, dx, dy);
       }
     };
@@ -566,6 +570,7 @@ export default function EditorCore({
         a.click();
         URL.revokeObjectURL(url);
         showToast("Plan saved as PNG image");
+        try { setRecentPlans(recordRecentPlan(state.roomName, JSON.stringify(editor.exportState()))); } catch { /* history is best-effort */ }
         try {
           const intent = safeGetItem("freeroomplanner-intent");
           const planType = intent ? JSON.parse(intent)?.intent ?? "room" : "room";
@@ -594,6 +599,7 @@ export default function EditorCore({
       a.click();
       URL.revokeObjectURL(url);
       showToast("Room saved as JSON");
+      try { setRecentPlans(recordRecentPlan(state.roomName, JSON.stringify(data))); } catch { /* history is best-effort */ }
     } catch {
       showToast("Failed to save JSON");
     }
@@ -680,6 +686,15 @@ export default function EditorCore({
     input.click();
   }, [applyLoadedPlan, showToast]);
 
+  const handleLoadRecent = useCallback((p: RecentPlan) => {
+    try {
+      const plan = JSON.parse(p.data);
+      if (!applyLoadedPlan(plan)) showToast("Couldn't open that plan");
+    } catch {
+      showToast("Couldn't open that plan");
+    }
+  }, [applyLoadedPlan, showToast]);
+
   const handleSelectFurniture = useCallback(
     (template: FurnitureTemplate) => {
       const canvasEl = document.querySelector('[data-testid="floor-plan-canvas"]');
@@ -751,6 +766,8 @@ export default function EditorCore({
           onSaveAllJSON={handleSaveAllJSON}
           onShareLink={handleShareLink}
           onLoadPlan={handleLoadPlan}
+          recentPlans={recentPlans}
+          onLoadRecent={handleLoadRecent}
           onClearAll={() => setShowClearDialog(true)}
           zoom={state.zoom}
           units={state.units}

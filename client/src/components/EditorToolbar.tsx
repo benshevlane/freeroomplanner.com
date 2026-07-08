@@ -1,4 +1,5 @@
 import { EditorTool, UnitSystem, MeasureMode, UNIT_LABELS, UNIT_SHORT } from "../lib/types";
+import type { RecentPlan } from "../lib/recent-plans";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Separator } from "@/components/ui/separator";
@@ -6,6 +7,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -55,6 +57,8 @@ interface EditorToolbarProps {
   onSaveAllJSON: () => void;
   onShareLink: () => void;
   onLoadPlan: () => void;
+  recentPlans?: RecentPlan[];
+  onLoadRecent?: (p: RecentPlan) => void;
   onClearAll: () => void;
   zoom: number;
   units: UnitSystem;
@@ -97,6 +101,8 @@ export default function EditorToolbar({
   onSaveAllJSON,
   onShareLink,
   onLoadPlan,
+  recentPlans,
+  onLoadRecent,
   onClearAll,
   zoom,
   units,
@@ -219,8 +225,21 @@ export default function EditorToolbar({
               </DropdownMenuItem>
               <DropdownMenuItem onClick={onLoadPlan}>
                 <FolderOpen className="h-4 w-4 mr-2" />
-                Load Plan
+                Load Plan (from file)
               </DropdownMenuItem>
+              {recentPlans && recentPlans.length > 0 && onLoadRecent && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel className="text-xs text-muted-foreground">Recent plans</DropdownMenuLabel>
+                  {recentPlans.map((p) => (
+                    <DropdownMenuItem key={p.id} onClick={() => onLoadRecent(p)} className="text-sm">
+                      <FolderOpen className="h-4 w-4 mr-2 opacity-60" />
+                      <span className="truncate max-w-[160px]">{p.name}</span>
+                      <span className="ml-auto pl-3 text-[10px] text-muted-foreground">{new Date(p.ts).toLocaleDateString()}</span>
+                    </DropdownMenuItem>
+                  ))}
+                </>
+              )}
               <DropdownMenuSeparator />
               {(["m", "cm", "mm", "ft"] as UnitSystem[]).map((u) => (
                 <DropdownMenuItem key={u} onClick={() => onSetUnits(u)}>
@@ -438,7 +457,7 @@ export default function EditorToolbar({
             </Button>
           </TooltipTrigger>
           <TooltipContent>
-            <p>{showAllMeasurements ? "Using full-size labels for all walls" : "Enlarge labels for short walls"}</p>
+            <p>{showAllMeasurements ? "Showing measurements on every wall — click to hide short-wall labels" : "Short-wall labels hidden — click to show measurements on all walls"}</p>
           </TooltipContent>
         </Tooltip>
         <DropdownMenu>
