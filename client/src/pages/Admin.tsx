@@ -808,27 +808,7 @@ export default function Admin() {
         </div>
 
         <h1 className="text-3xl font-bold mb-2">Admin</h1>
-        <p className="text-[#6b6457] mb-10">Manage the homepage hero image and view embed analytics.</p>
-
-        {/* Upload area */}
-        <div
-          ref={dropRef}
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={onDrop}
-          onClick={() => fileRef.current?.click()}
-          className="border-2 border-dashed border-[#d8d2c4] rounded-xl p-10 text-center cursor-pointer hover:border-[#3d8a7c] transition-colors"
-        >
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={(e) => { if (e.target.files?.[0]) upload(e.target.files[0]); }}
-          />
-          <div className="text-4xl mb-3 text-[#c4bfb4]">{uploading ? "..." : "+"}</div>
-          <p className="font-medium">{uploading ? "Uploading..." : "Drop an image here or click to browse"}</p>
-          <p className="text-sm text-[#9a9488] mt-1">PNG, JPG, or WebP. Will be compressed and saved as the homepage hero image.</p>
-        </div>
+        <p className="text-[#6b6457] mb-10">Planner activity, downloads, and embed analytics.</p>
 
         {message && (
           <p className={`mt-4 text-sm font-medium ${messageType === "error" ? "text-red-600" : "text-[#3d8a7c]"}`}>{message}</p>
