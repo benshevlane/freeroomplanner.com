@@ -65,6 +65,7 @@
 @keyframes frp-pulse { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.5); opacity: 0.4; } }
 @keyframes frp-dash { to { stroke-dashoffset: -32; } }
 @keyframes frp-rise { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+@keyframes frp-rise-nf { from { transform: translateY(18px); } to { transform: none; } }
 @keyframes frp-fade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes frp-pop { from { opacity: 0; transform: scale(0.72); } to { opacity: 1; transform: scale(1); } }
 @keyframes frp-draw { to { stroke-dashoffset: 0; } }
@@ -136,17 +137,17 @@ html.frp-anim-hold.frp-hero-shown #top [style*="animation: frp"]{ animation-play
     <div style="max-width: 1240px; margin: 0 auto; padding: 80px 40px 88px; display: grid; grid-template-columns: 1.02fr 1.1fr; gap: 64px; align-items: center;">
       <!-- copy -->
       <div>
-        <div style="display: inline-flex; align-items: center; gap: 8px; background: #ffffff; border: 1px solid #ccfbf1; color: #0f766e; padding: 7px 14px; border-radius: 999px; font-size: 13px; font-weight: 600; box-shadow: 0 2px 8px rgba(13,148,136,0.08); animation: frp-rise 0.7s cubic-bezier(0.2,0.7,0.2,1) both;">
+        <div style="display: inline-flex; align-items: center; gap: 8px; background: #ffffff; border: 1px solid #ccfbf1; color: #0f766e; padding: 7px 14px; border-radius: 999px; font-size: 13px; font-weight: 600; box-shadow: 0 2px 8px rgba(13,148,136,0.08); animation: frp-rise-nf 0.7s cubic-bezier(0.2,0.7,0.2,1) both;">
           <span style="width: 7px; height: 7px; border-radius: 50%; background: #0d9488; display: inline-block;"></span>
           Free forever · No sign-up · No download
         </div>
-        <h1 style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 60px; line-height: 1.02; letter-spacing: -0.035em; margin: 22px 0 0; text-wrap: balance; animation: frp-rise 0.7s cubic-bezier(0.2,0.7,0.2,1) both; animation-delay: 0.09s;">
+        <h1 style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 60px; line-height: 1.02; letter-spacing: -0.035em; margin: 22px 0 0; text-wrap: balance; animation: frp-rise-nf 0.7s cubic-bezier(0.2,0.7,0.2,1) both; animation-delay: 0.09s;">
           Draw your room. <span style="color: #0d9488;"><span style="display: inline-block; animation: frp-letter 0.42s cubic-bezier(0.2,0.7,0.2,1) both; animation-delay: 0.50s;">S</span><span style="display: inline-block; animation: frp-letter 0.42s cubic-bezier(0.2,0.7,0.2,1) both; animation-delay: 0.54s;">h</span><span style="display: inline-block; animation: frp-letter 0.42s cubic-bezier(0.2,0.7,0.2,1) both; animation-delay: 0.58s;">a</span><span style="display: inline-block; animation: frp-letter 0.42s cubic-bezier(0.2,0.7,0.2,1) both; animation-delay: 0.62s;">r</span><span style="display: inline-block; animation: frp-letter 0.42s cubic-bezier(0.2,0.7,0.2,1) both; animation-delay: 0.66s;">e</span><span style="display: inline-block; width: 0.3em;"></span><span style="display: inline-block; animation: frp-letter 0.42s cubic-bezier(0.2,0.7,0.2,1) both; animation-delay: 0.70s;">y</span><span style="display: inline-block; animation: frp-letter 0.42s cubic-bezier(0.2,0.7,0.2,1) both; animation-delay: 0.74s;">o</span><span style="display: inline-block; animation: frp-letter 0.42s cubic-bezier(0.2,0.7,0.2,1) both; animation-delay: 0.78s;">u</span><span style="display: inline-block; animation: frp-letter 0.42s cubic-bezier(0.2,0.7,0.2,1) both; animation-delay: 0.82s;">r</span><span style="display: inline-block; width: 0.3em;"></span><span style="display: inline-block; animation: frp-letter 0.42s cubic-bezier(0.2,0.7,0.2,1) both; animation-delay: 0.86s;">p</span><span style="display: inline-block; animation: frp-letter 0.42s cubic-bezier(0.2,0.7,0.2,1) both; animation-delay: 0.90s;">l</span><span style="display: inline-block; animation: frp-letter 0.42s cubic-bezier(0.2,0.7,0.2,1) both; animation-delay: 0.94s;">a</span><span style="display: inline-block; animation: frp-letter 0.42s cubic-bezier(0.2,0.7,0.2,1) both; animation-delay: 0.98s;">n</span><span style="display: inline-block; animation: frp-letter 0.42s cubic-bezier(0.2,0.7,0.2,1) both; animation-delay: 1.02s;">.</span></span>
         </h1>
-        <p style="font-size: 19px; line-height: 1.6; color: #475569; margin: 22px 0 0; max-width: 520px; animation: frp-rise 0.7s cubic-bezier(0.2,0.7,0.2,1) both; animation-delay: 0.19s;">
+        <p style="font-size: 19px; line-height: 1.6; color: #475569; margin: 22px 0 0; max-width: 520px; animation: frp-rise-nf 0.7s cubic-bezier(0.2,0.7,0.2,1) both; animation-delay: 0.19s;">
           Draw any room to scale, drag in furniture, and export a clean PNG to brief your kitchen maker, bathroom fitter, or builder. Built for homeowners, not architects.
         </p>
-        <div style="display: flex; align-items: center; gap: 14px; margin-top: 32px; flex-wrap: wrap; animation: frp-rise 0.7s cubic-bezier(0.2,0.7,0.2,1) both; animation-delay: 0.29s;">
+        <div style="display: flex; align-items: center; gap: 14px; margin-top: 32px; flex-wrap: wrap; animation: frp-rise-nf 0.7s cubic-bezier(0.2,0.7,0.2,1) both; animation-delay: 0.29s;">
           <a href="/app" style="display: inline-flex; align-items: center; gap: 9px; background: #0d9488; color: #fff; padding: 16px 28px; border-radius: 12px; font-size: 17px; font-weight: 700; text-decoration: none; box-shadow: 0 8px 22px rgba(13,148,136,0.35);">
             Start drawing — free
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg>
@@ -155,7 +156,7 @@ html.frp-anim-hold.frp-hero-shown #top [style*="animation: frp"]{ animation-play
             See how it works
           </a>
         </div>
-        <div style="display: flex; align-items: center; gap: 14px; margin-top: 26px; animation: frp-rise 0.7s cubic-bezier(0.2,0.7,0.2,1) both; animation-delay: 0.39s;">
+        <div style="display: flex; align-items: center; gap: 14px; margin-top: 26px; animation: frp-rise-nf 0.7s cubic-bezier(0.2,0.7,0.2,1) both; animation-delay: 0.39s;">
           <div style="display: flex;">
             <div style="width: 34px; height: 34px; border-radius: 50%; background: #14b8a6; border: 2px solid #fff; margin-left: -8px;"></div>
             <div style="width: 34px; height: 34px; border-radius: 50%; background: #64748b; border: 2px solid #fff; margin-left: -8px;"></div>
