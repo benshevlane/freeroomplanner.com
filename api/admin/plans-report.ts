@@ -63,8 +63,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         ? Number((ratingValues.reduce((a, b) => a + b, 0) / ratingCount).toFixed(1))
         : null;
 
+    // Diagnostics: first/last event per type, to verify date filtering and
+    // see how far back each event's history actually goes.
+    const eventTypes = ["plan_started", "plan_downloaded", "affiliate_click"];
+    const timelineEntries = await Promise.all(
+      eventTypes.map(async (t) => {
+        const [firstQ, lastQ] = await Promise.all([
+          supabaseAdmin!.from("usage_events").select("created_at").eq("event_type", t).order("created_at", { ascending: true }).limit(1),
+          supabaseAdmin!.from("usage_events").select("created_at").eq("event_type", t).order("created_at", { ascending: false }).limit(1),
+        ]);
+        return [t, {
+          first: firstQ.data?.[0]?.created_at ?? null,
+          last: lastQ.data?.[0]?.created_at ?? null,
+        }] as const;
+      })
+    );
+
     return res.json({
       days,
+      eventTimeline: Object.fromEntries(timelineEntries),
       totalPlansAllTime: totalQ.count ?? null,
       plansDownloaded: downloadsQ.count ?? 0,
       categoryBreakdown,
