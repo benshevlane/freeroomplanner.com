@@ -38,6 +38,7 @@ const SHELLS = {
     h1: "Turn visitors into ready-to-quote leads by embedding Free Room Planner into your website",
     intro: "The Free Room Planner embed turns website visitors into ready-to-quote leads: customers plan their room and arrive at enquiry knowing their space.",
     index: true,
+    reveal: true,
   },
   "embed.html": { title: "Free Room Planner — Embeddable Widget", desc: BASE_DESC, index: false },
   "plan.html": {
@@ -71,6 +72,15 @@ for (const [f, cfg] of Object.entries(SHELLS)) {
     html = html.replace(
       /<style>\/\* Anti-FOUC[\s\S]*?<\/style>/,
       "",
+    );
+  }
+  if (cfg.reveal) {
+    // Beats the JS-injected ".seo-shell{visibility:hidden}" via !important so
+    // the pre-rendered hero is the LCP element (~1-2s) instead of the React
+    // mount (~4s on throttled mobile).
+    html = html.replace(
+      "</head>",
+      '<style id="frp-reveal-shell">.seo-shell{visibility:visible!important;position:static!important}</style></head>',
     );
   }
   if (cfg.h1) {
