@@ -389,6 +389,7 @@ function ActivityReport() {
           className="text-sm border border-[#e8e3d8] rounded-lg px-2 py-1 bg-white"
           data-testid="activity-range"
         >
+          <option value={1}>Last 24 hours</option>
           <option value={7}>Last 7 days</option>
           <option value={30}>Last 30 days</option>
           <option value={60}>Last 60 days</option>
