@@ -36,6 +36,7 @@ import {
   Tags,
   TextCursorInput,
   Ruler,
+  Magnet,
 } from "lucide-react";
 
 interface EditorToolbarProps {
@@ -73,6 +74,8 @@ interface EditorToolbarProps {
   onTogglePropertiesPanel?: () => void;
   componentLabelsVisible: boolean;
   onToggleComponentLabels: () => void;
+  snapEnabled: boolean;
+  onToggleSnap: () => void;
 }
 
 const tools: { tool: EditorTool; icon: typeof MousePointer2; label: string; shortcut: string }[] = [
@@ -116,6 +119,8 @@ export default function EditorToolbar({
   onToggleFurniturePanel,
   onTogglePropertiesPanel,
   componentLabelsVisible,
+  snapEnabled,
+  onToggleSnap,
   onToggleComponentLabels,
 }: EditorToolbarProps) {
   if (isMobile) {
@@ -252,6 +257,10 @@ export default function EditorToolbar({
               <DropdownMenuItem onClick={onToggleShowAllMeasurements}>
                 <Ruler className="h-4 w-4 mr-2" />
                 Show all measurements: {showAllMeasurements ? "On" : "Off"}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onToggleSnap}>
+                <Magnet className="h-4 w-4 mr-2" />
+                Snapping: {snapEnabled ? "On" : "Off"}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={onToggleComponentLabels}>
                 <Tags className="h-4 w-4 mr-2" />
@@ -485,6 +494,28 @@ export default function EditorToolbar({
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              size="sm"
+              variant={snapEnabled ? "default" : "outline"}
+              onClick={onToggleSnap}
+              data-testid="btn-toggle-snap"
+              className="text-xs px-2"
+              aria-pressed={snapEnabled}
+            >
+              <Magnet className="h-3.5 w-3.5 mr-1" />
+              Snap
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>
+              {snapEnabled
+                ? "Snapping on — hold Alt to place freely"
+                : "Snapping off — hold Alt to snap"}
+            </p>
+          </TooltipContent>
+        </Tooltip>
         <Tooltip>
           <TooltipTrigger asChild>
             <Button

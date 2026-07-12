@@ -12,9 +12,9 @@ import {
   drawRoomAreas,
   drawResizeHandles,
   drawSnapIndicator,
-  drawAlignmentGuides,
-  computeAlignmentGuideSnap,
-  finalizeWallEndpoint,
+  drawAlignmentGuides as rawDrawAlignmentGuides,
+  computeAlignmentGuideSnap as rawComputeAlignmentGuideSnap,
+  finalizeWallEndpoint as rawFinalizeWallEndpoint,
   drawDistanceMeasurements,
   drawEditingDimension,
   collectDistanceMeasurementRects,
@@ -35,13 +35,13 @@ import {
   computeWallAngle,
   findAdjoiningWallDirection,
   screenToWorld,
-  snapToGrid,
-  snapToWallEndpoints,
-  snapToChainStart,
-  snapToWallBody,
-  snapToWallInnerFace,
-  snapFurnitureToWalls,
-  snapFurnitureToNearest,
+  snapToGrid as rawSnapToGrid,
+  snapToWallEndpoints as rawSnapToWallEndpoints,
+  snapToChainStart as rawSnapToChainStart,
+  snapToWallBody as rawSnapToWallBody,
+  snapToWallInnerFace as rawSnapToWallInnerFace,
+  snapFurnitureToWalls as rawSnapFurnitureToWalls,
+  snapFurnitureToNearest as rawSnapFurnitureToNearest,
   SnappedWallEdge,
   SnappedComponentEdge,
   drawWallSnapIndicators,
@@ -73,6 +73,8 @@ import { detectRooms } from "../lib/room-detection";
 interface FloorPlanCanvasProps {
   state: EditorState;
   isDark: boolean;
+  /** When false, items are placed exactly where the pointer is. */
+  snapEnabled: boolean;
   measureMode: MeasureMode;
   showAllMeasurements: boolean;
   onAddWall: (start: Point, end: Point) => void;
@@ -114,6 +116,7 @@ interface FloorPlanCanvasProps {
 export default function FloorPlanCanvas({
   state,
   isDark,
+  snapEnabled,
   measureMode,
   showAllMeasurements,
   onAddWall,
@@ -234,6 +237,72 @@ export default function FloorPlanCanvas({
   const [snapHighlightId, setSnapHighlightId] = useState<string | null>(null);
   const snapHighlightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevDidSnap = useRef(false);
+
+  // --- Snapping control -----------------------------------------------------
+  // Snapping can be turned off from the toolbar. Holding Alt/Option inverts
+  // whatever the current setting is, so you can drop a single piece exactly
+  // where the pointer is without leaving snapping off, and equally grab a snap
+  // on demand while snapping is off.
+  const [altHeld, setAltHeld] = useState(false);
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => { if (e.altKey) setAltHeld(true); };
+    const up = (e: KeyboardEvent) => { if (!e.altKey) setAltHeld(false); };
+    const blur = () => setAltHeld(false);
+    window.addEventListener("keydown", down);
+    window.addEventListener("keyup", up);
+    window.addEventListener("blur", blur);
+    return () => {
+      window.removeEventListener("keydown", down);
+      window.removeEventListener("keyup", up);
+      window.removeEventListener("blur", blur);
+    };
+  }, []);
+
+  const snapActive = altHeld ? !snapEnabled : snapEnabled;
+
+  // These shadow the imported helpers so every existing call site below picks
+  // up the toggle without needing to be individually gated. When snapping is
+  // off they return the raw pointer position and report didSnap: false, which
+  // also suppresses the snap indicators and highlights.
+  // Point-snapping helpers: return the raw pointer position, unsnapped.
+  const snapToWallEndpoints: typeof rawSnapToWallEndpoints = (point, ...rest) =>
+    snapActive ? rawSnapToWallEndpoints(point, ...rest) : { snapped: point, didSnap: false };
+  const snapToChainStart: typeof rawSnapToChainStart = (point, ...rest) =>
+    snapActive ? rawSnapToChainStart(point, ...rest) : { snapped: point, didSnap: false };
+  const snapToWallBody: typeof rawSnapToWallBody = (point, ...rest) =>
+    snapActive ? rawSnapToWallBody(point, ...rest) : { snapped: point, didSnap: false, wallId: null };
+  const snapToWallInnerFace: typeof rawSnapToWallInnerFace = (point, ...rest) =>
+    snapActive ? rawSnapToWallInnerFace(point, ...rest) : { snapped: point, didSnap: false, wallId: null };
+
+  // Furniture snapping: hand back the item's own position and no snapped edges,
+  // which also stops the snap indicators from drawing.
+  const snapFurnitureToWalls: typeof rawSnapFurnitureToWalls = (item, ...rest) =>
+    snapActive
+      ? rawSnapFurnitureToWalls(item, ...rest)
+      : { x: item.x, y: item.y, didSnap: false, snappedEdges: [] };
+  const snapFurnitureToNearest: typeof rawSnapFurnitureToNearest = (item, ...rest) =>
+    snapActive
+      ? rawSnapFurnitureToNearest(item, ...rest)
+      : { x: item.x, y: item.y, didSnap: false, snappedWallEdges: [], snappedComponentEdges: [] };
+
+  // Alignment guides: no guide lines to snap to.
+  const computeAlignmentGuideSnap: typeof rawComputeAlignmentGuideSnap = (point, ...rest) =>
+    snapActive ? rawComputeAlignmentGuideSnap(point, ...rest) : { snapX: null, snapY: null };
+
+  // Same for the drawn guides — with snapping off, no guide lines appear.
+  const drawAlignmentGuides: typeof rawDrawAlignmentGuides = (ctx, point, ...rest) =>
+    snapActive ? rawDrawAlignmentGuides(ctx, point, ...rest) : { snapX: null, snapY: null };
+
+  // With snapping off, keep sub-centimetre rounding (imperceptible, and it keeps
+  // the geometry clean) but drop the coarse 10 cm grid used for labels.
+  const snapToGrid: typeof rawSnapToGrid = (point, snapSize) =>
+    rawSnapToGrid(point, snapActive ? snapSize : Math.min(snapSize, 1));
+
+  // Cardinal (0/90/180/270) angle locking is part of snapping too: passing
+  // alreadySnapped=true makes it return the endpoint untouched.
+  const finalizeWallEndpoint: typeof rawFinalizeWallEndpoint = (wallStart, wallEnd, alreadySnapped) =>
+    rawFinalizeWallEndpoint(wallStart, wallEnd, snapActive ? alreadySnapped : true);
+  // --------------------------------------------------------------------------
 
   // Inline label editing state
   const [editingLabel, setEditingLabel] = useState<{ id: string | null; x: number; y: number; text: string; isNew: boolean; isRoomLabel?: boolean; roomKey?: string }>({ id: null, x: 0, y: 0, text: "", isNew: false });
