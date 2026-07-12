@@ -128,22 +128,32 @@ export default function EditorCore({
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [showRatingPrompt, setShowRatingPrompt] = useState(false);
 
-  // Ask "are you enjoying it?" once per browser, about two minutes into use —
-  // long enough to have formed an opinion, never in an embed, and never tied
-  // to saving (so it can't stack with the share/affiliate window).
-  useEffect(() => {
+  // Snapping preference. Snapping is on by default (it's what most people want),
+  // but it can now be turned off — previously it was always on with no escape,
+  // which was the single most common complaint in the feedback inbox.
+  const [snapEnabled, setSnapEnabled] = useState<boolean>(() => {
+    try {
+      return safeGetItem("freeroomplanner-snap-enabled") !== "false";
+    } catch {
+      return true;
+    }
+  });
+
+  // Ask "are you enjoying it?" once per browser, after the user has actually
+  // succeeded at something — saved a share link or downloaded their plan.
+  // It used to fire on a two-minute timer, which interrupted people mid-drawing
+  // and collected opinions at the moment of peak frustration rather than at a
+  // natural high point. Never shown inside an embed.
+  const requestRatingPrompt = useCallback(() => {
     try {
       if (window.location.pathname.startsWith("/embed")) return;
       if (safeGetItem("freeroomplanner-rating-prompted")) return;
-    } catch { return; }
-    const timer = setTimeout(() => {
-      try {
-        if (safeGetItem("freeroomplanner-rating-prompted")) return;
-        safeSetItem("freeroomplanner-rating-prompted", new Date().toISOString());
-      } catch { /* prompting must never break the app */ }
-      setShowRatingPrompt(true);
-    }, 120000);
-    return () => clearTimeout(timer);
+      safeSetItem("freeroomplanner-rating-prompted", new Date().toISOString());
+    } catch {
+      return; /* prompting must never break the app */
+    }
+    // Let the save/share dialog finish closing so the two never stack.
+    setTimeout(() => setShowRatingPrompt(true), 900);
   }, []);
   const [currentPlanCode, setCurrentPlanCode] = useState<string | null>(initialShareCode ?? getPlanCodeForSlot(storageKey));
 
@@ -163,8 +173,9 @@ export default function EditorCore({
           /* URL update is cosmetic — never break the save */
         }
       }
+      requestRatingPrompt();
     },
-    [updateUrlOnSave, storageKey]
+    [updateUrlOnSave, storageKey, requestRatingPrompt]
   );
   const [furniturePanelOpen, setFurniturePanelOpen] = useState(false);
   const [propertiesPanelOpen, setPropertiesPanelOpen] = useState(false);
@@ -183,13 +194,22 @@ export default function EditorCore({
     }, 2500);
   }, []);
 
+  const handleToggleSnap = useCallback(() => {
+    const next = !snapEnabled;
+    setSnapEnabled(next);
+    try {
+      safeSetItem("freeroomplanner-snap-enabled", next ? "true" : "false");
+    } catch { /* preference persistence is best-effort */ }
+    trackEvent("snap_toggled", { enabled: next });
+    showToast(next ? "Snapping on — hold Alt to place freely" : "Snapping off — hold Alt to snap");
+  }, [snapEnabled, showToast]);
+
   const selectedWall = state.walls.find((w) => w.id === state.selectedItemId) || null;
   const selectedFurniture = state.furniture.find((f) => f.id === state.selectedItemId) || null;
   const selectedLabel = state.labels.find((l) => l.id === state.selectedItemId) || null;
   const selectedTextBox = state.textBoxes.find((t) => t.id === state.selectedItemId) || null;
   const selectedArrow = state.arrows.find((a) => a.id === state.selectedItemId) || null;
   const hasSelection = !!(selectedWall || selectedFurniture || selectedLabel || selectedTextBox || selectedArrow);
-
 
   // Copy/paste/duplicate handlers
   const handleCopy = useCallback(() => {
@@ -582,11 +602,12 @@ export default function EditorCore({
           fetch("/api/track", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ event: "plan_downloaded", roomType: intentToRoomType() }) }).catch(() => {});
         } catch { /* analytics should never break the app */ }
         try { onExport?.(); } catch { /* never break the app */ }
+        requestRatingPrompt();
       }, "image/png");
     } catch {
       showToast("Failed to save image");
     }
-  }, [state, measureMode, showToast, onExport, editor]);
+  }, [state, measureMode, showToast, onExport, editor, requestRatingPrompt]);
 
   const handleSaveJSON = useCallback(() => {
     try {
@@ -750,6 +771,8 @@ export default function EditorCore({
         <EditorToolbar
           selectedTool={state.selectedTool}
           onSetTool={editor.setTool}
+          snapEnabled={snapEnabled}
+          onToggleSnap={handleToggleSnap}
           onUndo={editor.undo}
           onRedo={editor.redo}
           canUndo={editor.canUndo}
@@ -857,6 +880,7 @@ export default function EditorCore({
           state={state}
           dimEditing={dimEditing}
           isDark={isDark}
+          snapEnabled={snapEnabled}
           measureMode={measureMode}
           showAllMeasurements={showAllMeasurements}
           onAddWall={editor.addWall}

@@ -43,17 +43,21 @@ export default function RatingPromptDialog({ open, onOpenChange }: RatingPromptD
     setRating(n);
     trackEvent("rating_submitted", { rating: n });
     if (n === 5) {
+      // Record the 5-star straight away. Previously this only happened if the
+      // rater went on to click through to the review site, so anyone who tapped
+      // 5 stars and then "No thanks" was never counted — which quietly skewed
+      // the feedback inbox towards unhappy ratings only.
+      apiRequest("POST", "/api/feedback", {
+        type: "praise",
+        message: "In-app rating: 5/5",
+        rating: 5,
+        page: window.location.pathname,
+      }).catch(() => {});
+
       if (REVIEW_URL) {
         setStage("review");
         trackEvent("review_prompt_shown");
       } else {
-        // Still record the 5-star rating for Ben even without a review site
-        apiRequest("POST", "/api/feedback", {
-          type: "praise",
-          message: `In-app rating: 5/5`,
-          rating: 5,
-          page: window.location.pathname,
-        }).catch(() => {});
         setStage("thanks");
       }
     } else {
@@ -78,10 +82,8 @@ export default function RatingPromptDialog({ open, onOpenChange }: RatingPromptD
   };
 
   const handleReviewClick = () => {
+    // The 5/5 was already recorded on the star click, so don't post it twice.
     trackEvent("review_link_clicked");
-    try {
-      apiRequest("POST", "/api/feedback", { type: "praise", message: "In-app rating: 5/5 — sent to review site", rating: 5, page: window.location.pathname }).catch(() => {});
-    } catch { /* ignore */ }
     window.open(REVIEW_URL, "_blank", "noopener,noreferrer");
     setStage("thanks");
   };
