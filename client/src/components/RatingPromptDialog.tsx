@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Star } from "lucide-react";
 import {
   Dialog,
@@ -12,81 +12,147 @@ import { Textarea } from "@/components/ui/textarea";
 import { apiRequest } from "@/lib/queryClient";
 import { trackEvent } from "@/lib/analytics";
 
-// Where 5-star raters are invited to leave a public review.
-// Free Trustpilot review page for the claimed freeroomplanner.com domain.
+// Public review page for the claimed freeroomplanner.com domain.
 const REVIEW_URL = "https://uk.trustpilot.com/evaluate/freeroomplanner.com";
 const REVIEW_SITE_NAME = "Trustpilot";
+
+/**
+ * The acknowledgement shown after someone taps a star, above the feedback box.
+ * The empathy varies with the score — a frustrated person shouldn't get the
+ * same chirpy line as someone who loved it.
+ *
+ * IMPORTANT: the *review invite* that follows is identical for every score.
+ * Only inviting (or more warmly inviting) happy raters is "review gating",
+ * which breaches Trustpilot's Guidelines for Businesses and, since April 2025,
+ * the UK DMCC Act 2024 — the CMA lists "preventing some users from leaving
+ * reviews" as a misleading practice. Vary the sympathy, never the ask.
+ */
+const ACKNOWLEDGEMENTS: Record<number, { title: string; body: string }> = {
+  1: {
+    title: "Really sorry — that's not the experience we wanted for you.",
+    body: "Something's clearly gone wrong. If you've got thirty seconds, tell us what happened. It comes straight to me and I read every one.",
+  },
+  2: {
+    title: "Sorry it's falling short.",
+    body: "We'd rather know than not. What got in your way? Your note comes straight to the person building this.",
+  },
+  3: {
+    title: "Thanks — sounds like there's room to improve.",
+    body: "What would have made this better? The specific, annoying stuff is the most useful thing you can tell us.",
+  },
+  4: {
+    title: "Thanks, that's good to hear.",
+    body: "What's the one thing that would have made it a five? We're always chipping away at the rough edges.",
+  },
+  5: {
+    title: "Brilliant — thank you.",
+    body: "Anything we could still do better? And if not, no need to write anything.",
+  },
+};
 
 interface RatingPromptDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /**
+   * "rating" — full flow: stars, then the acknowledgement + feedback box, then
+   *            the review invite.
+   * "review" — the later re-ask: the review invite on its own.
+   */
+  mode?: "rating" | "review";
+  /** Fired when the user opens the review site, so we stop asking. */
+  onReviewOpened?: () => void;
 }
 
 type Stage = "rate" | "feedback" | "review" | "thanks";
 
-export default function RatingPromptDialog({ open, onOpenChange }: RatingPromptDialogProps) {
-  const [stage, setStage] = useState<Stage>("rate");
+export default function RatingPromptDialog({
+  open,
+  onOpenChange,
+  mode = "rating",
+  onReviewOpened,
+}: RatingPromptDialogProps) {
+  const [stage, setStage] = useState<Stage>(mode === "review" ? "review" : "rate");
   const [rating, setRating] = useState(0);
   const [hovered, setHovered] = useState(0);
   const [feedback, setFeedback] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+  // The re-ask opens straight at the review invite.
+  useEffect(() => {
+    if (open) {
+      setStage(mode === "review" ? "review" : "rate");
+      if (mode === "review") trackEvent("review_prompt_shown", { reask: true });
+    }
+  }, [open, mode]);
+
   const close = (o: boolean) => {
     onOpenChange(o);
     if (!o) {
-      // Reset for the (unlikely) next open
-      setTimeout(() => { setStage("rate"); setRating(0); setHovered(0); setFeedback(""); }, 300);
+      setTimeout(() => {
+        setStage(mode === "review" ? "review" : "rate");
+        setRating(0);
+        setHovered(0);
+        setFeedback("");
+      }, 300);
     }
   };
 
   const handleStarClick = (n: number) => {
     setRating(n);
     trackEvent("rating_submitted", { rating: n });
-    if (n === 5) {
-      // Record the 5-star straight away. Previously this only happened if the
-      // rater went on to click through to the review site, so anyone who tapped
-      // 5 stars and then "No thanks" was never counted — which quietly skewed
-      // the feedback inbox towards unhappy ratings only.
-      apiRequest("POST", "/api/feedback", {
-        type: "praise",
-        message: "In-app rating: 5/5",
-        rating: 5,
-        page: window.location.pathname,
-      }).catch(() => {});
 
-      if (REVIEW_URL) {
-        setStage("review");
-        trackEvent("review_prompt_shown");
-      } else {
-        setStage("thanks");
-      }
-    } else {
-      setStage("feedback");
-    }
+    // Record every rating straight away, at every score. This used to happen
+    // only for people who went on to click through to the review site, so the
+    // feedback inbox saw the unhappy ratings and almost nothing else.
+    apiRequest("POST", "/api/feedback", {
+      type: n >= 4 ? "praise" : "general",
+      message: `In-app rating: ${n}/5`,
+      rating: n,
+      page: window.location.pathname,
+    }).catch(() => {});
+
+    setStage("feedback");
   };
 
   const handleFeedbackSubmit = async () => {
     setSubmitting(true);
-    try {
-      await apiRequest("POST", "/api/feedback", {
-        type: "general",
-        message: `In-app rating: ${rating}/5${feedback.trim() ? `\n\n${feedback.trim()}` : ""}`,
-        rating,
-        page: window.location.pathname,
-      });
-    } catch {
-      /* never block the user on feedback delivery */
+    if (feedback.trim()) {
+      try {
+        await apiRequest("POST", "/api/feedback", {
+          type: "general",
+          message: `In-app rating: ${rating}/5\n\n${feedback.trim()}`,
+          rating,
+          page: window.location.pathname,
+        });
+      } catch {
+        /* never block the user on feedback delivery */
+      }
     }
     setSubmitting(false);
-    setStage("thanks");
+
+    // Everyone is invited to review, whatever they scored.
+    if (REVIEW_URL) {
+      setStage("review");
+      trackEvent("review_prompt_shown", { reask: false, rating });
+    } else {
+      setStage("thanks");
+    }
   };
 
   const handleReviewClick = () => {
-    // The 5/5 was already recorded on the star click, so don't post it twice.
-    trackEvent("review_link_clicked");
+    trackEvent("review_link_clicked", { mode, rating });
+    onReviewOpened?.();
     window.open(REVIEW_URL, "_blank", "noopener,noreferrer");
     setStage("thanks");
   };
+
+  const handleReviewDecline = () => {
+    trackEvent("review_prompt_declined", { mode, rating });
+    if (mode === "review") close(false);
+    else setStage("thanks");
+  };
+
+  const ack = ACKNOWLEDGEMENTS[rating] ?? ACKNOWLEDGEMENTS[3];
 
   return (
     <Dialog open={open} onOpenChange={close}>
@@ -94,8 +160,8 @@ export default function RatingPromptDialog({ open, onOpenChange }: RatingPromptD
         {stage === "rate" && (
           <>
             <DialogHeader>
-              <DialogTitle>Are you enjoying Free Room Planner?</DialogTitle>
-              <DialogDescription>Tap a star to rate us — it takes two seconds.</DialogDescription>
+              <DialogTitle>How are you finding Free Room Planner?</DialogTitle>
+              <DialogDescription>Tap a star to rate it — it takes two seconds.</DialogDescription>
             </DialogHeader>
             <div className="flex justify-center gap-2 py-4" onMouseLeave={() => setHovered(0)}>
               {[1, 2, 3, 4, 5].map((n) => (
@@ -130,46 +196,61 @@ export default function RatingPromptDialog({ open, onOpenChange }: RatingPromptD
         {stage === "feedback" && (
           <>
             <DialogHeader>
-              <DialogTitle>Thanks — what could we do better?</DialogTitle>
-              <DialogDescription>
-                Your feedback goes straight to the person building this.
-              </DialogDescription>
+              <DialogTitle data-testid="rating-ack-title">{ack.title}</DialogTitle>
+              <DialogDescription>{ack.body}</DialogDescription>
             </DialogHeader>
             <Textarea
               autoFocus
               value={feedback}
               onChange={(e) => setFeedback(e.target.value)}
-              placeholder="What was annoying, missing, or confusing?"
+              placeholder={
+                rating <= 2
+                  ? "What went wrong?"
+                  : rating === 5
+                    ? "Anything we could still improve? (optional)"
+                    : "What was annoying, missing or confusing?"
+              }
               rows={4}
               maxLength={5000}
               data-testid="rating-feedback-input"
             />
             <div className="flex justify-end gap-2 pt-1">
-              <Button variant="ghost" size="sm" onClick={() => handleFeedbackSubmit()} disabled={submitting}>
+              <Button variant="ghost" size="sm" onClick={handleFeedbackSubmit} disabled={submitting}>
                 Skip
               </Button>
-              <Button size="sm" onClick={() => handleFeedbackSubmit()} disabled={submitting} data-testid="rating-feedback-send">
+              <Button
+                size="sm"
+                onClick={handleFeedbackSubmit}
+                disabled={submitting}
+                data-testid="rating-feedback-send"
+              >
                 {submitting ? "Sending…" : "Send feedback"}
               </Button>
             </div>
           </>
         )}
 
+        {/* Identical for every score — the empathy varies above, the ask never does. */}
         {stage === "review" && (
           <>
             <DialogHeader>
-              <DialogTitle>Brilliant — thanks!</DialogTitle>
+              <DialogTitle>Could you review us?</DialogTitle>
               <DialogDescription>
-                Would you mind sharing that in a quick {REVIEW_SITE_NAME} review? It genuinely
-                helps other people find the planner.
+                Free Room Planner is free to use, and honest reviews on {REVIEW_SITE_NAME} help
+                other people find it. Would you share your experience — whatever it is?
               </DialogDescription>
             </DialogHeader>
             <div className="flex justify-end gap-2 pt-2">
-              <Button variant="ghost" size="sm" onClick={() => close(false)}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleReviewDecline}
+                data-testid="rating-review-decline"
+              >
                 No thanks
               </Button>
               <Button size="sm" onClick={handleReviewClick} data-testid="rating-review-link">
-                Leave a {REVIEW_SITE_NAME} review
+                Write a {REVIEW_SITE_NAME} review
               </Button>
             </div>
           </>
@@ -182,7 +263,9 @@ export default function RatingPromptDialog({ open, onOpenChange }: RatingPromptD
               <DialogDescription>We read every bit of feedback. Happy planning!</DialogDescription>
             </DialogHeader>
             <div className="flex justify-end pt-2">
-              <Button size="sm" onClick={() => close(false)}>Done</Button>
+              <Button size="sm" onClick={() => close(false)}>
+                Done
+              </Button>
             </div>
           </>
         )}

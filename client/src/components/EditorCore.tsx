@@ -144,17 +144,63 @@ export default function EditorCore({
   // It used to fire on a two-minute timer, which interrupted people mid-drawing
   // and collected opinions at the moment of peak frustration rather than at a
   // natural high point. Never shown inside an embed.
+  const [ratingPromptMode, setRatingPromptMode] = useState<"rating" | "review">("rating");
+
+  //   1. First success -> the full flow: stars, acknowledgement, review invite.
+  //   2. A later visit -> at most ONE more review invite, on its own.
+  //
+  // The invite goes to everyone regardless of score. Inviting only the happy
+  // raters is "review gating": it breaches Trustpilot's Guidelines for
+  // Businesses and, since April 2025, the UK DMCC Act 2024. We stop asking the
+  // moment someone opens the review site, and never ask twice in one day.
+  const REVIEW_STATE_KEY = "freeroomplanner-review-state";
+
+  const readReviewState = useCallback((): { asks: number; lastAskDay: string; opened: boolean } => {
+    try {
+      const raw = safeGetItem(REVIEW_STATE_KEY);
+      if (raw) return { asks: 0, lastAskDay: "", opened: false, ...JSON.parse(raw) };
+    } catch { /* fall through to defaults */ }
+    return { asks: 0, lastAskDay: "", opened: false };
+  }, []);
+
+  const writeReviewState = useCallback((next: Partial<{ asks: number; lastAskDay: string; opened: boolean }>) => {
+    try {
+      safeSetItem(REVIEW_STATE_KEY, JSON.stringify({ ...readReviewState(), ...next }));
+    } catch { /* best-effort */ }
+  }, [readReviewState]);
+
+  const handleReviewOpened = useCallback(() => {
+    writeReviewState({ opened: true });
+  }, [writeReviewState]);
+
   const requestRatingPrompt = useCallback(() => {
+    let mode: "rating" | "review";
+    const today = new Date().toDateString();
     try {
       if (window.location.pathname.startsWith("/embed")) return;
-      if (safeGetItem("freeroomplanner-rating-prompted")) return;
-      safeSetItem("freeroomplanner-rating-prompted", new Date().toISOString());
+
+      const st = readReviewState();
+      if (st.opened) return;               // already reviewed — never ask again
+      if (st.asks >= 2) return;            // one initial ask + one re-ask, then stop
+      if (st.lastAskDay === today) return; // never twice in the same day
+
+      if (!safeGetItem("freeroomplanner-rating-prompted")) {
+        safeSetItem("freeroomplanner-rating-prompted", new Date().toISOString());
+        mode = "rating";                   // first success: the full flow
+      } else {
+        mode = "review";                   // later visit: the review invite alone
+      }
+
+      // Count the ask when it is shown, not when it is declined — someone who
+      // dismisses the dialog outright has still been asked.
+      writeReviewState({ asks: st.asks + 1, lastAskDay: today });
     } catch {
       return; /* prompting must never break the app */
     }
+    setRatingPromptMode(mode);
     // Let the save/share dialog finish closing so the two never stack.
     setTimeout(() => setShowRatingPrompt(true), 900);
-  }, []);
+  }, [readReviewState, writeReviewState]);
   const [currentPlanCode, setCurrentPlanCode] = useState<string | null>(initialShareCode ?? getPlanCodeForSlot(storageKey));
 
   const handleShareLink = useCallback(() => {
@@ -979,7 +1025,12 @@ export default function EditorCore({
       />
 
       {/* One-time rating prompt */}
-      <RatingPromptDialog open={showRatingPrompt} onOpenChange={setShowRatingPrompt} />
+      <RatingPromptDialog
+        open={showRatingPrompt}
+        onOpenChange={setShowRatingPrompt}
+        mode={ratingPromptMode}
+        onReviewOpened={handleReviewOpened}
+      />
 
       {/* Toast notification */}
       {toast.visible && (
