@@ -203,6 +203,12 @@ const DIMENSION_COLOR_LIGHT = "#01696f";
 const DIMENSION_COLOR_DARK = "#4f98a3";
 const SELECT_COLOR = "#01696f";
 
+/** Longest on-screen side (px) below which an item can't legibly hold an inside
+ *  label. Under this size the label falls back to an outside callout (with a
+ *  leader line) instead of disappearing, so names/dimensions stay readable even
+ *  when furniture is drawn small. */
+const INSIDE_LABEL_MIN_PX = 60;
+
 /** Simple component types that render as plain rectangles (no internal visual details) */
 const SIMPLE_COMPONENT_TYPES = new Set([
   "worktop", "fridge", "dishwasher", "island",
@@ -1558,16 +1564,29 @@ export function drawWallSegmentMeasurements(
     // In full mode, extend at connected endpoints to match junction circle extent.
     const wallStartAlong = measureMode === "inside" ? halfThick : -segStartExt;
     const wallEndAlong = measureMode === "inside" ? wallLen - halfThick : wallLen + segEndExt;
+    // Build a consecutive dimension chain along the wall: wall-start → first
+    // opening, the clear gap between each adjacent pair of openings, and the
+    // last opening → wall-end. This inherently includes the distance available
+    // between two doors/windows on the same wall. Previously each opening was
+    // measured to the wall ends independently, so the span between two openings
+    // was never shown (users had to measure it by hand). occupants are already
+    // sorted by position along the wall above.
     const segments: { startAlong: number; endAlong: number }[] = [];
+    let cursor = wallStartAlong;
     for (const occ of occupants) {
       const edgeStart = occ.along - occ.halfExtent;
       const edgeEnd = occ.along + occ.halfExtent;
-      if (edgeStart > wallStartAlong + 1) {
-        segments.push({ startAlong: wallStartAlong, endAlong: edgeStart });
+      // Gap from the running cursor to this opening's near edge. Skipped when the
+      // opening starts before the cursor (overlapping or touching openings).
+      if (edgeStart > cursor + 1) {
+        segments.push({ startAlong: cursor, endAlong: edgeStart });
       }
-      if (wallEndAlong > edgeEnd + 1) {
-        segments.push({ startAlong: edgeEnd, endAlong: wallEndAlong });
-      }
+      // Advance past this opening; max() guards against overlapping openings.
+      cursor = Math.max(cursor, edgeEnd);
+    }
+    // Final gap from the last opening's far edge to the wall end.
+    if (wallEndAlong > cursor + 1) {
+      segments.push({ startAlong: cursor, endAlong: wallEndAlong });
     }
 
     // Draw each segment
@@ -7589,11 +7608,14 @@ export function collectComponentLabelRects(
           ({ pillW: autoPillW, pillH: autoPillH } = measurePill(nameFontSize, dimFontSize));
         }
 
-        // If still doesn't fit at minimum font size, move outside — but only
-        // doors/windows use an outside pill; regular furniture keeps the
-        // on-item transparent label so every item reads the same way.
+        // If still doesn't fit at minimum font size, move the label outside the
+        // item so the name and dimensions stay legible. Previously only
+        // doors/windows did this and regular furniture kept an on-item label,
+        // which meant labels on small furniture shrank away and then vanished
+        // entirely. Now every item falls back to an outside callout pill (with a
+        // leader line) at full readable size, keeping labels larger while the
+        // furniture itself stays to scale.
         if (
-          isDoorOrWindow &&
           !fitsInRect(autoPillW, autoPillH, fitWidthPx, fitHeightPx) &&
           !fitsInRect(autoPillW, autoPillH, fitHeightPx, fitWidthPx)
         ) {
@@ -7615,6 +7637,21 @@ export function collectComponentLabelRects(
         (pw >= fitHeightPx * 0.95 || ph >= fitWidthPx * 0.85)
       ) {
         isInside = false;
+      }
+    }
+
+    // Final safety net: if the label would still render inside but the item is
+    // too small on screen to show it legibly, fall back to an outside callout
+    // instead of letting the inside renderer hide it. Uses the longest on-screen
+    // side so tall, narrow items (which show a rotated inside label) are not
+    // pushed outside unnecessarily.
+    if (isInside && !hasCustomSize) {
+      const longestSidePx = Math.max(itemWidthPx, itemHeightPx);
+      if (longestSidePx < INSIDE_LABEL_MIN_PX) {
+        isInside = false;
+        nameFontSize = Math.max(9, 11 * zoom);
+        dimFontSize = Math.max(8, 9 * zoom);
+        ({ pillW: autoPillW, pillH: autoPillH } = measurePill(nameFontSize, dimFontSize));
       }
     }
 
@@ -7692,9 +7729,12 @@ function drawInsideComponentLabel(
   isHovered: boolean = false
 ) {
   const item = info.item;
-  // Hide label when item is too small on screen
-  const renderedWidth = item.width * pxPerCm;
-  if (renderedWidth < 60) return;
+  // Safety net only: items too small to hold a legible inside label are already
+  // flipped to an outside callout upstream (see computeComponentLabels), so this
+  // guard should rarely fire. Uses the longest on-screen side so tall, narrow
+  // items that show a rotated inside label are not hidden.
+  const renderedLongestSide = Math.max(item.width, item.height) * pxPerCm;
+  if (renderedLongestSide < INSIDE_LABEL_MIN_PX) return;
 
   const cx = (item.x + item.width / 2) * pxPerCm + panOffset.x;
   const cy = (item.y + item.height / 2) * pxPerCm + panOffset.y;
