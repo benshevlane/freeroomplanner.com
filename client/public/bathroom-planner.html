@@ -47,228 +47,369 @@
 <script type="application/ld+json">
 {"@context":"https://schema.org","@graph":[{"@type":"WebSite","@id":"https://freeroomplanner.com/#website","url":"https://freeroomplanner.com/","name":"Free Room Planner","description":"Free browser-based room and floor planning tool for homeowners.","publisher":{"@id":"https://freeroomplanner.com/#organization"}},{"@type":"Organization","@id":"https://freeroomplanner.com/#organization","name":"Free Room Planner","url":"https://freeroomplanner.com/","logo":{"@type":"ImageObject","url":"https://freeroomplanner.com/apple-touch-icon.png"}}]}
 </script>
+<style>body{font-family:'General Sans','DM Sans',system-ui,-apple-system,sans-serif}body *{font-family:inherit !important}a{transition:color .15s ease}</style>
+<style>
+@keyframes frp-float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+@keyframes frp-pulse { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.5); opacity: 0.4; } }
+@keyframes frp-dash { to { stroke-dashoffset: -32; } }
+@keyframes frp-rise { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+@keyframes frp-rise-nf { from { transform: translateY(18px); } to { transform: none; } }
+@keyframes frp-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes frp-pop { from { opacity: 0; transform: scale(0.72); } to { opacity: 1; transform: scale(1); } }
+@keyframes frp-draw { to { stroke-dashoffset: 0; } }
+@keyframes frp-drag { 0%, 100% { transform: translateX(-24px); opacity: 0; } 28%, 72% { transform: translateX(0); opacity: 1; } }
+@keyframes frp-nudge { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(4px); } }
+@keyframes frp-checkdraw { 0% { stroke-dashoffset: 24; } 40%, 88% { stroke-dashoffset: 0; } 100% { stroke-dashoffset: 24; } }
+@keyframes frp-bob { 0%, 100% { transform: scale(1); } 45% { transform: scale(1.12); } }
+@keyframes frp-linesdraw { 0% { stroke-dashoffset: 160; } 45%, 90% { stroke-dashoffset: 0; } 100% { stroke-dashoffset: 160; } }
+@keyframes frp-reveal { from { opacity: 0; transform: translateY(32px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce){*{animation-duration:.001ms!important;animation-iteration-count:1!important}}
+</style>
+<style>
+/* --- Mobile responsiveness for the inline-styled page --- */
+@media (max-width: 860px){
+  html, body{ overflow-x: hidden; }
+  nav{ padding: 14px 18px !important; gap: 10px !important; }
+  nav a[href="/#how"], nav a[href="/#features"], nav a[href="/#planners"], nav a[href="/#faq"]{ display: none !important; }
+  nav a[href="/app"]{ white-space: nowrap !important; padding: 10px 16px !important; font-size: 14px !important; }
+
+  /* collapse every multi-column grid to one column */
+  [style*="grid-template-columns"]{ grid-template-columns: 1fr !important; gap: 18px !important; }
+  [style*="repeat(4, 1fr)"]{ grid-template-columns: repeat(2, 1fr) !important; }
+
+  /* tighten section spacing on phones */
+  [style*="padding: 100px 40px"], [style*="padding: 92px 40px"], [style*="padding: 96px 32px"]{ padding: 52px 20px !important; }
+  [style*="padding: 64px 40px 40px"]{ padding: 40px 20px !important; }
+  [style*="padding: 28px 40px"]{ padding: 26px 20px !important; }
+  [style*="padding: 20px 40px"]{ padding: 20px 20px !important; }
+  [style*="padding: 16px 40px"]{ padding: 16px 20px !important; }
+
+  /* hero: remove the dead space, make it bigger */
+  [style*="padding: 80px 40px 88px"]{ padding: 20px 20px 44px !important; gap: 26px !important; }
+  h1{ font-size: 38px !important; line-height: 1.06 !important; }
+  h2{ font-size: 29px !important; line-height: 1.12 !important; }
+}
+@media (max-width: 420px){
+  h1{ font-size: 31px !important; }
+}
+/* Mobile: hold the hero entrance animation until it is scrolled into view */
+html.frp-anim-hold #top [style*="animation: frp"]{ animation-play-state: paused !important; }
+html.frp-anim-hold.frp-hero-shown #top [style*="animation: frp"]{ animation-play-state: running !important; }
+</style>
+<script>(function(){try{if("scrollRestoration" in history){history.scrollRestoration="manual";}if(window.matchMedia&&window.matchMedia("(max-width:860px)").matches){document.documentElement.classList.add("frp-anim-hold");}}catch(e){}})();</script>
 </head>
 <body>
-<header class="site-header">
-  <div class="container">
-    <nav class="site-nav">
-      <a href="/" class="nav-logo"><img src="/logo.png" alt="Free Room Planner" width="24" height="24" style="object-fit:contain;display:block;" /> Free Room Planner</a>
-      <ul class="nav-links" id="nav-links">
-        <li><a href="/how-it-works">How it works</a></li>
-        <li><a href="/#features">Features</a></li>
-        <li><a href="/#faq">FAQ</a></li>
-        <li><a href="/get-embed">For businesses</a></li>
-      </ul>
-      <div class="nav-actions">
-        <button class="btn-ghost" id="theme-toggle" aria-label="Toggle dark mode" title="Toggle dark mode"><svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg><svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg></button>
-        <button class="btn-ghost nav-mobile-toggle" id="mobile-nav-toggle" aria-label="Menu"><svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
-        <a href="/app" class="btn btn-primary btn-sm" style="text-decoration:none">Start drawing</a>
+<header style="position: sticky; top: 0; z-index: 50; background: #ffffff; border-bottom: 1px solid #e2e8f0;">
+    <nav style="max-width: 1240px; margin: 0 auto; padding: 16px 40px; display: flex; align-items: center; justify-content: space-between; gap: 24px;">
+      <a href="/" style="display: flex; align-items: center; gap: 10px; text-decoration: none; color: #0f172a;">
+        <img src="/logo.png" alt="Free Room Planner" width="30" height="30" style="object-fit:contain;display:block;" />
+        <span style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 18px; letter-spacing: -0.02em;">Free Room Planner</span>
+      </a>
+      <div style="display: flex; align-items: center; gap: 30px;">
+        <a href="/#how" style="text-decoration: none; color: #475569; font-size: 15px; font-weight: 500;">How it works</a>
+        <a href="/#features" style="text-decoration: none; color: #475569; font-size: 15px; font-weight: 500;">Features</a>
+        <a href="/#planners" style="text-decoration: none; color: #475569; font-size: 15px; font-weight: 500;">Planners</a>
+        <a href="/#faq" style="text-decoration: none; color: #475569; font-size: 15px; font-weight: 500;">FAQ</a>
+        <a href="/app" style="text-decoration: none; background: #0d9488; color: #fff; padding: 10px 20px; border-radius: 10px; font-size: 15px; font-weight: 600; box-shadow: 0 4px 12px rgba(13,148,136,0.3);">Start drawing</a>
       </div>
     </nav>
-  </div>
-</header>
-<style>
-  #theme-toggle svg:last-child { display:none; }
-  .dark #theme-toggle svg:first-child { display:none; }
-  .dark #theme-toggle svg:last-child { display:block; }
-</style>
+  </header>
 
-<nav class="breadcrumb container" aria-label="Breadcrumb">
-  <a href="/">Home</a><span>/</span><span>Bathroom Planner</span>
-</nav>
+  <nav aria-label="Breadcrumb" style="max-width: 1240px; margin: 0 auto; padding: 16px 40px; font-size: 13px; color: #64748b; display: flex; align-items: center; gap: 8px;">
+    <a href="/" style="color: #64748b; text-decoration: none;">Home</a><span style="color: #cbd5e1;">/</span><span style="color: #0f172a; font-weight: 500;">Bathroom Planner</span>
+  </nav>
 
-<section class="hero">
-  <div class="container">
-    <div class="hero__eyebrow"><span class="badge">Free online tool — no sign-up needed</span></div>
-    <h1 class="hero__title">The free bathroom planner that just works</h1>
-    <p class="hero__sub">The bathroom planner is a free online tool for designing your bathroom layout in minutes. Drag and drop fixtures, check dimensions, and share your plan — completely free, no download required.</p>
-    <div class="hero__cta">
-      <a href="/app" class="btn btn-primary btn-lg" onclick="try{localStorage.setItem('freeroomplanner-intent',JSON.stringify({intent:'bathroom_renovation'}))}catch(e){}">Plan my bathroom free</a>
-    </div>
-    <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:var(--space-3) var(--space-6);margin-top:var(--space-8)">
-      <span style="display:inline-flex;align-items:center;gap:var(--space-2);font-size:var(--text-sm);color:var(--fg-muted)"><svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="var(--accent)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> No download or sign-up</span>
-      <span style="display:inline-flex;align-items:center;gap:var(--space-2);font-size:var(--text-sm);color:var(--fg-muted)"><svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="var(--accent)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Accurate to-scale dimensions</span>
-      <span style="display:inline-flex;align-items:center;gap:var(--space-2);font-size:var(--text-sm);color:var(--fg-muted)"><svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="var(--accent)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> All bathroom fixtures included</span>
-      <span style="display:inline-flex;align-items:center;gap:var(--space-2);font-size:var(--text-sm);color:var(--fg-muted)"><svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="var(--accent)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Export and share your plan</span>
-      <span style="display:inline-flex;align-items:center;gap:var(--space-2);font-size:var(--text-sm);color:var(--fg-muted)"><svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="var(--accent)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Works on mobile and desktop</span>
-    </div>
-  </div>
-</section>
+  <!-- ============ HERO ============ -->
+  <section id="top" style="position: relative; overflow: hidden; background: #ffffff;">
+    <div style="max-width: 1240px; margin: 0 auto; padding: 80px 40px 88px; display: grid; grid-template-columns: 1.02fr 1.1fr; gap: 64px; align-items: center;">
+      <!-- copy -->
+      <div>
+        <div style="display: inline-flex; align-items: center; gap: 8px; background: #ffffff; border: 1px solid #ccfbf1; color: #0f766e; padding: 7px 14px; border-radius: 999px; font-size: 13px; font-weight: 600; box-shadow: 0 2px 8px rgba(13,148,136,0.08); animation: frp-rise-nf 0.7s cubic-bezier(0.2,0.7,0.2,1) both;">
+          <span style="width: 7px; height: 7px; border-radius: 50%; background: #0d9488; display: inline-block;"></span>
+          Free online tool — no sign-up needed
+        </div>
+        <h1 style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 48px; line-height: 1.05; letter-spacing: -0.035em; margin: 22px 0 0; text-wrap: balance; animation: frp-rise-nf 0.7s cubic-bezier(0.2,0.7,0.2,1) both; animation-delay: 0.09s;">The free bathroom planner <span style="color: #0d9488;">that just works</span></h1>
+        <p style="font-size: 18px; line-height: 1.6; color: #475569; margin: 22px 0 0; max-width: 540px; animation: frp-rise-nf 0.7s cubic-bezier(0.2,0.7,0.2,1) both; animation-delay: 0.19s;">The bathroom planner is a free online tool for designing your bathroom layout in minutes. Drag and drop fixtures, check dimensions, and share your plan — completely free, no download required.</p>
+        <div style="display: flex; align-items: center; gap: 14px; margin-top: 32px; flex-wrap: wrap; animation: frp-rise-nf 0.7s cubic-bezier(0.2,0.7,0.2,1) both; animation-delay: 0.29s;">
+          <a href="/app" onclick="try{localStorage.setItem('freeroomplanner-intent',JSON.stringify({intent:'bathroom_renovation'}))}catch(e){}" style="display: inline-flex; align-items: center; gap: 9px; background: #0d9488; color: #fff; padding: 16px 28px; border-radius: 12px; font-size: 17px; font-weight: 700; text-decoration: none; box-shadow: 0 8px 22px rgba(13,148,136,0.35);">
+            Plan my bathroom free
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg>
+          </a>
+          <a href="#how" style="display: inline-flex; align-items: center; gap: 8px; color: #0f172a; padding: 16px 22px; border-radius: 12px; font-size: 17px; font-weight: 600; text-decoration: none; border: 1px solid #cbd5e1; background: #fff;">
+            See how it works
+          </a>
+        </div>
+        <div style="display: flex; align-items: center; gap: 14px; margin-top: 26px; animation: frp-rise-nf 0.7s cubic-bezier(0.2,0.7,0.2,1) both; animation-delay: 0.39s;">
+          <div style="display: flex;">
+            <div style="width: 34px; height: 34px; border-radius: 50%; background: #14b8a6; border: 2px solid #fff; margin-left: -8px;"></div>
+            <div style="width: 34px; height: 34px; border-radius: 50%; background: #64748b; border: 2px solid #fff; margin-left: -8px;"></div>
+            <div style="width: 34px; height: 34px; border-radius: 50%; background: #0f766e; border: 2px solid #fff; margin-left: -8px;"></div>
+            <div style="width: 34px; height: 34px; border-radius: 50%; background: #64748b; border: 2px solid #fff; margin-left: -8px;"></div>
+          </div>
+          <div style="font-size: 14px; color: #475569; line-height: 1.35;">
+            <div style="color: #0d9488; font-size: 14px; letter-spacing: 1px;">★★★★★</div>
+            Loved by homeowners planning bathrooms, en-suites &amp; refits.
+          </div>
+        </div>
+      </div>
 
-<!-- What you get -->
-<section class="section section--alt" id="features">
-  <div class="container">
-    <div class="section__header fade-in">
-      <div class="section__eyebrow"><span class="badge">What you get</span></div>
-      <h2 class="section__title">Everything in a bathroom design tool, none of the complexity</h2>
-      <p class="section__sub">No steep learning curve. No subscription. Just a fast, accurate bathroom layout planner that lets you get on with designing.</p>
-    </div>
-    <div class="grid-3">
-      <div class="card fade-in">
-        <div class="card__icon"><svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg></div>
-        <div class="card__title">Drag-and-drop fixtures</div>
-        <div class="card__body">Place baths, showers, toilets, basins, and storage units with a single click. Snap to walls and other fixtures automatically.</div>
-      </div>
-      <div class="card fade-in">
-        <div class="card__icon"><svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M2 20L20 2m-4 4l2-2m-4 4l2-2m-4 4l2-2m-4 4l2-2M4 18l2-2"/></svg></div>
-        <div class="card__title">Real-scale dimensions</div>
-        <div class="card__body">Set your exact room size in millimetres and every fixture is drawn to scale. See instantly what fits before you buy anything.</div>
-      </div>
-      <div class="card fade-in">
-        <div class="card__icon"><svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="12" x2="16" y2="14"/></svg></div>
-        <div class="card__title">Works instantly in your browser</div>
-        <div class="card__body">Open the bathroom planner and start designing immediately. Nothing to install, no account to create, no credit card required.</div>
-      </div>
-      <div class="card fade-in">
-        <div class="card__icon"><svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></div>
-        <div class="card__title">Export your floor plan</div>
-        <div class="card__body">Download your bathroom layout as an image to share with your fitter, architect, or retailer. No reformatting needed.</div>
-      </div>
-      <div class="card fade-in">
-        <div class="card__icon"><svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="2" y="10" width="20" height="8" rx="2"/><rect x="4" y="7" width="4" height="5" rx="1"/><rect x="16" y="7" width="4" height="5" rx="1"/><line x1="6" y1="18" x2="6" y2="21"/><line x1="18" y1="18" x2="18" y2="21"/></svg></div>
-        <div class="card__title">Full fixture library</div>
-        <div class="card__body">Over 30 bathroom components including baths, walk-in showers, WCs, vanity units, radiators, and more — with standard UK sizes.</div>
-      </div>
-      <div class="card fade-in">
-        <div class="card__icon"><svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 .49-4.5"/></svg></div>
-        <div class="card__title">Rotate and resize anything</div>
-        <div class="card__body">Every item can be rotated, resized, and labelled. Test multiple bathroom layout ideas in minutes without making a single measurement in the real room.</div>
-      </div>
-    </div>
-  </div>
-</section>
+      <!-- canvas preview -->
+      <div style="position: relative; animation: frp-float 7s ease-in-out infinite;">
+        <div style="border-radius: 16px; overflow: hidden; box-shadow: 0 30px 70px -20px rgba(15,23,42,0.35), 0 0 0 1px rgba(15,23,42,0.04); background: #fff;">
+          <!-- browser chrome -->
+          <div style="display: flex; align-items: center; gap: 8px; padding: 12px 16px; background: #f1f5f9; border-bottom: 1px solid #e2e8f0;">
+            <span style="width: 11px; height: 11px; border-radius: 50%; background: #f87171;"></span>
+            <span style="width: 11px; height: 11px; border-radius: 50%; background: #fbbf24;"></span>
+            <span style="width: 11px; height: 11px; border-radius: 50%; background: #34d399;"></span>
+            <div style="flex: 1; margin-left: 10px; background: #fff; border: 1px solid #e2e8f0; border-radius: 7px; padding: 5px 12px; font-size: 12px; color: #64748b; display: flex; align-items: center; gap: 6px;">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#0d9488" stroke-width="2.5"><rect x="4" y="11" width="16" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg>
+              freeroomplanner.com/app — Bathroom plan
+            </div>
+            <!-- unit toggle -->
+            <div style="display: flex; background: #e2e8f0; border-radius: 8px; padding: 2px;">
+              <button style="border: none; background: #fff; border-radius: 6px; padding: 3px 10px; font-size: 11px; font-weight: 600; color: #0f172a;">m</button>
+              <button style="border: none; background: transparent; border-radius: 6px; padding: 3px 10px; font-size: 11px; font-weight: 600; color: #64748b;">ft</button>
+            </div>
+          </div>
+          <!-- bathroom plan -->
+          <div style="background: #fbfdfc; padding: 8px;">
+            <svg viewBox="0 0 620 460" style="width: 100%; display: block;" role="img" aria-label="Bathroom floor plan with bath, walk-in shower, WC and basin">
+              <defs>
+                <pattern id="frpGrid" width="20" height="20" patternUnits="userSpaceOnUse">
+                  <circle cx="1" cy="1" r="1" fill="#dbeae7"></circle>
+                </pattern>
+              </defs>
+              <rect x="0" y="0" width="620" height="460" fill="url(#frpGrid)"></rect>
 
-<!-- How it works -->
-<section class="section" id="how">
-  <div class="container">
-    <div class="section__header fade-in">
-      <div class="section__eyebrow"><span class="badge">How it works</span></div>
-      <h2 class="section__title">Plan your bathroom layout in four steps</h2>
-    </div>
-    <div class="steps">
-      <div class="fade-in">
-        <div class="step__num">1</div>
-        <h3 class="step__title">Set your room size</h3>
-        <p class="step__body">Enter your bathroom dimensions in millimetres to create an accurate to-scale floor plan.</p>
-      </div>
-      <div class="fade-in" style="transition-delay:80ms">
-        <div class="step__num">2</div>
-        <h3 class="step__title">Add your fixtures</h3>
-        <p class="step__body">Drag a bath, shower, toilet, and basin from the library into your room.</p>
-      </div>
-      <div class="fade-in" style="transition-delay:160ms">
-        <div class="step__num">3</div>
-        <h3 class="step__title">Adjust and refine</h3>
-        <p class="step__body">Move, rotate, and resize items until your layout works. Snap to walls for precision.</p>
-      </div>
-      <div class="fade-in" style="transition-delay:240ms">
-        <div class="step__num">4</div>
-        <h3 class="step__title">Export and share</h3>
-        <p class="step__body">Download your plan or share a link directly with your bathroom fitter or supplier.</p>
-      </div>
-    </div>
-  </div>
-</section>
+              <!-- dimension line top -->
+              <line x1="150" y1="46" x2="470" y2="46" stroke="#94a3b8" stroke-width="1.5"></line>
+              <line x1="150" y1="40" x2="150" y2="52" stroke="#94a3b8" stroke-width="1.5"></line>
+              <line x1="470" y1="40" x2="470" y2="52" stroke="#94a3b8" stroke-width="1.5"></line>
+              <rect x="272" y="34" width="76" height="24" rx="5" fill="#0f172a"></rect>
+              <text x="310" y="51" text-anchor="middle" font-family="'Plus Jakarta Sans',sans-serif" font-size="15" font-weight="600" fill="#fff">2.40 m</text>
 
-<!-- Who uses it -->
-<section class="section section--alt">
-  <div class="container">
-    <div class="section__header fade-in">
-      <div class="section__eyebrow"><span class="badge">Who uses it</span></div>
-      <h2 class="section__title">The bathroom layout planner for every project</h2>
-      <p class="section__sub">Whether you're redesigning a small en-suite or speccing out a full bathroom renovation, Free Room Planner gives you the tools to plan it properly.</p>
-    </div>
-    <div class="grid-2">
-      <div class="card fade-in">
-        <div class="card__title">Planning a bathroom renovation</div>
-        <div class="card__body">Map out exactly where your new fixtures will go before your fitter arrives. <a href="/blog/bathroom-planning-mistakes">Avoid costly mistakes</a> by checking dimensions on screen rather than discovering problems on the day.</div>
-      </div>
-      <div class="card fade-in">
-        <div class="card__title">Small bathroom or en-suite design</div>
-        <div class="card__body">Space is tight in a small bathroom. Use our bathroom design software to try different layouts — corner shower vs bath, wall-hung vs pedestal — until you find what works.</div>
-      </div>
-      <div class="card fade-in">
-        <div class="card__title">Briefing a bathroom designer</div>
-        <div class="card__body">Arrive at your bathroom design appointment with a plan already drawn up. Save time, communicate clearly, and get a more accurate quote from the outset.</div>
-      </div>
-      <div class="card fade-in">
-        <div class="card__title">Buying fixtures online</div>
-        <div class="card__body">Check that a bath, shower enclosure, or vanity unit actually fits your space before you order. Our bathroom planner shows you exactly how much room you have to work with.</div>
-      </div>
-    </div>
-  </div>
-</section>
+              <!-- dimension line left -->
+              <line x1="120" y1="70" x2="120" y2="390" stroke="#94a3b8" stroke-width="1.5"></line>
+              <line x1="114" y1="70" x2="126" y2="70" stroke="#94a3b8" stroke-width="1.5"></line>
+              <line x1="114" y1="390" x2="126" y2="390" stroke="#94a3b8" stroke-width="1.5"></line>
+              <g transform="rotate(-90 120 230)"><rect x="82" y="218" width="76" height="24" rx="5" fill="#0f172a"></rect><text x="120" y="235" text-anchor="middle" font-family="'Plus Jakarta Sans',sans-serif" font-size="15" font-weight="600" fill="#fff">3.00 m</text></g>
 
-<!-- Fixture library -->
-<section class="section">
-  <div class="container">
-    <div class="section__header fade-in">
-      <div class="section__eyebrow"><span class="badge">Fixture library</span></div>
-      <h2 class="section__title">Every bathroom component you need</h2>
-      <p class="section__sub">All items are sized to standard UK dimensions. Resize freely to match your exact products.</p>
-    </div>
-    <div class="fade-in" style="display:flex;flex-wrap:wrap;gap:var(--space-2);justify-content:center">
-      <span class="badge">Freestanding bath</span>
-      <span class="badge">Built-in bath</span>
-      <span class="badge">Corner bath</span>
-      <span class="badge">Walk-in shower</span>
-      <span class="badge">Shower enclosure</span>
-      <span class="badge">Shower + screen</span>
-      <span class="badge">Close-coupled WC</span>
-      <span class="badge">Wall-hung WC</span>
-      <span class="badge">Back-to-wall WC</span>
-      <span class="badge">Pedestal basin</span>
-      <span class="badge">Wall-hung basin</span>
-      <span class="badge">Vanity unit</span>
-      <span class="badge">Double vanity</span>
-      <span class="badge">Towel radiator</span>
-      <span class="badge">Bidet</span>
-      <span class="badge">Storage unit</span>
-    </div>
-  </div>
-</section>
+              <!-- floor fill -->
+              <rect x="150" y="70" width="320" height="320" fill="#f1f3f5" style="animation: frp-fade 0.6s ease both; animation-delay: 0.15s;"></rect>
 
-<!-- FAQ -->
-<section class="section section--alt" id="faq">
-  <div class="container">
-    <div class="section__header fade-in"><h2 class="section__title">Common questions</h2></div>
-    <div class="faq-list">
-      <div class="faq-item">
-        <button class="faq-q">Is this bathroom planner really free? <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button>
-        <div class="faq-a">Yes — Free Room Planner is completely free to use with no hidden charges. There's no subscription, no premium tier for basic features, and no requirement to create an account. You can plan your bathroom, export your layout, and share your design all at no cost.</div>
-      </div>
-      <div class="faq-item">
-        <button class="faq-q">Do I need to download anything or create an account? <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button>
-        <div class="faq-a">No download is required. Our bathroom design tool runs entirely in your browser — on desktop, tablet, or mobile. You don't need to register or log in to start planning.</div>
-      </div>
-      <div class="faq-item">
-        <button class="faq-q">Can I use it to plan a small bathroom or en-suite? <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button>
-        <div class="faq-a">Absolutely. The bathroom planner is particularly useful for small spaces where every centimetre matters. Set your exact room dimensions and check whether a bath or shower enclosure actually fits before committing to a purchase.</div>
-      </div>
-      <div class="faq-item">
-        <button class="faq-q">Is the bathroom design tool to scale? <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button>
-        <div class="faq-a">Yes. You enter your room measurements in millimetres and the planner draws everything to scale. This means the plan you see on screen reflects real-world proportions accurately, so you can trust what you're looking at.</div>
-      </div>
-      <div class="faq-item">
-        <button class="faq-q">Can I plan other rooms too? <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button>
-        <div class="faq-a">Yes — Free Room Planner works for any room in the house. As well as bathrooms, you can design kitchens, living rooms, bedrooms, and more. The same drag-and-drop tool works across all room types.</div>
-      </div>
-      <div class="faq-item">
-        <button class="faq-q">How do I share my bathroom plan with my fitter? <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button>
-        <div class="faq-a">You can export your finished bathroom layout as an image file and send it by email, WhatsApp, or however you normally share files. This gives your bathroom fitter a clear, dimensioned plan to work from before they visit the property.</div>
+              <!-- BATH -->
+              <g style="transform-box: fill-box; transform-origin: center; animation: frp-pop 0.5s cubic-bezier(0.2,0.7,0.2,1) both; animation-delay: 1.15s;">
+              <rect x="160" y="80" width="90" height="180" rx="10" fill="#cbd5e1"></rect>
+              <rect x="168" y="88" width="74" height="164" rx="8" fill="#eef2f6"></rect>
+              <circle cx="205" cy="100" r="4" fill="#94a3b8"></circle>
+              <circle cx="205" cy="114" r="2.5" fill="#94a3b8"></circle>
+              </g>
+              <!-- WALK-IN SHOWER -->
+              <g style="transform-box: fill-box; transform-origin: center; animation: frp-pop 0.5s cubic-bezier(0.2,0.7,0.2,1) both; animation-delay: 1.32s;">
+              <rect x="376" y="78" width="88" height="88" rx="4" fill="#eceef1" stroke="#94a3b8" stroke-width="2"></rect>
+              <circle cx="420" cy="122" r="26" fill="none" stroke="#94a3b8" stroke-width="1.5"></circle>
+              <circle cx="420" cy="122" r="3" fill="#94a3b8"></circle>
+              <circle cx="394" cy="94" r="5" fill="#94a3b8"></circle>
+              </g>
+              <!-- WC -->
+              <g style="transform-box: fill-box; transform-origin: center; animation: frp-pop 0.5s cubic-bezier(0.2,0.7,0.2,1) both; animation-delay: 1.48s;">
+              <rect x="170" y="364" width="44" height="20" rx="3" fill="#94a3b8"></rect>
+              <ellipse cx="192" cy="340" rx="15" ry="20" fill="#fff" stroke="#94a3b8" stroke-width="2"></ellipse>
+              </g>
+              <!-- BASIN / VANITY -->
+              <g style="transform-box: fill-box; transform-origin: center; animation: frp-pop 0.5s cubic-bezier(0.2,0.7,0.2,1) both; animation-delay: 1.62s;">
+              <rect x="372" y="346" width="90" height="38" rx="4" fill="#cbd5e1"></rect>
+              <ellipse cx="417" cy="365" rx="24" ry="13" fill="#eef2f6" stroke="#94a3b8" stroke-width="1.5"></ellipse>
+              <circle cx="417" cy="352" r="3" fill="#94a3b8"></circle>
+              </g>
+              <!-- TOWEL RADIATOR -->
+              <g style="animation: frp-fade 0.5s ease both; animation-delay: 1.7s;">
+              <rect x="456" y="210" width="10" height="70" rx="3" fill="#94a3b8"></rect>
+              </g>
+              <!-- WALLS -->
+              <path d="M150 70 H470 V390 H360 M290 390 H150 V70" fill="none" stroke="#1e293b" stroke-width="7" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="1500" stroke-dashoffset="1500" style="animation: frp-draw 1.25s ease both; animation-delay: 0.45s;"></path>
+              <!-- door swing -->
+              <path d="M290 320 A70 70 0 0 1 360 390" fill="none" stroke="#94a3b8" stroke-width="2" stroke-dasharray="4 4"></path>
+              <line x1="290" y1="390" x2="290" y2="320" stroke="#94a3b8" stroke-width="3"></line>
+              <!-- window on top wall -->
+              <rect x="272" y="66.5" width="80" height="7" fill="#eceef1"></rect>
+              <line x1="272" y1="70" x2="352" y2="70" stroke="#64748b" stroke-width="3"></line>
+
+              <!-- labels -->
+              <g style="animation: frp-fade 0.6s ease both; animation-delay: 1.85s;">
+              <g><rect x="258" y="140" width="82" height="26" rx="13" fill="#0f172a"></rect><text x="299" y="158" text-anchor="middle" font-family="'Plus Jakarta Sans',sans-serif" font-size="13" font-weight="600" fill="#fff">1700 mm</text></g>
+              <g><rect x="255" y="230" width="110" height="30" rx="15" fill="#fff" stroke="#e2e8f0"></rect><text x="310" y="250" text-anchor="middle" font-family="'Plus Jakarta Sans',sans-serif" font-size="14" font-weight="600" fill="#475569">Bathroom</text></g>
+              </g>
+              <!-- drawing cursor -->
+              <circle cx="470" cy="390" r="7" fill="#94a3b8"></circle>
+              <circle cx="470" cy="390" r="7" fill="#94a3b8" style="transform-origin: 470px 390px; animation: frp-pulse 2s ease-in-out infinite;"></circle>
+            </svg>
+          </div>
+        </div>
+        <!-- floating badge -->
+        <div style="position: absolute; bottom: -18px; left: -18px; background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px 16px; box-shadow: 0 12px 30px -8px rgba(15,23,42,0.25); display: flex; align-items: center; gap: 10px;">
+          <div style="width: 36px; height: 36px; border-radius: 9px; background: #ecfdf5; display: flex; align-items: center; justify-content: center;">
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#0d9488" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="m7 10 5 5 5-5"></path><path d="M12 15V3"></path></svg>
+          </div>
+          <div style="font-size: 13px; line-height: 1.25;"><div style="font-weight: 700;">Export PNG</div><div style="color: #64748b;">Ready to send</div></div>
+        </div>
       </div>
     </div>
-  </div>
-</section>
 
-<!-- Final CTA -->
-<section class="cta-section">
-  <div class="container fade-in">
-    <h2 class="section__title">Start planning your bathroom today</h2>
-    <p class="section__sub" style="margin:var(--space-4) auto var(--space-8)">No account. No download. No cost. Just open the planner and start designing.</p>
-    <a href="/app" class="btn btn-primary btn-lg" onclick="try{localStorage.setItem('freeroomplanner-intent',JSON.stringify({intent:'bathroom_renovation'}))}catch(e){}">Open the free bathroom planner</a>
-  </div>
-</section>
+    <!-- trust strip / stats bar -->
+    <div style="border-top: 1px solid #e2e8f0; background: rgba(255,255,255,0.6);">
+      <div style="max-width: 1240px; margin: 0 auto; padding: 28px 40px; display: grid; grid-template-columns: repeat(5, 1fr); gap: 24px;">
+        <div style="text-align: center;"><div style="display: flex; align-items: center; justify-content: center;"><svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="#0d9488" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></div><div style="font-size: 13px; color: #64748b; margin-top: 4px; font-weight: 500;">No download or sign-up</div></div>
+        <div style="text-align: center; border-left: 1px solid #e2e8f0;"><div style="display: flex; align-items: center; justify-content: center;"><svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="#0d9488" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></div><div style="font-size: 13px; color: #64748b; margin-top: 4px; font-weight: 500;">Accurate to-scale dimensions</div></div>
+        <div style="text-align: center; border-left: 1px solid #e2e8f0;"><div style="display: flex; align-items: center; justify-content: center;"><svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="#0d9488" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></div><div style="font-size: 13px; color: #64748b; margin-top: 4px; font-weight: 500;">All bathroom fixtures included</div></div>
+        <div style="text-align: center; border-left: 1px solid #e2e8f0;"><div style="display: flex; align-items: center; justify-content: center;"><svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="#0d9488" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></div><div style="font-size: 13px; color: #64748b; margin-top: 4px; font-weight: 500;">Export and share your plan</div></div>
+        <div style="text-align: center; border-left: 1px solid #e2e8f0;"><div style="display: flex; align-items: center; justify-content: center;"><svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="#0d9488" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></div><div style="font-size: 13px; color: #64748b; margin-top: 4px; font-weight: 500;">Works on mobile and desktop</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ FEATURES / WHAT YOU GET ============ -->
+  <section id="features" style="background: #f8fafc; border-top: 1px solid #eef2f6; border-bottom: 1px solid #eef2f6;">
+    <div style="max-width: 1240px; margin: 0 auto; padding: 92px 40px;">
+      <div style="text-align: center; max-width: 640px; margin: 0 auto 56px;">
+        <div style="font-size: 13px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #0d9488;">What you get</div>
+        <h2 style="font-family: 'Space Grotesk', sans-serif; font-size: 42px; font-weight: 700; letter-spacing: -0.03em; margin: 12px 0 0; line-height: 1.08;">Everything in a bathroom design tool, none of the complexity</h2>
+        <p style="font-size: 18px; color: #475569; margin: 16px 0 0;">No steep learning curve. No subscription. Just a fast, accurate bathroom layout planner that lets you get on with designing.</p>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; animation: frp-reveal 0.8s cubic-bezier(0.2,0.7,0.2,1) both; animation-timeline: view(); animation-range: entry 0% cover 20%;">
+        <div style="border: 1px solid #e2e8f0; border-radius: 16px; padding: 24px; background: #fff;"><div style="width: 40px; height: 40px; border-radius: 10px; background: #ecfdf5; display: flex; align-items: center; justify-content: center; margin-bottom: 14px;"><svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#0d9488" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg></div><h3 style="font-family: 'Space Grotesk', sans-serif; font-size: 17px; font-weight: 700; margin: 0 0 6px;">Drag-and-drop fixtures</h3><p style="font-size: 14px; color: #64748b; line-height: 1.55; margin: 0;">Place baths, showers, toilets, basins, and storage units with a single click. Snap to walls and other fixtures automatically.</p></div>
+        <div style="border: 1px solid #e2e8f0; border-radius: 16px; padding: 24px; background: #fff;"><div style="width: 40px; height: 40px; border-radius: 10px; background: #f8fafc; display: flex; align-items: center; justify-content: center; margin-bottom: 14px;"><svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#64748b" stroke-width="2"><path d="M2 20L20 2m-4 4l2-2m-4 4l2-2m-4 4l2-2m-4 4l2-2M4 18l2-2"/></svg></div><h3 style="font-family: 'Space Grotesk', sans-serif; font-size: 17px; font-weight: 700; margin: 0 0 6px;">Real-scale dimensions</h3><p style="font-size: 14px; color: #64748b; line-height: 1.55; margin: 0;">Set your exact room size in millimetres and every fixture is drawn to scale. See instantly what fits before you buy anything.</p></div>
+        <div style="border: 1px solid #e2e8f0; border-radius: 16px; padding: 24px; background: #fff;"><div style="width: 40px; height: 40px; border-radius: 10px; background: #ecfdf5; display: flex; align-items: center; justify-content: center; margin-bottom: 14px;"><svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#0d9488" stroke-width="2"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="12" x2="16" y2="14"/></svg></div><h3 style="font-family: 'Space Grotesk', sans-serif; font-size: 17px; font-weight: 700; margin: 0 0 6px;">Works instantly in your browser</h3><p style="font-size: 14px; color: #64748b; line-height: 1.55; margin: 0;">Open the bathroom planner and start designing immediately. Nothing to install, no account to create, no credit card required.</p></div>
+        <div style="border: 1px solid #e2e8f0; border-radius: 16px; padding: 24px; background: #fff;"><div style="width: 40px; height: 40px; border-radius: 10px; background: #f8fafc; display: flex; align-items: center; justify-content: center; margin-bottom: 14px;"><svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#64748b" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></div><h3 style="font-family: 'Space Grotesk', sans-serif; font-size: 17px; font-weight: 700; margin: 0 0 6px;">Export your floor plan</h3><p style="font-size: 14px; color: #64748b; line-height: 1.55; margin: 0;">Download your bathroom layout as an image to share with your fitter, architect, or retailer. No reformatting needed.</p></div>
+        <div style="border: 1px solid #e2e8f0; border-radius: 16px; padding: 24px; background: #fff;"><div style="width: 40px; height: 40px; border-radius: 10px; background: #ecfdf5; display: flex; align-items: center; justify-content: center; margin-bottom: 14px;"><svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#0d9488" stroke-width="2"><rect x="2" y="10" width="20" height="8" rx="2"/><rect x="4" y="7" width="4" height="5" rx="1"/><rect x="16" y="7" width="4" height="5" rx="1"/><line x1="6" y1="18" x2="6" y2="21"/><line x1="18" y1="18" x2="18" y2="21"/></svg></div><h3 style="font-family: 'Space Grotesk', sans-serif; font-size: 17px; font-weight: 700; margin: 0 0 6px;">Full fixture library</h3><p style="font-size: 14px; color: #64748b; line-height: 1.55; margin: 0;">Over 30 bathroom components including baths, walk-in showers, WCs, vanity units, radiators, and more — with standard UK sizes.</p></div>
+        <div style="border: 1px solid #e2e8f0; border-radius: 16px; padding: 24px; background: #fff;"><div style="width: 40px; height: 40px; border-radius: 10px; background: #f8fafc; display: flex; align-items: center; justify-content: center; margin-bottom: 14px;"><svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#64748b" stroke-width="2"><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 .49-4.5"/></svg></div><h3 style="font-family: 'Space Grotesk', sans-serif; font-size: 17px; font-weight: 700; margin: 0 0 6px;">Rotate and resize anything</h3><p style="font-size: 14px; color: #64748b; line-height: 1.55; margin: 0;">Every item can be rotated, resized, and labelled. Test multiple bathroom layout ideas in minutes without making a single measurement in the real room.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ HOW IT WORKS ============ -->
+  <section id="how" style="max-width: 1240px; margin: 0 auto; padding: 100px 40px;">
+    <div style="text-align: center; max-width: 640px; margin: 0 auto 56px;">
+      <div style="font-size: 13px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #0d9488;">How it works</div>
+      <h2 style="font-family: 'Space Grotesk', sans-serif; font-size: 42px; font-weight: 700; letter-spacing: -0.03em; margin: 12px 0 0; line-height: 1.08;">Plan your bathroom layout in four steps</h2>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; animation: frp-reveal 0.8s cubic-bezier(0.2,0.7,0.2,1) both; animation-timeline: view(); animation-range: entry 0% cover 20%;">
+      <div style="border: 1px solid #e2e8f0; border-radius: 18px; padding: 26px; background: #fff;">
+        <span style="width: 32px; height: 32px; border-radius: 9px; background: #0d9488; color: #fff; font-weight: 700; font-size: 15px; display: flex; align-items: center; justify-content: center;">1</span>
+        <h3 style="font-family: 'Space Grotesk', sans-serif; font-size: 19px; font-weight: 700; margin: 16px 0 0;">Set your room size</h3>
+        <p style="font-size: 15px; color: #475569; line-height: 1.6; margin: 10px 0 0;">Enter your bathroom dimensions in millimetres to create an accurate to-scale floor plan.</p>
+      </div>
+      <div style="border: 1px solid #e2e8f0; border-radius: 18px; padding: 26px; background: #fff;">
+        <span style="width: 32px; height: 32px; border-radius: 9px; background: #0d9488; color: #fff; font-weight: 700; font-size: 15px; display: flex; align-items: center; justify-content: center;">2</span>
+        <h3 style="font-family: 'Space Grotesk', sans-serif; font-size: 19px; font-weight: 700; margin: 16px 0 0;">Add your fixtures</h3>
+        <p style="font-size: 15px; color: #475569; line-height: 1.6; margin: 10px 0 0;">Drag a bath, shower, toilet, and basin from the library into your room.</p>
+      </div>
+      <div style="border: 1px solid #e2e8f0; border-radius: 18px; padding: 26px; background: #fff;">
+        <span style="width: 32px; height: 32px; border-radius: 9px; background: #0d9488; color: #fff; font-weight: 700; font-size: 15px; display: flex; align-items: center; justify-content: center;">3</span>
+        <h3 style="font-family: 'Space Grotesk', sans-serif; font-size: 19px; font-weight: 700; margin: 16px 0 0;">Adjust and refine</h3>
+        <p style="font-size: 15px; color: #475569; line-height: 1.6; margin: 10px 0 0;">Move, rotate, and resize items until your layout works. Snap to walls for precision.</p>
+      </div>
+      <div style="border: 1px solid #e2e8f0; border-radius: 18px; padding: 26px; background: #fff;">
+        <span style="width: 32px; height: 32px; border-radius: 9px; background: #0d9488; color: #fff; font-weight: 700; font-size: 15px; display: flex; align-items: center; justify-content: center;">4</span>
+        <h3 style="font-family: 'Space Grotesk', sans-serif; font-size: 19px; font-weight: 700; margin: 16px 0 0;">Export and share</h3>
+        <p style="font-size: 15px; color: #475569; line-height: 1.6; margin: 10px 0 0;">Download your plan or share a link directly with your bathroom fitter or supplier.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ WHO USES IT ============ -->
+  <section style="background: #f8fafc; border-top: 1px solid #eef2f6; border-bottom: 1px solid #eef2f6;">
+    <div style="max-width: 1240px; margin: 0 auto; padding: 92px 40px;">
+      <div style="text-align: center; max-width: 640px; margin: 0 auto 48px;">
+        <div style="font-size: 13px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #0d9488;">Who uses it</div>
+        <h2 style="font-family: 'Space Grotesk', sans-serif; font-size: 42px; font-weight: 700; letter-spacing: -0.03em; margin: 12px 0 0; line-height: 1.08;">The bathroom layout planner for every project</h2>
+        <p style="font-size: 18px; color: #475569; margin: 16px 0 0;">Whether you're redesigning a small en-suite or speccing out a full bathroom renovation, Free Room Planner gives you the tools to plan it properly.</p>
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 18px; animation: frp-reveal 0.8s cubic-bezier(0.2,0.7,0.2,1) both; animation-timeline: view(); animation-range: entry 0% cover 20%;">
+        <div style="border: 1px solid #e2e8f0; border-radius: 16px; padding: 26px; background: #fff;"><div style="width: 40px; height: 40px; border-radius: 10px; background: #ecfdf5; display: flex; align-items: center; justify-content: center; margin-bottom: 14px;"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#0d9488" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 20h20"></path><path d="M14 20v-8a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8"></path><path d="M18 20V8a2 2 0 0 0-2-2h-2"></path></svg></div><h3 style="font-family: 'Space Grotesk', sans-serif; font-size: 18px; font-weight: 700; margin: 0 0 8px;">Planning a bathroom renovation</h3><p style="font-size: 15px; color: #64748b; line-height: 1.6; margin: 0;">Map out exactly where your new fixtures will go before your fitter arrives. <a href="/blog/bathroom-planning-mistakes" style="color: #0d9488; font-weight: 600;">Avoid costly mistakes</a> by checking dimensions on screen rather than discovering problems on the day.</p></div>
+        <div style="border: 1px solid #e2e8f0; border-radius: 16px; padding: 26px; background: #fff;"><div style="width: 40px; height: 40px; border-radius: 10px; background: #f8fafc; display: flex; align-items: center; justify-content: center; margin-bottom: 14px;"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="2"></rect><line x1="2" y1="12" x2="22" y2="12"></line><line x1="12" y1="2" x2="12" y2="22"></line></svg></div><h3 style="font-family: 'Space Grotesk', sans-serif; font-size: 18px; font-weight: 700; margin: 0 0 8px;">Small bathroom or en-suite design</h3><p style="font-size: 15px; color: #64748b; line-height: 1.6; margin: 0;">Space is tight in a small bathroom. Use our bathroom design software to try different layouts — corner shower vs bath, wall-hung vs pedestal — until you find what works.</p></div>
+        <div style="border: 1px solid #e2e8f0; border-radius: 16px; padding: 26px; background: #fff;"><div style="width: 40px; height: 40px; border-radius: 10px; background: #ecfdf5; display: flex; align-items: center; justify-content: center; margin-bottom: 14px;"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#0d9488" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg></div><h3 style="font-family: 'Space Grotesk', sans-serif; font-size: 18px; font-weight: 700; margin: 0 0 8px;">Briefing a bathroom designer</h3><p style="font-size: 15px; color: #64748b; line-height: 1.6; margin: 0;">Arrive at your bathroom design appointment with a plan already drawn up. Save time, communicate clearly, and get a more accurate quote from the outset.</p></div>
+        <div style="border: 1px solid #e2e8f0; border-radius: 16px; padding: 26px; background: #fff;"><div style="width: 40px; height: 40px; border-radius: 10px; background: #f8fafc; display: flex; align-items: center; justify-content: center; margin-bottom: 14px;"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg></div><h3 style="font-family: 'Space Grotesk', sans-serif; font-size: 18px; font-weight: 700; margin: 0 0 8px;">Buying fixtures online</h3><p style="font-size: 15px; color: #64748b; line-height: 1.6; margin: 0;">Check that a bath, shower enclosure, or vanity unit actually fits your space before you order. Our bathroom planner shows you exactly how much room you have to work with.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ FIXTURE LIBRARY ============ -->
+  <section style="max-width: 1240px; margin: 0 auto; padding: 100px 40px;">
+    <div style="text-align: center; max-width: 640px; margin: 0 auto 48px;">
+      <div style="font-size: 13px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #0d9488;">Fixture library</div>
+      <h2 style="font-family: 'Space Grotesk', sans-serif; font-size: 42px; font-weight: 700; letter-spacing: -0.03em; margin: 12px 0 0; line-height: 1.08;">Every bathroom component you need</h2>
+      <p style="font-size: 18px; color: #475569; margin: 16px 0 0;">All items are sized to standard UK dimensions. Resize freely to match your exact products.</p>
+    </div>
+    <div style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; max-width: 860px; margin: 0 auto; animation: frp-reveal 0.8s cubic-bezier(0.2,0.7,0.2,1) both; animation-timeline: view(); animation-range: entry 0% cover 20%;">
+      <span style="display: inline-block; border: 1px solid #e2e8f0; background: #fff; border-radius: 999px; padding: 9px 18px; font-size: 14px; font-weight: 600; color: #334155;">Freestanding bath</span>
+      <span style="display: inline-block; border: 1px solid #e2e8f0; background: #fff; border-radius: 999px; padding: 9px 18px; font-size: 14px; font-weight: 600; color: #334155;">Built-in bath</span>
+      <span style="display: inline-block; border: 1px solid #e2e8f0; background: #fff; border-radius: 999px; padding: 9px 18px; font-size: 14px; font-weight: 600; color: #334155;">Corner bath</span>
+      <span style="display: inline-block; border: 1px solid #e2e8f0; background: #fff; border-radius: 999px; padding: 9px 18px; font-size: 14px; font-weight: 600; color: #334155;">Walk-in shower</span>
+      <span style="display: inline-block; border: 1px solid #e2e8f0; background: #fff; border-radius: 999px; padding: 9px 18px; font-size: 14px; font-weight: 600; color: #334155;">Shower enclosure</span>
+      <span style="display: inline-block; border: 1px solid #e2e8f0; background: #fff; border-radius: 999px; padding: 9px 18px; font-size: 14px; font-weight: 600; color: #334155;">Shower + screen</span>
+      <span style="display: inline-block; border: 1px solid #e2e8f0; background: #fff; border-radius: 999px; padding: 9px 18px; font-size: 14px; font-weight: 600; color: #334155;">Close-coupled WC</span>
+      <span style="display: inline-block; border: 1px solid #e2e8f0; background: #fff; border-radius: 999px; padding: 9px 18px; font-size: 14px; font-weight: 600; color: #334155;">Wall-hung WC</span>
+      <span style="display: inline-block; border: 1px solid #e2e8f0; background: #fff; border-radius: 999px; padding: 9px 18px; font-size: 14px; font-weight: 600; color: #334155;">Back-to-wall WC</span>
+      <span style="display: inline-block; border: 1px solid #e2e8f0; background: #fff; border-radius: 999px; padding: 9px 18px; font-size: 14px; font-weight: 600; color: #334155;">Pedestal basin</span>
+      <span style="display: inline-block; border: 1px solid #e2e8f0; background: #fff; border-radius: 999px; padding: 9px 18px; font-size: 14px; font-weight: 600; color: #334155;">Wall-hung basin</span>
+      <span style="display: inline-block; border: 1px solid #e2e8f0; background: #fff; border-radius: 999px; padding: 9px 18px; font-size: 14px; font-weight: 600; color: #334155;">Vanity unit</span>
+      <span style="display: inline-block; border: 1px solid #e2e8f0; background: #fff; border-radius: 999px; padding: 9px 18px; font-size: 14px; font-weight: 600; color: #334155;">Double vanity</span>
+      <span style="display: inline-block; border: 1px solid #e2e8f0; background: #fff; border-radius: 999px; padding: 9px 18px; font-size: 14px; font-weight: 600; color: #334155;">Towel radiator</span>
+      <span style="display: inline-block; border: 1px solid #e2e8f0; background: #fff; border-radius: 999px; padding: 9px 18px; font-size: 14px; font-weight: 600; color: #334155;">Bidet</span>
+      <span style="display: inline-block; border: 1px solid #e2e8f0; background: #fff; border-radius: 999px; padding: 9px 18px; font-size: 14px; font-weight: 600; color: #334155;">Storage unit</span>
+    </div>
+  </section>
+
+  <!-- ============ MORE PLANNERS ============ -->
+  <section style="background: #f8fafc; border-top: 1px solid #eef2f6; border-bottom: 1px solid #eef2f6;">
+    <div style="max-width: 1240px; margin: 0 auto; padding: 92px 40px;">
+      <div style="text-align: center; max-width: 640px; margin: 0 auto 48px;">
+        <div style="font-size: 13px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #0d9488;">More planners</div>
+        <h2 style="font-family: 'Space Grotesk', sans-serif; font-size: 42px; font-weight: 700; letter-spacing: -0.03em; margin: 12px 0 0; line-height: 1.08;">Room-specific planning tools</h2>
+        <p style="font-size: 18px; color: #475569; margin: 16px 0 0;">Planning a different room? Use the planner built for it — same canvas, same free export.</p>
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 18px; animation: frp-reveal 0.8s cubic-bezier(0.2,0.7,0.2,1) both; animation-timeline: view(); animation-range: entry 0% cover 20%;">
+        <a href="/kitchen-planner" style="text-decoration:none;color:inherit;border:1px solid #e2e8f0;border-radius:16px;padding:24px;background:#fff;display:flex;flex-direction:column;gap:6px;transition:all .15s;"><div style="display:flex;align-items:center;justify-content:space-between;"><h3 style="font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;margin:0;">Kitchen Planner</h3><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0d9488" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg></div><p style="font-size:14px;color:#64748b;line-height:1.5;margin:0;">Plan your kitchen layout with units, appliances, and islands.</p></a>
+        <a href="/bedroom-planner" style="text-decoration:none;color:inherit;border:1px solid #e2e8f0;border-radius:16px;padding:24px;background:#fff;display:flex;flex-direction:column;gap:6px;transition:all .15s;"><div style="display:flex;align-items:center;justify-content:space-between;"><h3 style="font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;margin:0;">Bedroom Planner</h3><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0d9488" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg></div><p style="font-size:14px;color:#64748b;line-height:1.5;margin:0;">Find the best bed position and storage configuration.</p></a>
+        <a href="/living-room-planner" style="text-decoration:none;color:inherit;border:1px solid #e2e8f0;border-radius:16px;padding:24px;background:#fff;display:flex;flex-direction:column;gap:6px;transition:all .15s;"><div style="display:flex;align-items:center;justify-content:space-between;"><h3 style="font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;margin:0;">Living Room Planner</h3><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0d9488" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg></div><p style="font-size:14px;color:#64748b;line-height:1.5;margin:0;">Arrange sofas, tables, and entertainment units for the perfect living space.</p></a>
+        <a href="/floor-plan-maker" style="text-decoration:none;color:inherit;border:1px solid #e2e8f0;border-radius:16px;padding:24px;background:#fff;display:flex;flex-direction:column;gap:6px;transition:all .15s;"><div style="display:flex;align-items:center;justify-content:space-between;"><h3 style="font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;margin:0;">Floor Plan Maker</h3><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0d9488" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg></div><p style="font-size:14px;color:#64748b;line-height:1.5;margin:0;">Draw whole-floor plans with multiple rooms, walls, doors, and windows.</p></a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ FAQ ============ -->
+  <section id="faq" style="max-width: 820px; margin: 0 auto; padding: 96px 32px;">
+    <div style="text-align: center; margin: 0 0 48px;">
+      <div style="font-size: 13px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #0d9488;">FAQ</div>
+      <h2 style="font-family: 'Space Grotesk', sans-serif; font-size: 42px; font-weight: 700; letter-spacing: -0.03em; margin: 12px 0 0; line-height: 1.08;">Common questions</h2>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 12px;">
+      <div style="border:1px solid #e2e8f0;border-radius:14px;overflow:hidden;background:#fff;"><button onclick="frpFaq(this)" style="width:100%;text-align:left;background:none;border:none;padding:20px 24px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:16px;font-family:'Inter',sans-serif;"><span style="font-size:17px;font-weight:600;color:#0f172a;">Is this bathroom planner really free?</span><span class="frp-faq-i" style="font-size:22px;color:#0d9488;line-height:1;flex-shrink:0;">+</span></button><div class="frp-faq-a" style="display:none;"><p style="margin:0;padding:0 24px 22px;font-size:15px;color:#475569;line-height:1.65;">Yes — Free Room Planner is completely free to use with no hidden charges. There's no subscription, no premium tier for basic features, and no requirement to create an account. You can plan your bathroom, export your layout, and share your design all at no cost.</p></div></div>
+      <div style="border:1px solid #e2e8f0;border-radius:14px;overflow:hidden;background:#fff;"><button onclick="frpFaq(this)" style="width:100%;text-align:left;background:none;border:none;padding:20px 24px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:16px;font-family:'Inter',sans-serif;"><span style="font-size:17px;font-weight:600;color:#0f172a;">Do I need to download anything or create an account?</span><span class="frp-faq-i" style="font-size:22px;color:#0d9488;line-height:1;flex-shrink:0;">+</span></button><div class="frp-faq-a" style="display:none;"><p style="margin:0;padding:0 24px 22px;font-size:15px;color:#475569;line-height:1.65;">No download is required. Our bathroom design tool runs entirely in your browser — on desktop, tablet, or mobile. You don't need to register or log in to start planning.</p></div></div>
+      <div style="border:1px solid #e2e8f0;border-radius:14px;overflow:hidden;background:#fff;"><button onclick="frpFaq(this)" style="width:100%;text-align:left;background:none;border:none;padding:20px 24px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:16px;font-family:'Inter',sans-serif;"><span style="font-size:17px;font-weight:600;color:#0f172a;">Can I use it to plan a small bathroom or en-suite?</span><span class="frp-faq-i" style="font-size:22px;color:#0d9488;line-height:1;flex-shrink:0;">+</span></button><div class="frp-faq-a" style="display:none;"><p style="margin:0;padding:0 24px 22px;font-size:15px;color:#475569;line-height:1.65;">Absolutely. The bathroom planner is particularly useful for small spaces where every centimetre matters. Set your exact room dimensions and check whether a bath or shower enclosure actually fits before committing to a purchase.</p></div></div>
+      <div style="border:1px solid #e2e8f0;border-radius:14px;overflow:hidden;background:#fff;"><button onclick="frpFaq(this)" style="width:100%;text-align:left;background:none;border:none;padding:20px 24px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:16px;font-family:'Inter',sans-serif;"><span style="font-size:17px;font-weight:600;color:#0f172a;">Is the bathroom design tool to scale?</span><span class="frp-faq-i" style="font-size:22px;color:#0d9488;line-height:1;flex-shrink:0;">+</span></button><div class="frp-faq-a" style="display:none;"><p style="margin:0;padding:0 24px 22px;font-size:15px;color:#475569;line-height:1.65;">Yes. You enter your room measurements in millimetres and the planner draws everything to scale. This means the plan you see on screen reflects real-world proportions accurately, so you can trust what you're looking at.</p></div></div>
+      <div style="border:1px solid #e2e8f0;border-radius:14px;overflow:hidden;background:#fff;"><button onclick="frpFaq(this)" style="width:100%;text-align:left;background:none;border:none;padding:20px 24px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:16px;font-family:'Inter',sans-serif;"><span style="font-size:17px;font-weight:600;color:#0f172a;">Can I plan other rooms too?</span><span class="frp-faq-i" style="font-size:22px;color:#0d9488;line-height:1;flex-shrink:0;">+</span></button><div class="frp-faq-a" style="display:none;"><p style="margin:0;padding:0 24px 22px;font-size:15px;color:#475569;line-height:1.65;">Yes — Free Room Planner works for any room in the house. As well as bathrooms, you can design kitchens, living rooms, bedrooms, and more. The same drag-and-drop tool works across all room types.</p></div></div>
+      <div style="border:1px solid #e2e8f0;border-radius:14px;overflow:hidden;background:#fff;"><button onclick="frpFaq(this)" style="width:100%;text-align:left;background:none;border:none;padding:20px 24px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:16px;font-family:'Inter',sans-serif;"><span style="font-size:17px;font-weight:600;color:#0f172a;">How do I share my bathroom plan with my fitter?</span><span class="frp-faq-i" style="font-size:22px;color:#0d9488;line-height:1;flex-shrink:0;">+</span></button><div class="frp-faq-a" style="display:none;"><p style="margin:0;padding:0 24px 22px;font-size:15px;color:#475569;line-height:1.65;">You can export your finished bathroom layout as an image file and send it by email, WhatsApp, or however you normally share files. This gives your bathroom fitter a clear, dimensioned plan to work from before they visit the property.</p></div></div>
+    </div>
+  </section>
+
+  <!-- ============ FINAL CTA ============ -->
+  <section style="max-width: 1240px; margin: 0 auto 88px; padding: 0 40px;">
+    <div style="position: relative; overflow: hidden; border-radius: 28px; background: linear-gradient(135deg, #0f766e 0%, #0d9488 55%, #14b8a6 100%); padding: 72px 48px; text-align: center; animation: frp-reveal 0.8s cubic-bezier(0.2,0.7,0.2,1) both; animation-timeline: view(); animation-range: entry 0% cover 24%;">
+      <div style="position: absolute; inset: 0; background-image: radial-gradient(circle, rgba(255,255,255,0.14) 1.5px, transparent 1.5px); background-size: 26px 26px; opacity: 0.5;"></div>
+      <div style="position: relative;">
+        <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.14); border: 1px solid rgba(255,255,255,0.3); color: #d0fbf3; padding: 6px 14px; border-radius: 999px; font-size: 13px; font-weight: 600; margin-bottom: 18px;">Free forever</div>
+        <h2 style="font-family: 'Space Grotesk', sans-serif; font-size: 46px; font-weight: 700; color: #fff; letter-spacing: -0.03em; margin: 0; line-height: 1.05;">Start planning your bathroom today</h2>
+        <p style="font-size: 20px; color: #d0fbf3; margin: 16px 0 0; font-weight: 500;">No account. No download. No cost. Just open the planner and start designing.</p>
+        <a href="/app" onclick="try{localStorage.setItem('freeroomplanner-intent',JSON.stringify({intent:'bathroom_renovation'}))}catch(e){}" style="display: inline-flex; align-items: center; gap: 10px; margin-top: 32px; background: #fff; color: #0f766e; padding: 17px 34px; border-radius: 14px; font-size: 18px; font-weight: 700; text-decoration: none; box-shadow: 0 12px 30px rgba(0,0,0,0.2);">
+          Open the free bathroom planner
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg>
+        </a>
+        <div style="margin-top: 20px; color: #a7f3e8; font-size: 14px;">No email · No credit card · No download</div>
+      </div>
+    </div>
+  </section>
 
 <script type="application/ld+json">{
   "@context": "https://schema.org",
@@ -291,49 +432,37 @@
   ]
 }</script>
 
-<footer class="site-footer">
-  <div class="container">
-    <div class="footer-grid">
-      <div class="footer-brand">
-        <div class="footer-brand__logo"><img src="/logo.png" alt="Free Room Planner" width="24" height="24" style="object-fit:contain;display:block;" /> Free Room Planner</div>
-        <p>Free browser-based room planner for homeowners. Draw accurate floor plans in minutes — no account, no download required.</p>
+  <!-- ============ FOOTER ============ -->
+  <footer style="background: #0f172a; color: #cbd5e1;">
+    <div style="max-width: 1240px; margin: 0 auto; padding: 64px 40px 40px; display: grid; grid-template-columns: 1.6fr 1fr 1fr 1fr 1fr; gap: 40px;">
+      <div>
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div style="width: 32px; height: 32px; border-radius: 9px; background: #0d9488; display: flex; align-items: center; justify-content: center;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21V5a2 2 0 0 1 2-2h9"></path><path d="M3 12h9"></path><path d="M12 3v18"></path><path d="M12 12h9v9h-9"></path></svg></div>
+          <span style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 17px; color: #fff;">Free Room Planner</span>
+        </div>
+        <p style="font-size: 14px; line-height: 1.6; color: #94a3b8; margin: 16px 0 0; max-width: 300px;">Free browser-based room planner for homeowners. Draw accurate floor plans in minutes — no account, no download required.</p>
       </div>
-      <div class="footer-col">
-        <p class="footer-col__title">Planners</p>
-        <ul>
-          <li><a href="/room-planner">Room Planner</a></li>
-          <li><a href="/kitchen-planner">Kitchen Planner</a></li>
-          <li><a href="/bathroom-planner">Bathroom Planner</a></li>
-          <li><a href="/bedroom-planner">Bedroom Planner</a></li>
-          <li><a href="/living-room-planner">Living Room Planner</a></li>
-          <li><a href="/floor-plan-maker">Floor Plan Maker</a></li>
-        </ul>
+      <div>
+        <div style="font-size: 13px; font-weight: 700; color: #fff; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 14px;">Planners</div>
+        <div style="display: flex; flex-direction: column; gap: 10px; font-size: 14px;"><a href="/room-planner" style="color: #94a3b8; text-decoration: none;">Room Planner</a><a href="/kitchen-planner" style="color: #94a3b8; text-decoration: none;">Kitchen Planner</a><a href="/bathroom-planner" style="color: #94a3b8; text-decoration: none;">Bathroom Planner</a><a href="/bedroom-planner" style="color: #94a3b8; text-decoration: none;">Bedroom Planner</a><a href="/living-room-planner" style="color: #94a3b8; text-decoration: none;">Living Room Planner</a><a href="/floor-plan-maker" style="color: #94a3b8; text-decoration: none;">Floor Plan Maker</a></div>
       </div>
-      <div class="footer-col">
-        <p class="footer-col__title">Resources</p>
-        <ul>
-          <li><a href="/how-it-works">How it works</a></li>
-          <li><a href="/blog">Blog</a></li>
-          <li><a href="/app">Open the planner</a></li>
-        </ul>
+      <div>
+        <div style="font-size: 13px; font-weight: 700; color: #fff; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 14px;">Resources</div>
+        <div style="display: flex; flex-direction: column; gap: 10px; font-size: 14px;"><a href="/how-it-works" style="color: #94a3b8; text-decoration: none;">How it works</a><a href="/#faq" style="color: #94a3b8; text-decoration: none;">FAQ</a><a href="/blog" style="color: #94a3b8; text-decoration: none;">Blog</a><a href="/app" style="color: #94a3b8; text-decoration: none;">Open the planner</a></div>
       </div>
-      <div class="footer-col">
-        <p class="footer-col__title">Use cases</p>
-        <ul>
-          <li><a href="/kitchen-planner">Kitchen renovations</a></li>
-          <li><a href="/bathroom-planner">Bathroom refits</a></li>
-          <li><a href="/bedroom-planner">Room rearrangements</a></li>
-          <li><a href="/living-room-planner">Living room layouts</a></li>
-          <li><a href="/floor-plan-maker">Floor plans &amp; renovations</a></li>
-          <li><a href="/room-planner">Extensions &amp; new builds</a></li>
-        </ul>
+      <div>
+        <div style="font-size: 13px; font-weight: 700; color: #fff; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 14px;">Use cases</div>
+        <div style="display: flex; flex-direction: column; gap: 10px; font-size: 14px;"><a href="/kitchen-planner" style="color: #94a3b8; text-decoration: none;">Kitchen renovations</a><a href="/bathroom-planner" style="color: #94a3b8; text-decoration: none;">Bathroom refits</a><a href="/bedroom-planner" style="color: #94a3b8; text-decoration: none;">Room rearrangements</a><a href="/living-room-planner" style="color: #94a3b8; text-decoration: none;">Living room layouts</a><a href="/floor-plan-maker" style="color: #94a3b8; text-decoration: none;">Floor plans &amp; renovations</a><a href="/room-planner" style="color: #94a3b8; text-decoration: none;">Extensions &amp; new builds</a></div>
+      </div>
+      <div>
+        <div style="font-size: 13px; font-weight: 700; color: #fff; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 14px;">For business</div>
+        <div style="display: flex; flex-direction: column; gap: 10px; font-size: 14px;"><a href="/get-embed" style="color: #94a3b8; text-decoration: none;">For businesses</a></div>
       </div>
     </div>
-    <div class="footer-bottom">
-      <span>&copy; 2026 Free Room Planner. Free to use.</span>
-    </div>
-  </div>
-</footer>
-<script src="/rs.js" defer></script>
+    <div style="border-top: 1px solid #1e293b;"><div style="max-width: 1240px; margin: 0 auto; padding: 20px 40px; font-size: 13px; color: #64748b;">© 2026 Free Room Planner. Free to use.</div></div>
+  </footer>
+
+<script>function frpFaq(b){var a=b.parentElement.querySelector(".frp-faq-a"),i=b.querySelector(".frp-faq-i");var o=a.style.display==="block";a.style.display=o?"none":"block";if(i)i.textContent=o?"+":"−";}</script>
+<script>(function(){function toTop(){try{window.scrollTo(0,0);}catch(e){}}toTop();window.addEventListener("pageshow",toTop);var de=document.documentElement;if(!de.classList.contains("frp-anim-hold"))return;var shown=false;function go(){if(shown)return;shown=true;de.classList.add("frp-hero-shown");}function init(){toTop();var hero=document.getElementById("top");if(!hero){go();return;}try{var io=new IntersectionObserver(function(es){for(var i=0;i<es.length;i++){if(es[i].isIntersecting){go();io.disconnect();break;}}},{threshold:0});io.observe(hero);}catch(e){go();return;}setTimeout(go,1500);}if(document.readyState!=="loading")init();else document.addEventListener("DOMContentLoaded",init);})();</script>
 </body>
 </html>
