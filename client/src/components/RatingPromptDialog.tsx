@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Star } from "lucide-react";
 import {
   Dialog,
@@ -76,16 +76,49 @@ export default function RatingPromptDialog({
   const [hovered, setHovered] = useState(0);
   const [feedback, setFeedback] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  // Guards against sending more than one feedback email per rating flow. The
+  // score used to be emailed the instant a star was tapped AND again when the
+  // feedback box was submitted, so anyone who left a comment generated two
+  // emails (and two saved rows) for the same rating. We now record the rating
+  // exactly once — at the end of the flow, or when the dialog is dismissed.
+  const emailedRef = useRef(false);
+
+  /**
+   * Send the rating to the inbox / feedback table exactly once. Called when the
+   * user finishes (with their comment, if any) or dismisses the dialog after
+   * choosing a score (so an abandoned rating is still captured). No-op if a
+   * score hasn't been chosen yet, or if this flow has already been recorded.
+   */
+  const recordRating = (includeFeedback: boolean) => {
+    if (emailedRef.current || rating <= 0) return;
+    emailedRef.current = true;
+    const note = feedback.trim();
+    const message =
+      includeFeedback && note
+        ? `In-app rating: ${rating}/5\n\n${note}`
+        : `In-app rating: ${rating}/5`;
+    apiRequest("POST", "/api/feedback", {
+      type: rating >= 4 ? "praise" : "general",
+      message,
+      rating,
+      page: window.location.pathname,
+    }).catch(() => {});
+  };
 
   // The re-ask opens straight at the review invite.
   useEffect(() => {
     if (open) {
       setStage(mode === "review" ? "review" : "rate");
+      emailedRef.current = false; // fresh flow — allow one email again
       if (mode === "review") trackEvent("review_prompt_shown", { reask: true });
     }
   }, [open, mode]);
 
   const close = (o: boolean) => {
+    // Safety net: if they picked a score but dismissed without pressing
+    // Skip/Send, still record it once (recordRating no-ops for score 0 or if
+    // it's already been sent, so this never produces a duplicate).
+    if (!o) recordRating(false);
     onOpenChange(o);
     if (!o) {
       setTimeout(() => {
@@ -93,6 +126,7 @@ export default function RatingPromptDialog({
         setRating(0);
         setHovered(0);
         setFeedback("");
+        emailedRef.current = false;
       }, 300);
     }
   };
@@ -100,35 +134,17 @@ export default function RatingPromptDialog({
   const handleStarClick = (n: number) => {
     setRating(n);
     trackEvent("rating_submitted", { rating: n });
-
-    // Record every rating straight away, at every score. This used to happen
-    // only for people who went on to click through to the review site, so the
-    // feedback inbox saw the unhappy ratings and almost nothing else.
-    apiRequest("POST", "/api/feedback", {
-      type: n >= 4 ? "praise" : "general",
-      message: `In-app rating: ${n}/5`,
-      rating: n,
-      page: window.location.pathname,
-    }).catch(() => {});
-
+    // Don't record yet — the score is sent once at the end of the flow (or on
+    // dismiss). This also means changing your mind between stars no longer
+    // fires an email per tap.
     setStage("feedback");
   };
 
-  const handleFeedbackSubmit = async () => {
+  const handleFeedbackSubmit = () => {
     setSubmitting(true);
-    if (feedback.trim()) {
-      try {
-        await apiRequest("POST", "/api/feedback", {
-          type: "general",
-          message: `In-app rating: ${rating}/5\n\n${feedback.trim()}`,
-          rating,
-          page: window.location.pathname,
-        });
-      } catch {
-        /* never block the user on feedback delivery */
-      }
-    }
-    setSubmitting(false);
+    // Single recording of the rating for this flow, including the comment if
+    // one was written. Fire-and-forget so the user is never blocked.
+    recordRating(true);
 
     // Everyone is invited to review, whatever they scored.
     if (REVIEW_URL) {
