@@ -534,10 +534,10 @@ export default function View3D({ state, isDark }: View3DProps) {
         camera={{ fov: 45, near: 10, far: 50000, position: camPos }}
       >
         <color attach="background" args={[isDark ? "#20242a" : "#e9edf2"]} />
-        <hemisphereLight intensity={0.9} color="#ffffff" groundColor="#8a8a80" />
+        <hemisphereLight intensity={0.5} color="#ffffff" groundColor="#8a8a80" />
         <directionalLight
           position={[center.x + 900, 1500, center.y + 500]}
-          intensity={2.2}
+          intensity={1.15}
           castShadow
           shadow-mapSize={[2048, 2048]}
           shadow-camera-left={-radius * 1.2}
