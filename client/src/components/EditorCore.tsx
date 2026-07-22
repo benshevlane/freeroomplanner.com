@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, lazy, Suspense } from "react";
 import { useEditor } from "../hooks/use-editor";
 import { useIsMobile } from "../hooks/use-mobile";
 import FloorPlanCanvas from "./FloorPlanCanvas";
@@ -30,6 +30,9 @@ import {
   snapFurnitureToNearest,
 } from "../lib/canvas-renderer";
 import { detectRooms } from "../lib/room-detection";
+
+// Lazy-loaded so Three.js is only downloaded when the user opens the 3D view
+const View3D = lazy(() => import("./View3D"));
 import { safeGetItem, safeSetItem } from "../lib/safe-storage";
 import SavePlanDialog from "./SavePlanDialog";
 import RatingPromptDialog from "./RatingPromptDialog";
@@ -39,7 +42,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
-import { Check } from "lucide-react";
+import { Check, Box as BoxIcon, PencilRuler } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -224,6 +227,7 @@ export default function EditorCore({
     [updateUrlOnSave, storageKey, requestRatingPrompt]
   );
   const [furniturePanelOpen, setFurniturePanelOpen] = useState(false);
+  const [is3D, setIs3D] = useState(false);
   const [propertiesPanelOpen, setPropertiesPanelOpen] = useState(false);
   const [dimEditing, setDimEditing] = useState<"width" | "height" | null>(null);
   const [toast, setToast] = useState<{ message: string; visible: boolean }>({ message: "", visible: false });
@@ -921,8 +925,20 @@ export default function EditorCore({
           <FurniturePanel onSelectFurniture={handleSelectFurniture} onSwitchToSelect={() => editor.setTool("select")} />
         )}
 
-        {/* Canvas */}
-        <FloorPlanCanvas
+        {/* Canvas area: 2D plan or 3D view */}
+        <div className="flex-1 relative overflow-hidden flex flex-col">
+          {is3D ? (
+            <Suspense
+              fallback={
+                <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
+                  Loading 3D view…
+                </div>
+              }
+            >
+              <View3D state={state} isDark={isDark} />
+            </Suspense>
+          ) : (
+            <FloorPlanCanvas
           state={state}
           dimEditing={dimEditing}
           isDark={isDark}
@@ -963,6 +979,29 @@ export default function EditorCore({
           autoEditTextBoxId={autoEditTextBoxId}
           onClearAutoEditTextBox={() => setAutoEditTextBoxId(null)}
         />
+          )}
+
+          {/* 2D/3D toggle */}
+          <Button
+            size="sm"
+            variant={is3D ? "default" : "secondary"}
+            className="absolute top-3 right-3 z-20 shadow-md gap-1.5"
+            onClick={() => {
+              setIs3D((v) => {
+                const next = !v;
+                if (next) trackEvent("view3d_opened", { walls: state.walls.length, furniture: state.furniture.length });
+                return next;
+              });
+            }}
+            data-testid="btn-3d-toggle"
+          >
+            {is3D ? (
+              <><PencilRuler className="h-4 w-4" /> 2D Plan</>
+            ) : (
+              <><BoxIcon className="h-4 w-4" /> 3D View <span className="text-[9px] font-semibold uppercase tracking-wide opacity-70">beta</span></>
+            )}
+          </Button>
+        </div>
 
         {/* Desktop: Properties sidebar */}
         {!isMobile && (
