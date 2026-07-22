@@ -982,10 +982,11 @@ export default function EditorCore({
           )}
 
           {/* 2D/3D toggle */}
+          <div className="absolute top-3 right-3 z-20">
           <Button
             size="sm"
             variant={is3D ? "default" : "secondary"}
-            className="absolute top-3 right-3 z-20 shadow-md gap-1.5"
+            className="shadow-md gap-1.5"
             onClick={() => {
               setIs3D((v) => {
                 const next = !v;
@@ -1001,6 +1002,7 @@ export default function EditorCore({
               <><BoxIcon className="h-4 w-4" /> 3D View <span className="text-[9px] font-semibold uppercase tracking-wide opacity-70">beta</span></>
             )}
           </Button>
+          </div>
         </div>
 
         {/* Desktop: Properties sidebar */}
