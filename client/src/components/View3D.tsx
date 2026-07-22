@@ -34,7 +34,7 @@ function std(color: string, opts: Partial<THREE.MeshStandardMaterialParameters> 
 const MAT = {
   wall: std("#e7e2d9"),
   wallInterior: std("#eceae3"),
-  floor: std("#d6c4a3", { roughness: 0.95 }),
+  floor: std("#c9b48c", { roughness: 0.95, side: THREE.DoubleSide }),
   ground: std("#c8ccd0", { roughness: 1 }),
   glass: new THREE.MeshStandardMaterial({
     color: "#a8cede", roughness: 0.15, metalness: 0.1,
