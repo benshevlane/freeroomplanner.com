@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
 import { Canvas } from "@react-three/fiber";
-import { OrbitControls } from "@react-three/drei";
+import { OrbitControls, useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import { EditorState, Wall, FurnitureItem, Point } from "../lib/types";
 import { detectRooms } from "../lib/room-detection";
@@ -467,13 +467,99 @@ function ItemShape({ item, wallHeight }: { item: FurnitureItem; wallHeight: numb
   return <Box w={w} h={fallbackH[item.category] ?? 60} d={d} mat={catMat} />;
 }
 
+
+// ---------------------------------------------------------------------------
+// Real furniture models (Poly Haven, CC0) — auto-scaled to each item's plan
+// dimensions. Items without a model fall back to the procedural stand-in.
+// ---------------------------------------------------------------------------
+interface ModelDef {
+  url: string;
+  targetH: number; // cm
+}
+
+function def(file: string, targetH: number): ModelDef {
+  return { url: `/models/${file}.glb`, targetH };
+}
+
+const MODEL_MAP: Record<string, ModelDef> = {
+  sofa_3: def("sofa_03", 80),
+  sofa_2: def("sofa_02", 75),
+  sofa_bed: def("sofa_02", 75),
+  armchair: def("modern_arm_chair_01", 90),
+  footstool: def("Ottoman_01", 45),
+  coffee_table: def("modern_coffee_table_01", 40),
+  side_table: def("side_table_01", 50),
+  bedside_table: def("ClassicNightstand_01", 60),
+  chest_drawers: def("drawer_cabinet", 80),
+  wardrobe: def("drawer_cabinet", 200),
+  dining_table_4: def("dining_table", 75),
+  dining_table_6: def("dining_table", 75),
+  dining_table_round: def("round_wooden_table_01", 75),
+  dining_chair: def("dining_chair_02", 90),
+  bar_stool: def("bar_chair_round_01", 75),
+  desk: def("metal_office_desk", 75),
+  bookshelf: def("Shelf_01", 180),
+  sideboard: def("modern_wooden_cabinet", 70),
+  cooker: def("electric_stove", 90),
+};
+
+function ModelItem({ item, model }: { item: FurnitureItem; model: ModelDef }) {
+  const { scene } = useGLTF(model.url);
+
+  const { holder, size } = useMemo(() => {
+    const clone = scene.clone(true);
+    clone.traverse((o: THREE.Object3D) => {
+      if ((o as THREE.Mesh).isMesh) {
+        o.castShadow = true;
+        o.receiveShadow = true;
+      }
+    });
+    const box = new THREE.Box3().setFromObject(clone);
+    const sz = box.getSize(new THREE.Vector3());
+    const center = box.getCenter(new THREE.Vector3());
+    // Centre on origin with the base resting on the floor
+    clone.position.set(-center.x, -box.min.y, -center.z);
+    const holder = new THREE.Group();
+    holder.add(clone);
+    return { holder, size: sz };
+  }, [scene]);
+
+  // Model sizes are in metres; the plan works in cm
+  const bw = size.x * 100;
+  const bh = Math.max(size.y * 100, 1);
+  const bd = size.z * 100;
+
+  // If the model's long axis doesn't match the item's, turn it 90°
+  const rotate90 = item.width >= item.height !== bw >= bd;
+  const mw = rotate90 ? bd : bw;
+  const md = rotate90 ? bw : bd;
+
+  const sx = item.width / Math.max(mw, 1);
+  const sz2 = item.height / Math.max(md, 1);
+  const sy = model.targetH / bh;
+
+  return (
+    <group scale={[sx, sy, sz2]}>
+      <group rotation={[0, rotate90 ? Math.PI / 2 : 0, 0]}>
+        <primitive object={holder} />
+      </group>
+    </group>
+  );
+}
+
 function Item3D({ item, wallHeight }: { item: FurnitureItem; wallHeight: number }) {
   const cx = item.x + item.width / 2;
   const cy = item.y + item.height / 2;
   return (
     <group position={[cx, 0, cy]} rotation={[0, -(item.rotation * Math.PI) / 180, 0]}>
       <group scale={[item.mirrored ? -1 : 1, 1, 1]}>
-        <ItemShape item={item} wallHeight={wallHeight} />
+        {MODEL_MAP[item.type] ? (
+          <Suspense fallback={<ItemShape item={item} wallHeight={wallHeight} />}>
+            <ModelItem item={item} model={MODEL_MAP[item.type]} />
+          </Suspense>
+        ) : (
+          <ItemShape item={item} wallHeight={wallHeight} />
+        )}
       </group>
     </group>
   );
