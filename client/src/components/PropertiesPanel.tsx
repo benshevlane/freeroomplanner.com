@@ -8,6 +8,18 @@ import { Switch } from "@/components/ui/switch";
 import { RotateCw, Trash2, Ruler, Copy, Bold, Square, FlipHorizontal, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Pencil } from "lucide-react";
 
 interface PropertiesPanelProps {
+  /** Live overview of the plan, shown when nothing is selected */
+  planSummary?: {
+    areaM2: number;
+    perimeterCm: number;
+    rooms: number;
+    walls: number;
+    items: number;
+    labels: number;
+    textBoxes: number;
+    arrows: number;
+  };
+  onExportPng?: () => void;
   selectedWall: Wall | null;
   selectedFurniture: FurnitureItem | null;
   selectedLabel: RoomLabel | null;
@@ -105,12 +117,56 @@ export default function PropertiesPanel({
   walls = [],
   units,
   measureMode = "full",
+  planSummary,
+  onExportPng,
 }: PropertiesPanelProps) {
   if (!selectedWall && !selectedFurniture && !selectedLabel && !selectedTextBox && !selectedArrow) {
+    const fmtArea = (m2: number) =>
+      units === "ft" ? `${(m2 * 10.7639).toFixed(1)} sq ft` : `${m2.toFixed(1)} m²`;
     return (
-      <div className="p-4 text-sm text-muted-foreground" data-testid="properties-empty">
-        <p className="font-medium text-foreground mb-1">Properties</p>
-        <p>Select an item to view its properties</p>
+      <div className="p-4 text-sm space-y-3" data-testid="properties-empty">
+        <div>
+          <p className="font-semibold">Room overview</p>
+          <p className="text-xs text-muted-foreground">
+            Nothing selected · select any wall or item to edit its exact size
+          </p>
+        </div>
+
+        {planSummary && (planSummary.walls > 0 || planSummary.items > 0) ? (
+          <>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="rounded-md border border-border p-2">
+                <p className="text-lg font-semibold tabular-nums leading-tight">{fmtArea(planSummary.areaM2)}</p>
+                <p className="text-[11px] text-muted-foreground">Floor area</p>
+              </div>
+              <div className="rounded-md border border-border p-2">
+                <p className="text-lg font-semibold tabular-nums leading-tight">{formatDimension(planSummary.perimeterCm, units)}</p>
+                <p className="text-[11px] text-muted-foreground">Walls total</p>
+              </div>
+            </div>
+            <div className="text-xs text-muted-foreground space-y-1">
+              {([
+                ["Walls", planSummary.walls],
+                ["Items", planSummary.items],
+                ["Labels", planSummary.labels],
+                ["Text boxes", planSummary.textBoxes],
+                ["Arrows", planSummary.arrows],
+              ] as const).map(([label, count]) => (
+                <div key={label} className="flex justify-between">
+                  <span>{label}</span>
+                  <span className="tabular-nums font-medium text-foreground">{count}</span>
+                </div>
+              ))}
+            </div>
+            {onExportPng && (
+              <Button size="sm" className="w-full" variant="outline" onClick={onExportPng} data-testid="btn-summary-export">
+                Download plan PNG
+              </Button>
+            )}
+          </>
+        ) : (
+          <p className="text-muted-foreground">Draw walls or add items to see your plan summary here.</p>
+        )}
       </div>
     );
   }

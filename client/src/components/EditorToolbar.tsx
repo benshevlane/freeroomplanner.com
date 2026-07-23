@@ -317,9 +317,9 @@ export default function EditorToolbar({
 
   // Desktop layout (unchanged)
   return (
-    <div className="flex items-center gap-1 px-3 py-2 border-b border-border bg-card" data-testid="editor-toolbar">
-      {/* Tools */}
-      <div className="flex items-center gap-0.5">
+    <div className="flex items-center gap-1.5 px-3 py-2 border-b border-border bg-card" data-testid="editor-toolbar">
+      {/* Tools cluster */}
+      <div className="flex items-center gap-0.5 rounded-lg border border-border bg-card p-0.5">
         {tools.map(({ tool, icon: Icon, label, shortcut }) => (
           <Tooltip key={tool}>
             <TooltipTrigger asChild>
@@ -338,17 +338,12 @@ export default function EditorToolbar({
             </TooltipContent>
           </Tooltip>
         ))}
-      </div>
-
-      <Separator orientation="vertical" className="h-6 mx-1" />
-
-      {/* Text / Annotation Tools */}
-      <div className="flex items-center gap-0.5">
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
               size="icon"
-              variant={selectedTool === "label" ? "default" : "ghost"}
+              variant="ghost"
+              className={selectedTool === "label" ? "bg-foreground text-background hover:bg-foreground" : ""}
               onClick={() => onSetTool("label")}
               data-testid="tool-label"
             >
@@ -367,10 +362,8 @@ export default function EditorToolbar({
         </Tooltip>
       </div>
 
-      <Separator orientation="vertical" className="h-6 mx-1" />
-
-      {/* Undo/Redo */}
-      <div className="flex items-center gap-0.5">
+      {/* History cluster */}
+      <div className="flex items-center gap-0.5 rounded-lg border border-border bg-card p-0.5">
         <Tooltip>
           <TooltipTrigger asChild>
             <Button size="icon" variant="ghost" onClick={onUndo} disabled={!canUndo} data-testid="btn-undo">
@@ -389,10 +382,8 @@ export default function EditorToolbar({
         </Tooltip>
       </div>
 
-      <Separator orientation="vertical" className="h-6 mx-1" />
-
-      {/* Zoom */}
-      <div className="flex items-center gap-0.5">
+      {/* Zoom cluster */}
+      <div className="flex items-center gap-0.5 rounded-lg border border-border bg-card p-0.5">
         <Tooltip>
           <TooltipTrigger asChild>
             <Button size="icon" variant="ghost" onClick={onZoomOut} data-testid="btn-zoom-out">
@@ -421,8 +412,6 @@ export default function EditorToolbar({
           <TooltipContent><p>Fit plan to view</p></TooltipContent>
         </Tooltip>
       </div>
-
-      <Separator orientation="vertical" className="h-6 mx-1" />
 
       {/* Selection actions */}
       {hasSelection && (
@@ -467,35 +456,30 @@ export default function EditorToolbar({
         </Tooltip>
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={onToggleMeasureMode}
-              data-testid="btn-toggle-measure"
-              className="text-xs px-2"
-            >
-              {measureMode === "full" ? "Full Wall" : "Inside"}
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  data-testid="btn-toggle-measure"
+                  className="text-xs px-2 gap-1"
+                >
+                  {measureMode === "full" ? "Full wall" : "Inside faces"}
+                  <span className="text-[9px] opacity-60">▾</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => { if (measureMode !== "inside") onToggleMeasureMode(); }}>
+                  {measureMode === "inside" ? "✓ " : " "}Inside faces — usable room size
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => { if (measureMode !== "full") onToggleMeasureMode(); }}>
+                  {measureMode === "full" ? "✓ " : " "}Full wall — outside length
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </TooltipTrigger>
           <TooltipContent>
-            <p>{measureMode === "full" ? "Showing full wall length — click for inside measurement" : "Showing inside measurement — click for full wall length"}</p>
-          </TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              size="sm"
-              variant={showAllMeasurements ? "default" : "outline"}
-              onClick={onToggleShowAllMeasurements}
-              data-testid="btn-toggle-show-all-measurements"
-              className="text-xs px-2"
-            >
-              <Ruler className="h-3.5 w-3.5 mr-1" />
-              All
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>{showAllMeasurements ? "Showing measurements on every wall — click to hide short-wall labels" : "Short-wall labels hidden — click to show measurements on all walls"}</p>
+            <p>How wall lengths are measured</p>
           </TooltipContent>
         </Tooltip>
         {/* Units: obvious metric / imperial toggle. The metric side also opens
@@ -615,6 +599,10 @@ export default function EditorToolbar({
             <DropdownMenuItem onClick={onToggleMeasurements} data-testid="menu-toggle-measurements">
               <Ruler className="h-4 w-4 mr-2" />
               {measurementsVisible ? "✓ " : " "}Measurements
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={onToggleShowAllMeasurements} data-testid="btn-toggle-show-all-measurements">
+              <Ruler className="h-4 w-4 mr-2 opacity-50" />
+              {showAllMeasurements ? "✓ " : " "}All wall sizes (incl. short walls)
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
