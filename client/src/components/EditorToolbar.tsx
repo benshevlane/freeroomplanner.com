@@ -438,98 +438,8 @@ export default function EditorToolbar({
         </div>
       )}
 
-      {/* Spacer */}
-      <div className="flex-1" />
-
-      {/* Actions */}
-      <div className="flex items-center gap-1">
-        {/* One press: opens the save window, which creates the shareable link
-            and downloads the plan image. The plan already auto-saves locally. */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button size="sm" onClick={onShareLink} data-testid="btn-save-plan" className="h-9 rounded-[10px] px-4 text-[13px] font-bold shadow-md shadow-primary/30 gap-1.5">
-              <Download className="h-4 w-4" />
-              Save
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent><p>Save your plan — downloads it and creates a shareable link</p></TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  data-testid="btn-toggle-measure"
-                  className="h-9 rounded-[10px] border border-border bg-background text-muted-foreground hover:bg-muted px-3 text-[13px] font-semibold gap-1.5"
-                >
-                  {measureMode === "full" ? "Full wall" : "Inside faces"}
-                  <span className="text-[9px] opacity-60">▾</span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => { if (measureMode !== "inside") onToggleMeasureMode(); }}>
-                  {measureMode === "inside" ? "✓ " : " "}Inside faces — usable room size
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => { if (measureMode !== "full") onToggleMeasureMode(); }}>
-                  {measureMode === "full" ? "✓ " : " "}Full wall — outside length
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>How wall lengths are measured</p>
-          </TooltipContent>
-        </Tooltip>
-        {/* Units: obvious metric / imperial toggle. The metric side also opens
-            a small menu to pick m, cm or mm. */}
-        <div
-          className="flex items-center h-9 rounded-[10px] border border-border bg-background overflow-hidden"
-          data-testid="units-toggle"
-          role="group"
-          aria-label="Measurement units"
-        >
-          <DropdownMenu>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    data-testid="btn-units-metric"
-                    className={`h-full text-[13px] font-semibold px-3 rounded-none gap-1 ${units !== "ft" ? "bg-primary/10 text-primary hover:bg-primary/15" : "text-muted-foreground"}`}
-                  >
-                    Metric{units !== "ft" ? ` (${UNIT_SHORT[units]})` : ""}
-                  </Button>
-                </DropdownMenuTrigger>
-              </TooltipTrigger>
-              <TooltipContent><p>Metric units — click again to choose m, cm or mm</p></TooltipContent>
-            </Tooltip>
-            <DropdownMenuContent align="end">
-              {(["m", "cm", "mm"] as UnitSystem[]).map((u) => (
-                <DropdownMenuItem key={u} onClick={() => onSetUnits(u)} className={units === u ? "font-semibold" : ""}>
-                  <span className="font-mono w-8 inline-block">{UNIT_SHORT[u]}</span>
-                  {UNIT_LABELS[u]}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                size="sm"
-                variant="ghost"
-                data-testid="btn-units-imperial"
-                className={`h-full text-[13px] font-semibold px-3 rounded-none ${units === "ft" ? "bg-primary/10 text-primary hover:bg-primary/15" : "text-muted-foreground"}`}
-                onClick={() => onSetUnits("ft")}
-              >
-                Feet &amp; Inches
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent><p>Imperial units — enter sizes like 6'6"</p></TooltipContent>
-          </Tooltip>
-        </div>
+      {/* View pills — mock order: Snap · Detach · Labels · Inside faces · Units */}
+      <div className="flex items-center gap-1.5">
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
@@ -608,6 +518,87 @@ export default function EditorToolbar({
         </DropdownMenu>
         <Tooltip>
           <TooltipTrigger asChild>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  data-testid="btn-toggle-measure"
+                  className="h-9 rounded-[10px] border border-border bg-background text-muted-foreground hover:bg-muted px-3 text-[13px] font-semibold gap-1.5"
+                >
+                  {measureMode === "full" ? "Full wall" : "Inside faces"}
+                  <span className="text-[9px] opacity-60">▾</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => { if (measureMode !== "inside") onToggleMeasureMode(); }}>
+                  {measureMode === "inside" ? "✓ " : " "}Inside faces — usable room size
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => { if (measureMode !== "full") onToggleMeasureMode(); }}>
+                  {measureMode === "full" ? "✓ " : " "}Full wall — outside length
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>How wall lengths are measured</p>
+          </TooltipContent>
+        </Tooltip>
+        <div
+          className="flex items-center h-9 rounded-[10px] border border-border bg-background overflow-hidden"
+          data-testid="units-toggle"
+          role="group"
+          aria-label="Measurement units"
+        >
+          <DropdownMenu>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    data-testid="btn-units-metric"
+                    className={`h-full text-[13px] font-semibold px-3 rounded-none gap-1 ${units !== "ft" ? "bg-primary/10 text-primary hover:bg-primary/15" : "text-muted-foreground"}`}
+                  >
+                    Metric{units !== "ft" ? ` (${UNIT_SHORT[units]})` : ""}
+                  </Button>
+                </DropdownMenuTrigger>
+              </TooltipTrigger>
+              <TooltipContent><p>Metric units — click again to choose m, cm or mm</p></TooltipContent>
+            </Tooltip>
+            <DropdownMenuContent align="end">
+              {(["m", "cm", "mm"] as UnitSystem[]).map((u) => (
+                <DropdownMenuItem key={u} onClick={() => onSetUnits(u)} className={units === u ? "font-semibold" : ""}>
+                  <span className="font-mono w-8 inline-block">{UNIT_SHORT[u]}</span>
+                  {UNIT_LABELS[u]}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                size="sm"
+                variant="ghost"
+                data-testid="btn-units-imperial"
+                className={`h-full text-[13px] font-semibold px-3 rounded-none ${units === "ft" ? "bg-primary/10 text-primary hover:bg-primary/15" : "text-muted-foreground"}`}
+                onClick={() => onSetUnits("ft")}
+              >
+                Feet &amp; Inches
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent><p>Imperial units — enter sizes like 6'6"</p></TooltipContent>
+          </Tooltip>
+        </div>
+      </div>
+
+      {/* Spacer */}
+      <div className="flex-1" />
+
+      {/* Document actions, right-aligned: Load · Save · overflow */}
+      <div className="flex items-center gap-1.5">
+        <Tooltip>
+          <TooltipTrigger asChild>
             <Button size="sm" variant="ghost" onClick={onLoadPlan} data-testid="btn-load-plan" className="h-9 rounded-[10px] border border-border bg-background text-muted-foreground hover:bg-muted px-3 text-[13px] font-semibold gap-1.5">
               <FolderOpen className="h-4 w-4" />
               Load
@@ -615,8 +606,17 @@ export default function EditorToolbar({
           </TooltipTrigger>
           <TooltipContent><p>Load Plan (JSON)</p></TooltipContent>
         </Tooltip>
-
-        {/* Overflow: destructive actions live here, away from Save */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button size="sm" onClick={onShareLink} data-testid="btn-save-plan" className="h-9 rounded-[10px] px-4 text-[13px] font-bold shadow-md shadow-primary/30 gap-1.5">
+              <Download className="h-4 w-4" />
+              Save
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent><p>Save your plan — downloads it and creates a shareable link</p></TooltipContent>
+        </Tooltip>
+        <div className="w-px h-6 bg-border mx-0.5" />
+        {/* Overflow menu holding destructive Clear, moved away from Save */}
         <DropdownMenu>
           <Tooltip>
             <TooltipTrigger asChild>
