@@ -37,6 +37,7 @@ import {
   TextCursorInput,
   Ruler,
   Magnet,
+  Unlink,
 } from "lucide-react";
 
 interface EditorToolbarProps {
@@ -76,6 +77,10 @@ interface EditorToolbarProps {
   onToggleComponentLabels: () => void;
   snapEnabled: boolean;
   onToggleSnap: () => void;
+  measurementsVisible: boolean;
+  onToggleMeasurements: () => void;
+  detachWalls: boolean;
+  onToggleDetachWalls: () => void;
 }
 
 const tools: { tool: EditorTool; icon: typeof MousePointer2; label: string; shortcut: string }[] = [
@@ -121,6 +126,10 @@ export default function EditorToolbar({
   componentLabelsVisible,
   snapEnabled,
   onToggleSnap,
+  measurementsVisible,
+  onToggleMeasurements,
+  detachWalls,
+  onToggleDetachWalls,
   onToggleComponentLabels,
 }: EditorToolbarProps) {
   if (isMobile) {
@@ -199,6 +208,26 @@ export default function EditorToolbar({
 
           <div className="flex-1" />
 
+          {/* Compact metric / imperial toggle */}
+          <div className="flex items-center rounded-md border border-border overflow-hidden mr-1" data-testid="units-toggle-mobile">
+            <Button
+              size="sm"
+              variant={units !== "ft" ? "default" : "ghost"}
+              className="text-xs px-2 h-8 rounded-none"
+              onClick={() => onSetUnits("m")}
+            >
+              {units !== "ft" ? UNIT_SHORT[units] : "m"}
+            </Button>
+            <Button
+              size="sm"
+              variant={units === "ft" ? "default" : "ghost"}
+              className="text-xs px-2 h-8 rounded-none"
+              onClick={() => onSetUnits("ft")}
+            >
+              ft/in
+            </Button>
+          </div>
+
           <Button size="icon" variant="ghost" className={btnClass} onClick={onTogglePropertiesPanel} data-testid="btn-properties">
             <SlidersHorizontal className="h-5 w-5" />
           </Button>
@@ -257,6 +286,14 @@ export default function EditorToolbar({
               <DropdownMenuItem onClick={onToggleShowAllMeasurements}>
                 <Ruler className="h-4 w-4 mr-2" />
                 Show all measurements: {showAllMeasurements ? "On" : "Off"}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onToggleMeasurements}>
+                <Ruler className="h-4 w-4 mr-2" />
+                Measurements: {measurementsVisible ? "On" : "Off"}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onToggleDetachWalls}>
+                <Unlink className="h-4 w-4 mr-2" />
+                Detach walls: {detachWalls ? "On" : "Off"}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={onToggleSnap}>
                 <Magnet className="h-4 w-4 mr-2" />
@@ -469,31 +506,54 @@ export default function EditorToolbar({
             <p>{showAllMeasurements ? "Showing measurements on every wall — click to hide short-wall labels" : "Short-wall labels hidden — click to show measurements on all walls"}</p>
           </TooltipContent>
         </Tooltip>
-        <DropdownMenu>
+        {/* Units: obvious metric / imperial toggle. The metric side also opens
+            a small menu to pick m, cm or mm. */}
+        <div
+          className="flex items-center rounded-md border border-border overflow-hidden"
+          data-testid="units-toggle"
+          role="group"
+          aria-label="Measurement units"
+        >
+          <DropdownMenu>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant={units !== "ft" ? "default" : "ghost"}
+                    data-testid="btn-units-metric"
+                    className="text-xs px-2.5 rounded-none gap-1"
+                  >
+                    Metric{units !== "ft" ? ` (${UNIT_SHORT[units]})` : ""}
+                  </Button>
+                </DropdownMenuTrigger>
+              </TooltipTrigger>
+              <TooltipContent><p>Metric units — click again to choose m, cm or mm</p></TooltipContent>
+            </Tooltip>
+            <DropdownMenuContent align="end">
+              {(["m", "cm", "mm"] as UnitSystem[]).map((u) => (
+                <DropdownMenuItem key={u} onClick={() => onSetUnits(u)} className={units === u ? "font-semibold" : ""}>
+                  <span className="font-mono w-8 inline-block">{UNIT_SHORT[u]}</span>
+                  {UNIT_LABELS[u]}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Tooltip>
             <TooltipTrigger asChild>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  data-testid="btn-toggle-units"
-                  className="text-xs font-mono px-2"
-                >
-                  {UNIT_SHORT[units]}
-                </Button>
-              </DropdownMenuTrigger>
+              <Button
+                size="sm"
+                variant={units === "ft" ? "default" : "ghost"}
+                data-testid="btn-units-imperial"
+                className="text-xs px-2.5 rounded-none"
+                onClick={() => onSetUnits("ft")}
+              >
+                Feet &amp; Inches
+              </Button>
             </TooltipTrigger>
-            <TooltipContent><p>Change measurement units</p></TooltipContent>
+            <TooltipContent><p>Imperial units — enter sizes like 6'6"</p></TooltipContent>
           </Tooltip>
-          <DropdownMenuContent align="end">
-            {(["m", "cm", "mm", "ft"] as UnitSystem[]).map((u) => (
-              <DropdownMenuItem key={u} onClick={() => onSetUnits(u)} className={units === u ? "font-semibold" : ""}>
-                <span className="font-mono w-6 inline-block">{UNIT_SHORT[u]}</span>
-                {UNIT_LABELS[u]}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
+        </div>
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
@@ -513,6 +573,44 @@ export default function EditorToolbar({
               {snapEnabled
                 ? "Snapping on — hold Alt to place freely"
                 : "Snapping off — hold Alt to snap"}
+            </p>
+          </TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              size="sm"
+              variant={measurementsVisible ? "default" : "outline"}
+              onClick={onToggleMeasurements}
+              data-testid="btn-toggle-measurements"
+              className="text-xs px-2"
+              aria-pressed={measurementsVisible}
+            >
+              <Ruler className="h-3.5 w-3.5 mr-1" />
+              Sizes
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent><p>{measurementsVisible ? "Hide all measurements" : "Show measurements"}</p></TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              size="sm"
+              variant={detachWalls ? "default" : "outline"}
+              onClick={onToggleDetachWalls}
+              data-testid="btn-toggle-detach"
+              className="text-xs px-2"
+              aria-pressed={detachWalls}
+            >
+              <Unlink className="h-3.5 w-3.5 mr-1" />
+              Detach
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>
+              {detachWalls
+                ? "Detach on — dragging a wall moves it alone (hold Alt for the same)"
+                : "Drag moves connected walls together — turn on (or hold Alt) to move one wall alone"}
             </p>
           </TooltipContent>
         </Tooltip>

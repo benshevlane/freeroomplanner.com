@@ -27,6 +27,17 @@ const REVIEW_SITE_NAME = "Trustpilot";
  * the UK DMCC Act 2024 — the CMA lists "preventing some users from leaving
  * reviews" as a misleading practice. Vary the sympathy, never the ask.
  */
+const USE_CASES = [
+  "Kitchen renovation",
+  "Bathroom renovation",
+  "Bedroom",
+  "Living room",
+  "Whole home / extension",
+  "Moving house",
+  "Work / my business",
+  "Other",
+];
+
 const ACKNOWLEDGEMENTS: Record<number, { title: string; body: string }> = {
   1: {
     title: "Really sorry — that's not the experience we wanted for you.",
@@ -75,6 +86,8 @@ export default function RatingPromptDialog({
   const [rating, setRating] = useState(0);
   const [hovered, setHovered] = useState(0);
   const [feedback, setFeedback] = useState("");
+  const [useCase, setUseCase] = useState<string | null>(null);
+  const [useCaseOther, setUseCaseOther] = useState("");
   const [submitting, setSubmitting] = useState(false);
   // Guards against sending more than one feedback email per rating flow. The
   // score used to be emailed the instant a star was tapped AND again when the
@@ -93,10 +106,13 @@ export default function RatingPromptDialog({
     if (emailedRef.current || rating <= 0) return;
     emailedRef.current = true;
     const note = feedback.trim();
-    const message =
-      includeFeedback && note
-        ? `In-app rating: ${rating}/5\n\n${note}`
-        : `In-app rating: ${rating}/5`;
+    const chosenUseCase =
+      useCase === "Other" && useCaseOther.trim()
+        ? `Other: ${useCaseOther.trim()}`
+        : useCase;
+    let message = `In-app rating: ${rating}/5`;
+    if (chosenUseCase) message += `\nUsing it for: ${chosenUseCase}`;
+    if (includeFeedback && note) message += `\n\n${note}`;
     apiRequest("POST", "/api/feedback", {
       type: rating >= 4 ? "praise" : "general",
       message,
@@ -126,6 +142,8 @@ export default function RatingPromptDialog({
         setRating(0);
         setHovered(0);
         setFeedback("");
+        setUseCase(null);
+        setUseCaseOther("");
         emailedRef.current = false;
       }, 300);
     }
@@ -142,6 +160,7 @@ export default function RatingPromptDialog({
 
   const handleFeedbackSubmit = () => {
     setSubmitting(true);
+    if (useCase) trackEvent("use_case_selected", { useCase });
     // Single recording of the rating for this flow, including the comment if
     // one was written. Fire-and-forget so the user is never blocked.
     recordRating(true);
@@ -215,8 +234,44 @@ export default function RatingPromptDialog({
               <DialogTitle data-testid="rating-ack-title">{ack.title}</DialogTitle>
               <DialogDescription>{ack.body}</DialogDescription>
             </DialogHeader>
+            <div className="space-y-1.5 pb-1">
+              <p className="text-xs font-medium text-foreground">
+                What are you using Free Room Planner for?{" "}
+                <span className="text-muted-foreground font-normal">
+                  It helps us add features and make it as useful as possible.
+                </span>
+              </p>
+              <div className="flex flex-wrap gap-1.5" data-testid="use-case-chips">
+                {USE_CASES.map((uc) => (
+                  <button
+                    key={uc}
+                    type="button"
+                    onClick={() => setUseCase(useCase === uc ? null : uc)}
+                    className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                      useCase === uc
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-background text-muted-foreground border-border hover:border-primary/60"
+                    }`}
+                    data-testid={`use-case-${uc.toLowerCase().replace(/[^a-z]+/g, "-")}`}
+                  >
+                    {uc}
+                  </button>
+                ))}
+              </div>
+              {useCase === "Other" && (
+                <input
+                  type="text"
+                  autoFocus
+                  value={useCaseOther}
+                  onChange={(e) => setUseCaseOther(e.target.value)}
+                  placeholder="Tell us more…"
+                  maxLength={200}
+                  className="w-full text-xs px-2.5 py-1.5 rounded-md border border-border bg-background outline-none focus:border-primary"
+                  data-testid="use-case-other-input"
+                />
+              )}
+            </div>
             <Textarea
-              autoFocus
               value={feedback}
               onChange={(e) => setFeedback(e.target.value)}
               placeholder={

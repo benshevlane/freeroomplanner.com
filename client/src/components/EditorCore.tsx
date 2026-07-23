@@ -142,6 +142,34 @@ export default function EditorCore({
     }
   });
 
+  // Master measurements toggle — some people want a clean, dimension-free plan.
+  const [measurementsVisible, setMeasurementsVisible] = useState<boolean>(() => {
+    try {
+      return safeGetItem("freeroomplanner-measurements-visible") !== "false";
+    } catch {
+      return true;
+    }
+  });
+  const handleToggleMeasurements = useCallback(() => {
+    setMeasurementsVisible((v) => {
+      const next = !v;
+      safeSetItem("freeroomplanner-measurements-visible", String(next));
+      trackEvent("measurements_toggled", { visible: next });
+      return next;
+    });
+  }, []);
+
+  // Detach mode: drag a wall without pulling its connected walls along.
+  // Session-only on purpose — leaving it stuck on would surprise people later.
+  const [detachWalls, setDetachWalls] = useState(false);
+  const handleToggleDetachWalls = useCallback(() => {
+    setDetachWalls((v) => {
+      const next = !v;
+      trackEvent("detach_walls_toggled", { enabled: next });
+      return next;
+    });
+  }, []);
+
   // Ask "are you enjoying it?" once per browser, after the user has actually
   // succeeded at something — saved a share link or downloaded their plan.
   // It used to fire on a two-minute timer, which interrupted people mid-drawing
@@ -823,6 +851,10 @@ export default function EditorCore({
           onSetTool={editor.setTool}
           snapEnabled={snapEnabled}
           onToggleSnap={handleToggleSnap}
+          measurementsVisible={measurementsVisible}
+          onToggleMeasurements={handleToggleMeasurements}
+          detachWalls={detachWalls}
+          onToggleDetachWalls={handleToggleDetachWalls}
           onUndo={editor.undo}
           onRedo={editor.redo}
           canUndo={editor.canUndo}
@@ -943,6 +975,8 @@ export default function EditorCore({
           dimEditing={dimEditing}
           isDark={isDark}
           snapEnabled={snapEnabled}
+          measurementsVisible={measurementsVisible}
+          detachWalls={detachWalls}
           measureMode={measureMode}
           showAllMeasurements={showAllMeasurements}
           onAddWall={editor.addWall}
