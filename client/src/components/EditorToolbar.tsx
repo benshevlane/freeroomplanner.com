@@ -317,9 +317,9 @@ export default function EditorToolbar({
 
   // Desktop layout (unchanged)
   return (
-    <div className="flex items-center gap-1.5 px-3 py-2 border-b border-border bg-card" data-testid="editor-toolbar">
+    <div className="flex items-center gap-3 px-4 py-2 border-b border-border bg-muted/40" data-testid="editor-toolbar">
       {/* Tools cluster */}
-      <div className="flex items-center gap-0.5 rounded-lg border border-border bg-card p-0.5">
+      <div className="flex items-center gap-0.5 rounded-xl border border-border bg-background p-[3px] shadow-sm">
         {tools.map(({ tool, icon: Icon, label, shortcut }) => (
           <Tooltip key={tool}>
             <TooltipTrigger asChild>
@@ -363,7 +363,7 @@ export default function EditorToolbar({
       </div>
 
       {/* History cluster */}
-      <div className="flex items-center gap-0.5 rounded-lg border border-border bg-card p-0.5">
+      <div className="flex items-center gap-0.5 rounded-xl border border-border bg-background p-[3px] shadow-sm">
         <Tooltip>
           <TooltipTrigger asChild>
             <Button size="icon" variant="ghost" onClick={onUndo} disabled={!canUndo} data-testid="btn-undo">
@@ -383,7 +383,7 @@ export default function EditorToolbar({
       </div>
 
       {/* Zoom cluster */}
-      <div className="flex items-center gap-0.5 rounded-lg border border-border bg-card p-0.5">
+      <div className="flex items-center gap-0.5 rounded-xl border border-border bg-background p-[3px] shadow-sm">
         <Tooltip>
           <TooltipTrigger asChild>
             <Button size="icon" variant="ghost" onClick={onZoomOut} data-testid="btn-zoom-out">
@@ -447,8 +447,8 @@ export default function EditorToolbar({
             and downloads the plan image. The plan already auto-saves locally. */}
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button size="sm" onClick={onShareLink} data-testid="btn-save-plan">
-              <Download className="h-4 w-4 mr-1" />
+            <Button size="sm" onClick={onShareLink} data-testid="btn-save-plan" className="h-9 rounded-[10px] px-4 text-[13px] font-bold shadow-md shadow-primary/30 gap-1.5">
+              <Download className="h-4 w-4" />
               Save
             </Button>
           </TooltipTrigger>
@@ -460,9 +460,9 @@ export default function EditorToolbar({
               <DropdownMenuTrigger asChild>
                 <Button
                   size="sm"
-                  variant="outline"
+                  variant="ghost"
                   data-testid="btn-toggle-measure"
-                  className="text-xs px-2 gap-1"
+                  className="h-9 rounded-[10px] border border-border bg-background text-muted-foreground hover:bg-muted px-3 text-[13px] font-semibold gap-1.5"
                 >
                   {measureMode === "full" ? "Full wall" : "Inside faces"}
                   <span className="text-[9px] opacity-60">▾</span>
@@ -485,7 +485,7 @@ export default function EditorToolbar({
         {/* Units: obvious metric / imperial toggle. The metric side also opens
             a small menu to pick m, cm or mm. */}
         <div
-          className="flex items-center rounded-md border border-border overflow-hidden"
+          className="flex items-center h-9 rounded-[10px] border border-border bg-background overflow-hidden"
           data-testid="units-toggle"
           role="group"
           aria-label="Measurement units"
@@ -498,7 +498,7 @@ export default function EditorToolbar({
                     size="sm"
                     variant="ghost"
                     data-testid="btn-units-metric"
-                    className={`text-xs px-2.5 rounded-none gap-1 ${units !== "ft" ? "border-primary text-primary bg-primary/10 hover:bg-primary/15" : ""}`}
+                    className={`h-full text-[13px] font-semibold px-3 rounded-none gap-1 ${units !== "ft" ? "bg-primary/10 text-primary hover:bg-primary/15" : "text-muted-foreground"}`}
                   >
                     Metric{units !== "ft" ? ` (${UNIT_SHORT[units]})` : ""}
                   </Button>
@@ -521,7 +521,7 @@ export default function EditorToolbar({
                 size="sm"
                 variant="ghost"
                 data-testid="btn-units-imperial"
-                className={`text-xs px-2.5 rounded-none ${units === "ft" ? "border-primary text-primary bg-primary/10 hover:bg-primary/15" : ""}`}
+                className={`h-full text-[13px] font-semibold px-3 rounded-none ${units === "ft" ? "bg-primary/10 text-primary hover:bg-primary/15" : "text-muted-foreground"}`}
                 onClick={() => onSetUnits("ft")}
               >
                 Feet &amp; Inches
@@ -534,10 +534,10 @@ export default function EditorToolbar({
           <TooltipTrigger asChild>
             <Button
               size="sm"
-              variant="outline"
+              variant="ghost"
               onClick={onToggleSnap}
               data-testid="btn-toggle-snap"
-              className={`text-xs px-2 ${snapEnabled ? "border-primary text-primary bg-primary/10 hover:bg-primary/15" : ""}`}
+              className={snapEnabled ? "h-9 rounded-[10px] border border-primary/40 bg-primary/10 text-primary hover:bg-primary/15 px-3 text-[13px] font-semibold gap-1.5" : "h-9 rounded-[10px] border border-border bg-background text-muted-foreground hover:bg-muted px-3 text-[13px] font-semibold gap-1.5"}
               aria-pressed={snapEnabled}
             >
               <Magnet className="h-3.5 w-3.5 mr-1" />
@@ -556,10 +556,10 @@ export default function EditorToolbar({
           <TooltipTrigger asChild>
             <Button
               size="sm"
-              variant="outline"
+              variant="ghost"
               onClick={onToggleDetachWalls}
               data-testid="btn-toggle-detach"
-              className={`text-xs px-2 ${detachWalls ? "border-primary text-primary bg-primary/10 hover:bg-primary/15" : ""}`}
+              className={detachWalls ? "h-9 rounded-[10px] border border-primary/40 bg-primary/10 text-primary hover:bg-primary/15 px-3 text-[13px] font-semibold gap-1.5" : "h-9 rounded-[10px] border border-border bg-background text-muted-foreground hover:bg-muted px-3 text-[13px] font-semibold gap-1.5"}
               aria-pressed={detachWalls}
             >
               <Unlink className="h-3.5 w-3.5 mr-1" />
@@ -580,9 +580,9 @@ export default function EditorToolbar({
               <DropdownMenuTrigger asChild>
                 <Button
                   size="sm"
-                  variant="outline"
+                  variant="ghost"
                   data-testid="btn-toggle-labels"
-                  className={`text-xs px-2 ${componentLabelsVisible || measurementsVisible ? "border-primary text-primary bg-primary/10 hover:bg-primary/15" : ""}`}
+                  className={componentLabelsVisible || measurementsVisible ? "h-9 rounded-[10px] border border-primary/40 bg-primary/10 text-primary hover:bg-primary/15 px-3 text-[13px] font-semibold gap-1.5" : "h-9 rounded-[10px] border border-border bg-background text-muted-foreground hover:bg-muted px-3 text-[13px] font-semibold gap-1.5"}
                 >
                   <Tags className="h-3.5 w-3.5 mr-1" />
                   Labels
@@ -608,8 +608,8 @@ export default function EditorToolbar({
         </DropdownMenu>
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button size="sm" variant="ghost" onClick={onLoadPlan} data-testid="btn-load-plan">
-              <FolderOpen className="h-4 w-4 mr-1" />
+            <Button size="sm" variant="ghost" onClick={onLoadPlan} data-testid="btn-load-plan" className="h-9 rounded-[10px] border border-border bg-background text-muted-foreground hover:bg-muted px-3 text-[13px] font-semibold gap-1.5">
+              <FolderOpen className="h-4 w-4" />
               Load
             </Button>
           </TooltipTrigger>
@@ -621,7 +621,7 @@ export default function EditorToolbar({
           <Tooltip>
             <TooltipTrigger asChild>
               <DropdownMenuTrigger asChild>
-                <Button size="icon" variant="ghost" className="h-8 w-8" data-testid="btn-toolbar-overflow">
+                <Button size="icon" variant="ghost" className="h-9 w-9 rounded-[10px] border border-border bg-background text-muted-foreground hover:bg-muted" data-testid="btn-toolbar-overflow">
                   <MoreHorizontal className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
