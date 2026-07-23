@@ -1,9 +1,10 @@
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
 import { OrbitControls, useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import { EditorState, Wall, FurnitureItem, Point } from "../lib/types";
 import { detectRooms } from "../lib/room-detection";
+import { trackEvent } from "@/lib/analytics";
 
 /**
  * Phase 1 "3D View" — builds a procedural 3D scene directly from the 2D plan
@@ -764,6 +765,126 @@ function Item3D({ item, wallHeight, inWorktopRun = false }: { item: FurnitureIte
 // ---------------------------------------------------------------------------
 // Main view
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Photoreal snapshot: progressive accumulation render.
+//
+// Instead of one 16ms frame, we spend a few hundred frames on a single image:
+// each pass jitters the camera by a sub-pixel (anti-aliasing) and the sun by
+// a few tens of cm (soft, area-light shadows), and the passes are averaged on
+// a 2D canvas. The result reads as a photograph rather than a game frame.
+// ---------------------------------------------------------------------------
+interface SnapshotRequest {
+  frames: number;
+  width: number;
+}
+
+function SnapshotEngine({
+  request,
+  lightRef,
+  onProgress,
+  onDone,
+}: {
+  request: SnapshotRequest | null;
+  lightRef: React.RefObject<THREE.DirectionalLight>;
+  onProgress: (pct: number) => void;
+  onDone: (dataUrl: string | null) => void;
+}) {
+  const { gl, scene, camera } = useThree();
+  const busy = useRef(false);
+
+  useEffect(() => {
+    if (!request || busy.current) return;
+    busy.current = true;
+    let cancelled = false;
+
+    const run = async () => {
+      const persp = camera as THREE.PerspectiveCamera;
+      const canvas = gl.domElement;
+      const viewW = canvas.clientWidth || 1200;
+      const viewH = canvas.clientHeight || 800;
+      const outW = request.width;
+      const outH = Math.round((outW * viewH) / viewW);
+
+      // Accumulation canvas (2D running average)
+      const acc = document.createElement("canvas");
+      acc.width = outW;
+      acc.height = outH;
+      const actx = acc.getContext("2d");
+      if (!actx) { onDone(null); busy.current = false; return; }
+
+      const prevPixelRatio = gl.getPixelRatio();
+      const prevShadows = gl.shadowMap.enabled;
+      const light = lightRef.current;
+      const originalLightPos = light ? light.position.clone() : null;
+      const prevShadowMapSize = light ? light.shadow.mapSize.clone() : null;
+
+      try {
+        gl.setPixelRatio(1);
+        gl.setSize(outW, outH, false); // drawing buffer only; CSS size untouched
+        gl.shadowMap.enabled = true;
+        if (light) {
+          light.shadow.mapSize.set(2048, 2048);
+          if (light.shadow.map) { light.shadow.map.dispose(); light.shadow.map = null; }
+        }
+
+        for (let i = 0; i < request.frames; i++) {
+          if (cancelled) break;
+          // Sub-pixel camera jitter for anti-aliasing
+          const jx = (Math.random() - 0.5);
+          const jy = (Math.random() - 0.5);
+          persp.setViewOffset(outW, outH, jx, jy, outW, outH);
+          // Sun jitter for soft shadows (approximates an area light)
+          if (light && originalLightPos) {
+            light.position.set(
+              originalLightPos.x + (Math.random() - 0.5) * 120,
+              originalLightPos.y + (Math.random() - 0.5) * 60,
+              originalLightPos.z + (Math.random() - 0.5) * 120
+            );
+          }
+          gl.render(scene, camera);
+          actx.globalAlpha = 1 / (i + 1);
+          actx.drawImage(canvas, 0, 0, outW, outH);
+          if (i % 4 === 0) {
+            onProgress(Math.round(((i + 1) / request.frames) * 100));
+            await new Promise((r) => requestAnimationFrame(r));
+          }
+        }
+
+        // Watermark (free tier)
+        actx.globalAlpha = 1;
+        const fs = Math.max(16, Math.round(outW / 90));
+        actx.font = `600 ${fs}px 'General Sans', 'DM Sans', sans-serif`;
+        actx.textAlign = "right";
+        actx.fillStyle = "rgba(255,255,255,0.85)";
+        actx.shadowColor = "rgba(0,0,0,0.45)";
+        actx.shadowBlur = 6;
+        actx.fillText("made with freeroomplanner.com", outW - fs, outH - fs);
+
+        onDone(cancelled ? null : acc.toDataURL("image/jpeg", 0.92));
+      } finally {
+        // Restore the live view exactly as it was
+        persp.clearViewOffset();
+        if (light && originalLightPos) light.position.copy(originalLightPos);
+        if (light && prevShadowMapSize) {
+          light.shadow.mapSize.copy(prevShadowMapSize);
+          if (light.shadow.map) { light.shadow.map.dispose(); light.shadow.map = null; }
+        }
+        gl.shadowMap.enabled = prevShadows;
+        gl.setPixelRatio(prevPixelRatio);
+        gl.setSize(canvas.clientWidth, canvas.clientHeight, false);
+        busy.current = false;
+      }
+    };
+
+    void run();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [request]);
+
+  return null;
+}
+
 interface View3DProps {
   state: EditorState;
   isDark: boolean;
@@ -773,6 +894,31 @@ export default function View3D({ state, isDark }: View3DProps) {
   const [wallHeight, setWallHeight] = useState(DEFAULT_WALL_HEIGHT);
   const [style, setStyle] = useState<StyleState>(loadStyle);
   const [stylePanelOpen, setStylePanelOpen] = useState(false);
+  const [snapshotRequest, setSnapshotRequest] = useState<SnapshotRequest | null>(null);
+  const [snapshotProgress, setSnapshotProgress] = useState(0);
+  const snapshotStartRef = useRef(0);
+  const lightRef = useRef<THREE.DirectionalLight>(null);
+
+  const startSnapshot = () => {
+    if (snapshotRequest) return;
+    const mobile = typeof window !== "undefined" && !window.matchMedia("(min-width: 768px)").matches;
+    trackEvent("snapshot_clicked", { mobile });
+    snapshotStartRef.current = performance.now();
+    setSnapshotProgress(0);
+    setSnapshotRequest({ frames: mobile ? 90 : 180, width: mobile ? 1600 : 2560 });
+  };
+
+  const finishSnapshot = (dataUrl: string | null) => {
+    setSnapshotRequest(null);
+    if (!dataUrl) return;
+    trackEvent("snapshot_rendered", {
+      ms: Math.round(performance.now() - snapshotStartRef.current),
+    });
+    const a = document.createElement("a");
+    a.href = dataUrl;
+    a.download = "room-photo.jpg";
+    a.click();
+  };
 
   const updateStyle = (patch: Partial<StyleState>) => {
     setStyle((prev) => {
@@ -877,6 +1023,7 @@ export default function View3D({ state, isDark }: View3DProps) {
   return (
     <div className="flex-1 relative overflow-hidden select-none" data-testid="view-3d">
       <Canvas
+        frameloop={snapshotRequest ? "never" : "always"}
         shadows={enableShadows}
         dpr={[1, 2]}
         camera={{ fov: 45, near: 10, far: 50000, position: camPos }}
@@ -889,6 +1036,7 @@ export default function View3D({ state, isDark }: View3DProps) {
           groundColor="#8a8a80"
         />
         <directionalLight
+          ref={lightRef}
           position={[center.x + 900, 1500, center.y + 500]}
           color={style.evening ? "#ffd9a6" : "#ffffff"}
           intensity={style.evening ? 0.55 : 1.15}
@@ -916,6 +1064,12 @@ export default function View3D({ state, isDark }: View3DProps) {
         ))}
         <WorktopRuns runs={worktopRuns} />
 
+        <SnapshotEngine
+          request={snapshotRequest}
+          lightRef={lightRef}
+          onProgress={setSnapshotProgress}
+          onDone={finishSnapshot}
+        />
         <OrbitControls
           target={[center.x, 60, center.y]}
           maxPolarAngle={Math.PI / 2 - 0.03}
@@ -941,6 +1095,14 @@ export default function View3D({ state, isDark }: View3DProps) {
             aria-label="Wall height"
           />
           <span className="text-xs font-medium tabular-nums w-9">{(formatMeters(wallHeight))}</span>
+          <button
+            type="button"
+            onClick={startSnapshot}
+            className="text-xs px-2 py-1 rounded-md border bg-background text-foreground border-border hover:border-primary/60"
+            data-testid="btn-3d-photo"
+          >
+            📷 Photo
+          </button>
           <button
             type="button"
             onClick={() => setStylePanelOpen((o) => !o)}
@@ -1066,6 +1228,28 @@ export default function View3D({ state, isDark }: View3DProps) {
           </div>
         )}
       </div>
+
+      {/* Snapshot progress overlay */}
+      {snapshotRequest && (
+        <div className="absolute inset-0 z-20 bg-background/85 backdrop-blur-sm flex items-center justify-center" data-testid="snapshot-overlay">
+          <div className="bg-card border border-border rounded-xl shadow-lg p-5 w-72 text-center space-y-3">
+            <p className="text-sm font-semibold">Rendering your photo…</p>
+            <div className="h-2 rounded-full bg-muted overflow-hidden">
+              <div className="h-full bg-primary transition-all" style={{ width: `${snapshotProgress}%` }} />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Building soft light and shadows — takes 10–20 seconds
+            </p>
+            <button
+              type="button"
+              className="text-xs text-muted-foreground hover:text-foreground"
+              onClick={() => setSnapshotRequest(null)}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Hint / empty state */}
       {isEmpty ? (
