@@ -845,10 +845,10 @@ function SnapshotEngine({
           gl.render(scene, camera);
           actx.globalAlpha = 1 / (i + 1);
           actx.drawImage(canvas, 0, 0, outW, outH);
-          if (i % 4 === 0) {
-            onProgress(Math.round(((i + 1) / request.frames) * 100));
-            await new Promise((r) => requestAnimationFrame(r));
-          }
+          // Yield EVERY frame — on slow GPUs a burst of full-res renders
+          // would otherwise freeze the tab for seconds at a time.
+          onProgress(Math.round(((i + 1) / request.frames) * 100));
+          await new Promise((r) => requestAnimationFrame(r));
         }
 
         // Watermark (free tier)
@@ -905,7 +905,7 @@ export default function View3D({ state, isDark }: View3DProps) {
     trackEvent("snapshot_clicked", { mobile });
     snapshotStartRef.current = performance.now();
     setSnapshotProgress(0);
-    setSnapshotRequest({ frames: mobile ? 90 : 180, width: mobile ? 1600 : 2560 });
+    setSnapshotRequest({ frames: mobile ? 70 : 140, width: mobile ? 1600 : 2560 });
   };
 
   const finishSnapshot = (dataUrl: string | null) => {
