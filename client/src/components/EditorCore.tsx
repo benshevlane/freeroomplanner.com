@@ -839,6 +839,23 @@ export default function EditorCore({
     [editor, state.furniture, state.walls]
   );
 
+  // Live plan overview for the properties panel's empty state
+  const detectedForSummary = detectRooms(state.walls); // area already in m²
+  const planSummary = {
+    areaM2: detectedForSummary.reduce((sum, r) => sum + r.area, 0),
+    perimeterCm: state.walls.reduce((sum, w) => {
+      const dx = w.end.x - w.start.x;
+      const dy = w.end.y - w.start.y;
+      return sum + Math.sqrt(dx * dx + dy * dy);
+    }, 0),
+    rooms: detectedForSummary.length,
+    walls: state.walls.length,
+    items: state.furniture.length,
+    labels: state.labels.length,
+    textBoxes: state.textBoxes.length,
+    arrows: state.arrows.length,
+  };
+
   return (
     <>
       {/* Optional header */}
@@ -946,6 +963,8 @@ export default function EditorCore({
                       onDimEditing={setDimEditing}
                       units={state.units}
                       measureMode={measureMode}
+                      planSummary={planSummary}
+                      onExportPng={handleSavePlan}
                     />
                   </ScrollArea>
                 </div>
@@ -1063,6 +1082,8 @@ export default function EditorCore({
                 onDimEditing={setDimEditing}
                 units={state.units}
                 measureMode={measureMode}
+                planSummary={planSummary}
+                onExportPng={handleSavePlan}
               />
             </ScrollArea>
 
