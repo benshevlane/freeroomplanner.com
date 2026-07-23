@@ -716,6 +716,9 @@ function def(file: string, targetH: number, yaw = 0): ModelDef {
 }
 
 const MODEL_MAP: Record<string, ModelDef> = {
+  bed_double: def("fm_bed_grey", 95),
+  bed_king: def("fm_bed_grey", 95),
+  bed_superking: def("fm_bed_grey", 95),
   sofa_3: def("sofa_03", 80, Math.PI),
   sofa_2: def("sofa_02", 75, Math.PI),
   sofa_bed: def("sofa_02", 75, Math.PI),
