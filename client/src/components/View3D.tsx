@@ -534,9 +534,11 @@ function ModelItem({ item, model }: { item: FurnitureItem; model: ModelDef }) {
   const mw = rotate90 ? bd : bw;
   const md = rotate90 ? bw : bd;
 
-  const sx = item.width / Math.max(mw, 1);
-  const sz2 = item.height / Math.max(md, 1);
-  const sy = model.targetH / bh;
+  // bw/bh/bd are cm equivalents of the model's metre-based units, so the
+  // resulting scale factors must be multiplied back up by 100
+  const sx = (item.width / Math.max(mw, 1)) * 100;
+  const sz2 = (item.height / Math.max(md, 1)) * 100;
+  const sy = (model.targetH / bh) * 100;
 
   return (
     <group scale={[sx, sy, sz2]}>
