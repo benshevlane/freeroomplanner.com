@@ -442,7 +442,7 @@ export default function FloorPlanCanvas({
     detectedRoomsRef.current = rooms;
     roomLabelPositionsRef.current = roomLabelPositions;
     if (rooms.length > 0) {
-      drawRoomAreas(ctx, rooms, state.gridSize, state.zoom, state.panOffset, isDark, state.units, state.roomNames, selectedRoomKey, roomLabelPositions, state.roomLabelOffsets, state.walls, measureMode);
+      drawRoomAreas(ctx, rooms, state.gridSize, state.zoom, state.panOffset, isDark, state.units, state.roomNames, selectedRoomKey, roomLabelPositions, state.roomLabelOffsets, state.walls, measureMode, measurementsVisible);
     }
 
     // Walls — cache resolved label positions for accurate hit testing
@@ -1258,7 +1258,7 @@ export default function FloorPlanCanvas({
         setTimeout(() => labelInputRef.current?.focus(), 0);
       }
     },
-    [state, getCanvasPos, onSelectItem, onAddWall, onSetWallDrawing, onRemoveWall, onRemoveFurniture, onRemoveLabel, onRemoveArrow, onPushUndo, onUpdateFurniture, onSplitWallAndConnect, onAddArrow, arrowDrawingStart, onSetLabelOffset, editingLabel]
+    [state, getCanvasPos, onSelectItem, onAddWall, onSetWallDrawing, onRemoveWall, onRemoveFurniture, onRemoveLabel, onRemoveArrow, onPushUndo, onUpdateFurniture, onSplitWallAndConnect, onAddArrow, arrowDrawingStart, onSetLabelOffset, editingLabel, detachWalls]
   );
 
   // Store world position for new labels
