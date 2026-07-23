@@ -148,8 +148,8 @@ export default function EditorToolbar({
             <Button
               key={tool}
               size="icon"
-              variant={selectedTool === tool ? "default" : "ghost"}
-              className={btnClass}
+              variant="ghost"
+              className={`${btnClass} ${selectedTool === tool ? "bg-foreground text-background hover:bg-foreground" : ""}`}
               onClick={() => onSetTool(tool)}
               data-testid={`tool-${tool}`}
             >
@@ -325,7 +325,8 @@ export default function EditorToolbar({
             <TooltipTrigger asChild>
               <Button
                 size="icon"
-                variant={selectedTool === tool ? "default" : "ghost"}
+                variant="ghost"
+                className={selectedTool === tool ? "bg-foreground text-background hover:bg-foreground" : ""}
                 onClick={() => onSetTool(tool)}
                 data-testid={`tool-${tool}`}
               >
@@ -453,15 +454,6 @@ export default function EditorToolbar({
 
       {/* Actions */}
       <div className="flex items-center gap-1">
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button size="sm" variant="ghost" onClick={onClearAll} className="text-destructive" data-testid="btn-clear">
-              <Trash className="h-4 w-4 mr-1" />
-              Clear
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent><p>Clear all items</p></TooltipContent>
-        </Tooltip>
         {/* One press: opens the save window, which creates the shareable link
             and downloads the plan image. The plan already auto-saves locally. */}
         <Tooltip>
@@ -520,9 +512,9 @@ export default function EditorToolbar({
                 <DropdownMenuTrigger asChild>
                   <Button
                     size="sm"
-                    variant={units !== "ft" ? "default" : "ghost"}
+                    variant="ghost"
                     data-testid="btn-units-metric"
-                    className="text-xs px-2.5 rounded-none gap-1"
+                    className={`text-xs px-2.5 rounded-none gap-1 ${units !== "ft" ? "border-primary text-primary bg-primary/10 hover:bg-primary/15" : ""}`}
                   >
                     Metric{units !== "ft" ? ` (${UNIT_SHORT[units]})` : ""}
                   </Button>
@@ -543,9 +535,9 @@ export default function EditorToolbar({
             <TooltipTrigger asChild>
               <Button
                 size="sm"
-                variant={units === "ft" ? "default" : "ghost"}
+                variant="ghost"
                 data-testid="btn-units-imperial"
-                className="text-xs px-2.5 rounded-none"
+                className={`text-xs px-2.5 rounded-none ${units === "ft" ? "border-primary text-primary bg-primary/10 hover:bg-primary/15" : ""}`}
                 onClick={() => onSetUnits("ft")}
               >
                 Feet &amp; Inches
@@ -558,10 +550,10 @@ export default function EditorToolbar({
           <TooltipTrigger asChild>
             <Button
               size="sm"
-              variant={snapEnabled ? "default" : "outline"}
+              variant="outline"
               onClick={onToggleSnap}
               data-testid="btn-toggle-snap"
-              className="text-xs px-2"
+              className={`text-xs px-2 ${snapEnabled ? "border-primary text-primary bg-primary/10 hover:bg-primary/15" : ""}`}
               aria-pressed={snapEnabled}
             >
               <Magnet className="h-3.5 w-3.5 mr-1" />
@@ -580,10 +572,10 @@ export default function EditorToolbar({
           <TooltipTrigger asChild>
             <Button
               size="sm"
-              variant={detachWalls ? "default" : "outline"}
+              variant="outline"
               onClick={onToggleDetachWalls}
               data-testid="btn-toggle-detach"
-              className="text-xs px-2"
+              className={`text-xs px-2 ${detachWalls ? "border-primary text-primary bg-primary/10 hover:bg-primary/15" : ""}`}
               aria-pressed={detachWalls}
             >
               <Unlink className="h-3.5 w-3.5 mr-1" />
@@ -604,9 +596,9 @@ export default function EditorToolbar({
               <DropdownMenuTrigger asChild>
                 <Button
                   size="sm"
-                  variant={componentLabelsVisible || measurementsVisible ? "default" : "outline"}
+                  variant="outline"
                   data-testid="btn-toggle-labels"
-                  className="text-xs px-2"
+                  className={`text-xs px-2 ${componentLabelsVisible || measurementsVisible ? "border-primary text-primary bg-primary/10 hover:bg-primary/15" : ""}`}
                 >
                   <Tags className="h-3.5 w-3.5 mr-1" />
                   Labels
@@ -635,6 +627,26 @@ export default function EditorToolbar({
           </TooltipTrigger>
           <TooltipContent><p>Load Plan (JSON)</p></TooltipContent>
         </Tooltip>
+
+        {/* Overflow: destructive actions live here, away from Save */}
+        <DropdownMenu>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <DropdownMenuTrigger asChild>
+                <Button size="icon" variant="ghost" className="h-8 w-8" data-testid="btn-toolbar-overflow">
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+            </TooltipTrigger>
+            <TooltipContent><p>More</p></TooltipContent>
+          </Tooltip>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={onClearAll} className="text-destructive" data-testid="btn-clear">
+              <Trash className="h-4 w-4 mr-2" />
+              Clear canvas…
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </div>
   );
