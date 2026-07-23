@@ -5,6 +5,7 @@ import * as THREE from "three";
 import { EditorState, Wall, FurnitureItem, Point, FURNITURE_LIBRARY } from "../lib/types";
 import { detectRooms } from "../lib/room-detection";
 import { trackEvent } from "@/lib/analytics";
+import { WebGLPathTracer } from "three-gpu-pathtracer";
 
 /**
  * Phase 1 "3D View" — builds a procedural 3D scene directly from the 2D plan
@@ -896,6 +897,7 @@ function SnapshotEngine({
       const light = lightRef.current;
       const originalLightPos = light ? light.position.clone() : null;
       const prevShadowMapSize = light ? light.shadow.mapSize.clone() : null;
+      let pathTracer: WebGLPathTracer | null = null;
 
       try {
         gl.setPixelRatio(1);
@@ -906,27 +908,54 @@ function SnapshotEngine({
           if (light.shadow.map) { light.shadow.map.dispose(); light.shadow.map = null; }
         }
 
-        for (let i = 0; i < request.frames; i++) {
-          if (cancelled) break;
-          // Sub-pixel camera jitter for anti-aliasing
-          const jx = (Math.random() - 0.5);
-          const jy = (Math.random() - 0.5);
-          persp.setViewOffset(outW, outH, jx, jy, outW, outH);
-          // Sun jitter for soft shadows (approximates an area light)
-          if (light && originalLightPos) {
-            light.position.set(
-              originalLightPos.x + (Math.random() - 0.5) * 120,
-              originalLightPos.y + (Math.random() - 0.5) * 60,
-              originalLightPos.z + (Math.random() - 0.5) * 120
-            );
+        // --- Preferred path: true global illumination (WebGL2 only) ---
+        if (gl.capabilities.isWebGL2) {
+          try {
+            pathTracer = new WebGLPathTracer(gl);
+            pathTracer.bounces = 5;
+            pathTracer.filterGlossyFactor = 0.5;
+            pathTracer.renderScale = 1;
+            pathTracer.tiles.set(2, 2);
+            pathTracer.dynamicLowRes = false;
+            pathTracer.rasterizeScene = false;
+            pathTracer.setScene(scene, camera);
+          } catch (err) {
+            console.warn("[snapshot] path tracer unavailable, falling back:", err);
+            pathTracer = null;
           }
-          gl.render(scene, camera);
-          actx.globalAlpha = 1 / (i + 1);
+        }
+
+        if (pathTracer) {
+          const targetSamples = request.frames; // ~70-140 samples
+          const started = performance.now();
+          const MAX_MS = 90_000;
+          while (!cancelled && pathTracer.samples < targetSamples && performance.now() - started < MAX_MS) {
+            pathTracer.renderSample();
+            onProgress(Math.min(99, Math.round((pathTracer.samples / targetSamples) * 100)));
+            await new Promise((r) => requestAnimationFrame(r));
+          }
+          actx.globalAlpha = 1;
           actx.drawImage(canvas, 0, 0, outW, outH);
-          // Yield EVERY frame — on slow GPUs a burst of full-res renders
-          // would otherwise freeze the tab for seconds at a time.
-          onProgress(Math.round(((i + 1) / request.frames) * 100));
-          await new Promise((r) => requestAnimationFrame(r));
+        } else {
+          // --- Fallback: jittered accumulation (works everywhere) ---
+          for (let i = 0; i < request.frames; i++) {
+            if (cancelled) break;
+            const jx = (Math.random() - 0.5);
+            const jy = (Math.random() - 0.5);
+            persp.setViewOffset(outW, outH, jx, jy, outW, outH);
+            if (light && originalLightPos) {
+              light.position.set(
+                originalLightPos.x + (Math.random() - 0.5) * 120,
+                originalLightPos.y + (Math.random() - 0.5) * 60,
+                originalLightPos.z + (Math.random() - 0.5) * 120
+              );
+            }
+            gl.render(scene, camera);
+            actx.globalAlpha = 1 / (i + 1);
+            actx.drawImage(canvas, 0, 0, outW, outH);
+            onProgress(Math.round(((i + 1) / request.frames) * 100));
+            await new Promise((r) => requestAnimationFrame(r));
+          }
         }
 
         // Watermark (free tier)
@@ -942,6 +971,7 @@ function SnapshotEngine({
         onDone(cancelled ? null : acc.toDataURL("image/jpeg", 0.92));
       } finally {
         // Restore the live view exactly as it was
+        if (pathTracer) { try { pathTracer.dispose(); } catch { /* already gone */ } }
         persp.clearViewOffset();
         if (light && originalLightPos) light.position.copy(originalLightPos);
         if (light && prevShadowMapSize) {
@@ -1034,6 +1064,7 @@ export default function View3D({ state, isDark, onUpdateFurniture, onPushUndo }:
 
   const startSnapshot = () => {
     if (snapshotRequest) return;
+    setSelectedId(null); // the selection ring must not appear in the photo
     const mobile = typeof window !== "undefined" && !window.matchMedia("(min-width: 768px)").matches;
     trackEvent("snapshot_clicked", { mobile });
     snapshotStartRef.current = performance.now();
@@ -1411,7 +1442,7 @@ export default function View3D({ state, isDark, onUpdateFurniture, onPushUndo }:
               <div className="h-full bg-primary transition-all" style={{ width: `${snapshotProgress}%` }} />
             </div>
             <p className="text-xs text-muted-foreground">
-              Building soft light and shadows — takes 10–20 seconds
+              Tracing real light — 20–60 seconds depending on your device
             </p>
             <button
               type="button"
