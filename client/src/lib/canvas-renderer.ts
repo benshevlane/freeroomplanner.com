@@ -4461,7 +4461,9 @@ export function drawRoomAreas(
   labelPositions: Map<string, Point> = new Map(),
   roomLabelOffsets: Record<string, Point> = {},
   walls: Wall[] = [],
-  measureMode: MeasureMode = "segment"
+  measureMode: MeasureMode = "segment",
+  /** When false, the room label shows only the name — no area or dimensions */
+  showDims: boolean = true
 ) {
   const pxPerCm = (gridSize * zoom) / 100;
 
@@ -4610,9 +4612,12 @@ export function drawRoomAreas(
       ? (isDark ? "rgba(79, 152, 163, 0.9)" : "rgba(1, 105, 111, 0.8)")
       : (isDark ? "rgba(79, 152, 163, 0.5)" : "rgba(1, 105, 111, 0.4)");
 
-    // Compute vertical layout: center the label block around cy
+    // Compute vertical layout: center the label block around cy.
+    // With measurements hidden the label is just the name.
     const lineGap = 2;
-    const blockHeight = nameFontSize + lineGap + areaFontSize + (dimsText ? lineGap + dimsFontSize : 0);
+    const blockHeight = showDims
+      ? nameFontSize + lineGap + areaFontSize + (dimsText ? lineGap + dimsFontSize : 0)
+      : nameFontSize;
     const topY = cy - blockHeight / 2;
 
     ctx.textAlign = "center";
@@ -4623,17 +4628,19 @@ export function drawRoomAreas(
     ctx.fillStyle = baseColor;
     ctx.fillText(roomName, cx, topY + nameFontSize / 2);
 
-    // Area (smaller, lighter)
-    ctx.font = `500 ${areaFontSize}px 'General Sans', 'DM Sans', sans-serif`;
-    ctx.fillStyle = areaColor;
-    ctx.fillText(areaText, cx, topY + nameFontSize + lineGap + areaFontSize / 2);
+    if (showDims) {
+      // Area (smaller, lighter)
+      ctx.font = `500 ${areaFontSize}px 'General Sans', 'DM Sans', sans-serif`;
+      ctx.fillStyle = areaColor;
+      ctx.fillText(areaText, cx, topY + nameFontSize + lineGap + areaFontSize / 2);
 
-    // Dimensions (same size as area, green)
-    if (dimsText) {
-      const dimsColor = isDark ? "#3ddc81" : "#2ecc71";
-      ctx.font = `500 ${dimsFontSize}px 'General Sans', 'DM Sans', sans-serif`;
-      ctx.fillStyle = dimsColor;
-      ctx.fillText(dimsText, cx, topY + nameFontSize + lineGap + areaFontSize + lineGap + dimsFontSize / 2);
+      // Dimensions (same size as area, green)
+      if (dimsText) {
+        const dimsColor = isDark ? "#3ddc81" : "#2ecc71";
+        ctx.font = `500 ${dimsFontSize}px 'General Sans', 'DM Sans', sans-serif`;
+        ctx.fillStyle = dimsColor;
+        ctx.fillText(dimsText, cx, topY + nameFontSize + lineGap + areaFontSize + lineGap + dimsFontSize / 2);
+      }
     }
   });
 }
