@@ -277,7 +277,7 @@ export default function EditorToolbar({
               <DropdownMenuSeparator />
               {(["m", "cm", "mm", "ft"] as UnitSystem[]).map((u) => (
                 <DropdownMenuItem key={u} onClick={() => onSetUnits(u)}>
-                  {units === u ? "\u2713 " : "   "}{UNIT_LABELS[u]}
+                  {units === u ? "✓ " : "   "}{UNIT_LABELS[u]}
                 </DropdownMenuItem>
               ))}
               <DropdownMenuItem onClick={onToggleMeasureMode}>
@@ -580,22 +580,6 @@ export default function EditorToolbar({
           <TooltipTrigger asChild>
             <Button
               size="sm"
-              variant={measurementsVisible ? "default" : "outline"}
-              onClick={onToggleMeasurements}
-              data-testid="btn-toggle-measurements"
-              className="text-xs px-2"
-              aria-pressed={measurementsVisible}
-            >
-              <Ruler className="h-3.5 w-3.5 mr-1" />
-              Sizes
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent><p>{measurementsVisible ? "Hide all measurements" : "Show measurements"}</p></TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              size="sm"
               variant={detachWalls ? "default" : "outline"}
               onClick={onToggleDetachWalls}
               data-testid="btn-toggle-detach"
@@ -614,21 +598,34 @@ export default function EditorToolbar({
             </p>
           </TooltipContent>
         </Tooltip>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              size="sm"
-              variant={componentLabelsVisible ? "default" : "outline"}
-              onClick={onToggleComponentLabels}
-              data-testid="btn-toggle-labels"
-              className="text-xs px-2"
-            >
-              <Tags className="h-3.5 w-3.5 mr-1" />
-              Labels
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent><p>{componentLabelsVisible ? "Hide component labels" : "Show component labels"}</p></TooltipContent>
-        </Tooltip>
+        <DropdownMenu>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  size="sm"
+                  variant={componentLabelsVisible || measurementsVisible ? "default" : "outline"}
+                  data-testid="btn-toggle-labels"
+                  className="text-xs px-2"
+                >
+                  <Tags className="h-3.5 w-3.5 mr-1" />
+                  Labels
+                </Button>
+              </DropdownMenuTrigger>
+            </TooltipTrigger>
+            <TooltipContent><p>Show or hide item labels and measurements</p></TooltipContent>
+          </Tooltip>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={onToggleComponentLabels} data-testid="menu-toggle-item-labels">
+              <Tags className="h-4 w-4 mr-2" />
+              {componentLabelsVisible ? "✓ " : " "}Item labels
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={onToggleMeasurements} data-testid="menu-toggle-measurements">
+              <Ruler className="h-4 w-4 mr-2" />
+              {measurementsVisible ? "✓ " : " "}Measurements
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
         <Tooltip>
           <TooltipTrigger asChild>
             <Button size="sm" variant="ghost" onClick={onLoadPlan} data-testid="btn-load-plan">

@@ -69,6 +69,99 @@ function categoryMaterial(category: string): THREE.MeshStandardMaterial {
   }
 }
 
+
+// ---------------------------------------------------------------------------
+// Continuous worktops over runs of kitchen base units.
+//
+// In real kitchens a row of base units shares one worktop. When two or more
+// base units sit in a line (axis-aligned, gaps under 4cm) we render a single
+// continuous slab across the run instead of one small slab per unit.
+// ---------------------------------------------------------------------------
+const BASE_RUN_TYPES = new Set([
+  "worktop", "kitchen_sink_s", "kitchen_sink_d", "cooker", "range_cooker",
+  "dishwasher", "washing_machine", "tumble_dryer", "oven_builtin",
+  "floor_cupboard", "drawer_unit_2", "drawer_unit_3", "boiler",
+]);
+
+const WORKTOP_H = 87;      // cabinet height (cm)
+const SLAB_T = 4;          // worktop slab thickness (cm)
+const RUN_GAP = 4;         // max gap between units in a run (cm)
+const RUN_OVERHANG = 1.5;  // slab overhang past the run's ends (cm)
+
+interface RunBox { minX: number; maxX: number; minY: number; maxY: number }
+
+function itemAabb(f: FurnitureItem): RunBox {
+  const rot = ((f.rotation % 360) + 360) % 360;
+  const swap = rot === 90 || rot === 270;
+  const w = swap ? f.height : f.width;
+  const d = swap ? f.width : f.height;
+  const cx = f.x + f.width / 2;
+  const cy = f.y + f.height / 2;
+  return { minX: cx - w / 2, maxX: cx + w / 2, minY: cy - d / 2, maxY: cy + d / 2 };
+}
+
+function computeWorktopRuns(items: FurnitureItem[]): { runs: RunBox[]; covered: Set<string> } {
+  const bases = items.filter((f) => BASE_RUN_TYPES.has(f.type) && f.rotation % 90 === 0);
+  const boxes = bases.map((f) => ({ id: f.id, box: itemAabb(f) }));
+  const runs: RunBox[] = [];
+  const covered = new Set<string>();
+
+  // Chain along one axis: items whose cross-axis band matches (within 8cm)
+  // and whose along-axis gaps are small form one run.
+  const chain = (axis: "x" | "y") => {
+    const bandMin = axis === "x" ? "minY" : "minX";
+    const bandMax = axis === "x" ? "maxY" : "maxX";
+    const lo = axis === "x" ? "minX" : "minY";
+    const hi = axis === "x" ? "maxX" : "maxY";
+    const sorted = [...boxes].sort((a, b) => a.box[lo] - b.box[lo]);
+    const used = new Set<string>();
+    for (let i = 0; i < sorted.length; i++) {
+      if (used.has(sorted[i].id)) continue;
+      const group = [sorted[i]];
+      for (let j = i + 1; j < sorted.length; j++) {
+        if (used.has(sorted[j].id)) continue;
+        const last = group[group.length - 1];
+        const sameBand =
+          Math.abs(sorted[j].box[bandMin] - last.box[bandMin]) <= 8 &&
+          Math.abs(sorted[j].box[bandMax] - last.box[bandMax]) <= 8;
+        const gap = sorted[j].box[lo] - last.box[hi];
+        if (sameBand && gap <= RUN_GAP && gap > -30) group.push(sorted[j]);
+      }
+      if (group.length >= 2) {
+        const run: RunBox = {
+          minX: Math.min(...group.map((g) => g.box.minX)) - RUN_OVERHANG,
+          maxX: Math.max(...group.map((g) => g.box.maxX)) + RUN_OVERHANG,
+          minY: Math.min(...group.map((g) => g.box.minY)) - RUN_OVERHANG,
+          maxY: Math.max(...group.map((g) => g.box.maxY)) + RUN_OVERHANG,
+        };
+        runs.push(run);
+        group.forEach((g) => { used.add(g.id); covered.add(g.id); });
+      }
+    }
+  };
+  chain("x");
+  chain("y");
+  return { runs, covered };
+}
+
+function WorktopRuns({ runs }: { runs: RunBox[] }) {
+  return (
+    <>
+      {runs.map((r, i) => (
+        <mesh
+          key={i}
+          position={[(r.minX + r.maxX) / 2, WORKTOP_H + SLAB_T / 2, (r.minY + r.maxY) / 2]}
+          material={MAT.worktop}
+          castShadow
+          receiveShadow
+        >
+          <boxGeometry args={[r.maxX - r.minX, SLAB_T, r.maxY - r.minY]} />
+        </mesh>
+      ))}
+    </>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Wall construction with door/window openings
 // ---------------------------------------------------------------------------
@@ -232,7 +325,7 @@ function Cyl({ r, h, x = 0, y, z = 0, mat }: {
   );
 }
 
-function ItemShape({ item, wallHeight }: { item: FurnitureItem; wallHeight: number }) {
+function ItemShape({ item, wallHeight, inWorktopRun = false }: { item: FurnitureItem; wallHeight: number; inWorktopRun?: boolean }) {
   const w = item.width;
   const d = item.height;
   const t = item.type;
@@ -344,7 +437,7 @@ function ItemShape({ item, wallHeight }: { item: FurnitureItem; wallHeight: numb
     return (
       <>
         <Box w={w} h={87} d={d} mat={appliance ? MAT.appliance : MAT.kitchenUnit} />
-        <Box w={w + 3} h={4} d={d + 3} y={89} mat={MAT.worktop} />
+        {!inWorktopRun && <Box w={w + 3} h={4} d={d + 3} y={89} mat={MAT.worktop} />}
         {sink && <Box w={Math.min(w - 16, w * 0.75)} h={3} d={Math.min(d - 16, 44)} y={92} mat={MAT.chrome} />}
         {(t === "cooker" || t === "range_cooker") && <Box w={w - 10} h={2} d={d - 10} y={92} mat={MAT.screen} />}
       </>
@@ -549,18 +642,18 @@ function ModelItem({ item, model }: { item: FurnitureItem; model: ModelDef }) {
   );
 }
 
-function Item3D({ item, wallHeight }: { item: FurnitureItem; wallHeight: number }) {
+function Item3D({ item, wallHeight, inWorktopRun = false }: { item: FurnitureItem; wallHeight: number; inWorktopRun?: boolean }) {
   const cx = item.x + item.width / 2;
   const cy = item.y + item.height / 2;
   return (
     <group position={[cx, 0, cy]} rotation={[0, -(item.rotation * Math.PI) / 180, 0]}>
       <group scale={[item.mirrored ? -1 : 1, 1, 1]}>
         {MODEL_MAP[item.type] ? (
-          <Suspense fallback={<ItemShape item={item} wallHeight={wallHeight} />}>
+          <Suspense fallback={<ItemShape item={item} wallHeight={wallHeight} inWorktopRun={inWorktopRun} />}>
             <ModelItem item={item} model={MODEL_MAP[item.type]} />
           </Suspense>
         ) : (
-          <ItemShape item={item} wallHeight={wallHeight} />
+          <ItemShape item={item} wallHeight={wallHeight} inWorktopRun={inWorktopRun} />
         )}
       </group>
     </group>
@@ -586,6 +679,11 @@ export default function View3D({ state, isDark }: View3DProps) {
   const items = useMemo(
     () => state.furniture.filter((f) => !OPENING_TYPES.has(f.type)),
     [state.furniture]
+  );
+
+  const { runs: worktopRuns, covered: worktopCovered } = useMemo(
+    () => computeWorktopRuns(items),
+    [items]
   );
 
   // Scene bounds -> camera framing
@@ -646,8 +744,9 @@ export default function View3D({ state, isDark }: View3DProps) {
           <WallMesh key={d.wall.id} data={d} height={wallHeight} />
         ))}
         {items.map((item) => (
-          <Item3D key={item.id} item={item} wallHeight={wallHeight} />
+          <Item3D key={item.id} item={item} wallHeight={wallHeight} inWorktopRun={worktopCovered.has(item.id)} />
         ))}
+        <WorktopRuns runs={worktopRuns} />
 
         <OrbitControls
           target={[center.x, 60, center.y]}
