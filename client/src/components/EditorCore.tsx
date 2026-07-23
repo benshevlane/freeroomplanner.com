@@ -30,6 +30,9 @@ import {
   snapFurnitureToNearest,
 } from "../lib/canvas-renderer";
 import { detectRooms, snapWallsForDetection } from "../lib/room-detection";
+
+// Lazy-loaded so Three.js is only downloaded when the user opens the 3D view
+const View3D = lazy(() => import("./View3D"));
 import { safeGetItem, safeSetItem } from "../lib/safe-storage";
 import SavePlanDialog from "./SavePlanDialog";
 import RatingPromptDialog from "./RatingPromptDialog";
