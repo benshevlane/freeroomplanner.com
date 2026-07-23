@@ -1,3 +1,6 @@
 3D furniture models in this folder are from Poly Haven (https://polyhaven.com),
 licensed CC0 (public domain). Free for commercial use, no attribution required.
 Optimized for web delivery (packed GLB, WebP textures, 1k resolution).
+
+fm_bed_grey.glb is from FurniMesh (https://furnimesh.com), free for
+commercial use without attribution, simplified for web delivery.
