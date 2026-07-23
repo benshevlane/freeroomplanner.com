@@ -314,6 +314,130 @@ interface DownloadPartner {
   plan_exported_count: number;
 }
 
+function FeedbackReport() {
+  const [days, setDays] = useState(30);
+  const { data, isLoading, error } = useQuery<{
+    days: number;
+    total: number;
+    ratingAvg: number | null;
+    ratingCount: number;
+    histogram: Record<string, number>;
+    useCases: { useCase: string; count: number }[];
+    comments: {
+      created_at: string;
+      type: string | null;
+      email: string | null;
+      rating: number | null;
+      page: string | null;
+      country: string | null;
+      body: string;
+    }[];
+  }>({
+    queryKey: [`/api/admin/feedback-report?days=${days}`],
+  });
+
+  const maxHist = data ? Math.max(1, ...Object.values(data.histogram)) : 1;
+
+  return (
+    <div className="mt-12">
+      <div className="flex items-center justify-between mb-1">
+        <h2 className="text-lg font-semibold">Feedback &amp; Ratings</h2>
+        <select
+          value={days}
+          onChange={(e) => setDays(Number(e.target.value))}
+          className="text-sm border border-[#e8e3d8] rounded-lg px-2 py-1 bg-white"
+          data-testid="feedback-range"
+        >
+          <option value={7}>Last 7 days</option>
+          <option value={30}>Last 30 days</option>
+          <option value={90}>Last 90 days</option>
+          <option value={365}>Last year</option>
+        </select>
+      </div>
+      <p className="text-sm text-[#6b6457] mb-4">
+        Every in-app rating and written comment, plus what people say they use the planner for.
+      </p>
+
+      {isLoading && <p className="text-sm text-[#9a9488]">Loading feedback…</p>}
+      {error && <p className="text-sm text-red-600">Failed to load feedback report.</p>}
+
+      {data && (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+            <div className="rounded-xl border border-[#e8e3d8] bg-white p-4 shadow-sm">
+              <div className="text-2xl font-semibold tabular-nums">
+                {data.ratingAvg != null ? `${data.ratingAvg} ★` : "—"}
+              </div>
+              <div className="text-xs text-[#6b6457] mt-1">
+                Average rating ({data.ratingCount} ratings)
+              </div>
+              <div className="mt-3 space-y-1">
+                {[5, 4, 3, 2, 1].map((star) => (
+                  <div key={star} className="flex items-center gap-2 text-xs">
+                    <span className="w-3 text-[#6b6457]">{star}</span>
+                    <div className="flex-1 h-2 rounded bg-[#f0ece3] overflow-hidden">
+                      <div
+                        className="h-full bg-amber-400"
+                        style={{ width: `${((data.histogram[String(star)] ?? 0) / maxHist) * 100}%` }}
+                      />
+                    </div>
+                    <span className="w-6 text-right tabular-nums text-[#6b6457]">
+                      {data.histogram[String(star)] ?? 0}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="rounded-xl border border-[#e8e3d8] bg-white p-4 shadow-sm md:col-span-2">
+              <h3 className="text-sm font-medium text-[#6b6457] mb-2">What people use it for</h3>
+              {data.useCases.length === 0 ? (
+                <p className="text-sm text-[#9a9488]">No answers yet — the question was added July 2026.</p>
+              ) : (
+                <table className="w-full text-sm">
+                  <tbody>
+                    {data.useCases.map((u) => (
+                      <tr key={u.useCase} className="border-b border-[#f0ece3] last:border-0">
+                        <td className="py-1.5 text-[#374151]">{u.useCase}</td>
+                        <td className="py-1.5 text-right font-medium tabular-nums">{u.count}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-[#e8e3d8] bg-white p-4 shadow-sm">
+            <h3 className="text-sm font-medium text-[#6b6457] mb-3">
+              Written comments ({data.comments.length})
+            </h3>
+            {data.comments.length === 0 ? (
+              <p className="text-sm text-[#9a9488]">No written comments in this period.</p>
+            ) : (
+              <div className="space-y-3 max-h-[480px] overflow-y-auto pr-1">
+                {data.comments.map((c, i) => (
+                  <div key={i} className="border-b border-[#f0ece3] last:border-0 pb-3">
+                    <div className="flex items-center gap-2 text-xs text-[#9a9488] mb-1">
+                      <span>{new Date(c.created_at).toLocaleDateString()}</span>
+                      {c.rating != null && (
+                        <span className="text-amber-500">{"★".repeat(c.rating)}{"☆".repeat(5 - c.rating)}</span>
+                      )}
+                      {c.type && <span className="uppercase tracking-wide">{c.type}</span>}
+                      {c.country && <span>{c.country}</span>}
+                      {c.email && <span className="text-[#6b6457]">{c.email}</span>}
+                    </div>
+                    <p className="text-sm text-[#374151] whitespace-pre-wrap">{c.body}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function DownloadsReport() {
   const { data, isLoading, error } = useQuery<{
     total_downloads: number;
@@ -835,6 +959,9 @@ export default function Admin() {
 
         {/* Planner Activity (starts / saves / affiliate clicks) */}
         <ActivityReport />
+
+        {/* Feedback & Ratings */}
+        <FeedbackReport />
 
         {/* Plan Downloads Report */}
         <DownloadsReport />
