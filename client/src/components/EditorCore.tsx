@@ -29,10 +29,7 @@ import {
   collectDistanceMeasurementRects,
   snapFurnitureToNearest,
 } from "../lib/canvas-renderer";
-import { detectRooms } from "../lib/room-detection";
-
-// Lazy-loaded so Three.js is only downloaded when the user opens the 3D view
-const View3D = lazy(() => import("./View3D"));
+import { detectRooms, snapWallsForDetection } from "../lib/room-detection";
 import { safeGetItem, safeSetItem } from "../lib/safe-storage";
 import SavePlanDialog from "./SavePlanDialog";
 import RatingPromptDialog from "./RatingPromptDialog";
@@ -840,7 +837,7 @@ export default function EditorCore({
   );
 
   // Live plan overview for the properties panel's empty state
-  const detectedForSummary = detectRooms(state.walls); // area already in m²
+  const detectedForSummary = detectRooms(snapWallsForDetection(state.walls)); // area already in m²; tolerant of small wall gaps
   const planSummary = {
     areaM2: detectedForSummary.reduce((sum, r) => sum + r.area, 0),
     perimeterCm: state.walls.reduce((sum, w) => {
