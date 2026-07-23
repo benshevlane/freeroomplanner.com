@@ -76,9 +76,9 @@ const FLOORS: FloorChoice[] = [
 
 const WALL_COLORS = ["#eae4d8", "#f2efe9", "#d9c8a8", "#b6c2ae", "#bccfd8", "#e3c9c0", "#3f4f63", "#4a4c4f"];
 const UNIT_COLORS = ["#8fa3ad", "#8fa38f", "#45586e", "#e8e2d2", "#494b4d", "#f0efec", "#b08968", "#01696f"];
-const WORKTOPS = [
+const WORKTOPS: { id: string; label: string; color: string; roughness: number; texture?: string }[] = [
   { id: "oak", label: "Oak", color: "#c9b18a", roughness: 0.7 },
-  { id: "stone", label: "Stone", color: "#9a9d9f", roughness: 0.5 },
+  { id: "stone", label: "Marble", color: "#ffffff", roughness: 0.35, texture: "/textures/marble_01.jpg" },
   { id: "quartz", label: "White quartz", color: "#e9e8e4", roughness: 0.4 },
 ];
 
@@ -941,8 +941,25 @@ export default function View3D({ state, isDark }: View3DProps) {
     MAT.wallInterior.color.set(style.wallColor);
     MAT.kitchenUnit.color.set(style.unitColor);
     const wt = WORKTOPS.find((w) => w.id === style.worktop) ?? WORKTOPS[0];
-    MAT.worktop.color.set(wt.color);
     MAT.worktop.roughness = wt.roughness;
+    if (wt.texture) {
+      const img = new Image();
+      img.onload = () => {
+        const tex = new THREE.Texture(img);
+        tex.colorSpace = THREE.SRGBColorSpace;
+        tex.anisotropy = 4;
+        tex.needsUpdate = true;
+        if (MAT.worktop.map) MAT.worktop.map.dispose();
+        MAT.worktop.map = tex;
+        MAT.worktop.color.set(wt.color);
+        MAT.worktop.needsUpdate = true;
+      };
+      img.src = wt.texture;
+    } else {
+      if (MAT.worktop.map) { MAT.worktop.map.dispose(); MAT.worktop.map = null; }
+      MAT.worktop.color.set(wt.color);
+      MAT.worktop.needsUpdate = true;
+    }
   }, [style.wallColor, style.unitColor, style.worktop]);
 
   useEffect(() => {
