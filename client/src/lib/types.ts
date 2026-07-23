@@ -36,6 +36,10 @@ export interface FurnitureItem {
   labelRotation?: number; // degrees, independent rotation for the component label
   labelWidth?: number;    // cm override for auto-computed label pill width
   labelHeight?: number;   // cm override for auto-computed label pill height
+  /** 3D view: user-chosen colour for this item (hex). Undefined = default */
+  colorOverride?: string;
+  /** 3D view: cabinet front style for kitchen units */
+  doorStyle?: "flat" | "shaker";
 }
 
 export type LabelSize = "small" | "medium" | "large";

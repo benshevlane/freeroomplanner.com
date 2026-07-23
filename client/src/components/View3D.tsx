@@ -1,8 +1,8 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
-import { OrbitControls, useGLTF } from "@react-three/drei";
+import { Environment, OrbitControls, useGLTF } from "@react-three/drei";
 import * as THREE from "three";
-import { EditorState, Wall, FurnitureItem, Point } from "../lib/types";
+import { EditorState, Wall, FurnitureItem, Point, FURNITURE_LIBRARY } from "../lib/types";
 import { detectRooms } from "../lib/room-detection";
 import { trackEvent } from "@/lib/analytics";
 
@@ -74,6 +74,11 @@ const FLOORS: FloorChoice[] = [
   { id: "carpet", label: "Carpet", color: "#b8ab98", tileM: 1 },
 ];
 
+const ITEM_COLORS = [
+  "#8fa3ad", "#8fa38f", "#45586e", "#e8e2d2", "#494b4d", "#f0efec",
+  "#b08968", "#01696f", "#a95c45", "#d6b598", "#6b7f95", "#3d3d3b",
+];
+
 const WALL_COLORS = ["#eae4d8", "#f2efe9", "#d9c8a8", "#b6c2ae", "#bccfd8", "#e3c9c0", "#3f4f63", "#4a4c4f"];
 const UNIT_COLORS = ["#8fa3ad", "#8fa38f", "#45586e", "#e8e2d2", "#494b4d", "#f0efec", "#b08968", "#01696f"];
 const WORKTOPS: { id: string; label: string; color: string; roughness: number; texture?: string }[] = [
@@ -110,10 +115,12 @@ function loadStyle(): StyleState {
 
 /** Applies exposure (brightness dial + evening dimming) to the renderer */
 function SceneSettings({ brightness, evening }: { brightness: number; evening: boolean }) {
-  const { gl } = useThree();
+  const { gl, scene } = useThree();
   useEffect(() => {
     gl.toneMappingExposure = brightness * (evening ? 0.72 : 1);
-  }, [gl, brightness, evening]);
+    // Image-based ambient light; dimmed in evening mode
+    (scene as THREE.Scene & { environmentIntensity?: number }).environmentIntensity = evening ? 0.3 : 0.85;
+  }, [gl, scene, brightness, evening]);
   return null;
 }
 
@@ -429,7 +436,19 @@ function ItemShape({ item, wallHeight, inWorktopRun = false }: { item: Furniture
   const w = item.width;
   const d = item.height;
   const t = item.type;
-  const catMat = categoryMaterial(item.category);
+  // Per-item colour override creates a dedicated material for this item
+  const override = useMemo(
+    () => (item.colorOverride ? std(item.colorOverride) : null),
+    [item.colorOverride]
+  );
+  const shakerFrame = useMemo(() => {
+    if (!override && !item.colorOverride) return null;
+    return null;
+  }, [override, item.colorOverride]);
+  void shakerFrame;
+  const catMat = override ?? categoryMaterial(item.category);
+  const unitMat = override ?? MAT.kitchenUnit;
+  const applianceMat = override ?? MAT.appliance;
 
   // --- Beds ---
   if (t.startsWith("bed_") || t === "cot") {
@@ -536,7 +555,15 @@ function ItemShape({ item, wallHeight, inWorktopRun = false }: { item: Furniture
     const sink = t === "kitchen_sink_s" || t === "kitchen_sink_d";
     return (
       <>
-        <Box w={w} h={87} d={d} mat={appliance ? MAT.appliance : MAT.kitchenUnit} />
+        <Box w={w} h={87} d={d} mat={appliance ? applianceMat : unitMat} />
+        {item.doorStyle === "shaker" && !appliance && (
+          <>
+            {/* Shaker front: raised frame + recessed centre panel */}
+            <Box w={Math.max(w - 8, 10)} h={71} d={1.6} y={45} z={d / 2 + 0.8} mat={unitMat} />
+            <Box w={Math.max(w - 22, 6)} h={57} d={1} y={45} z={d / 2 + 1.0} mat={MAT.dark} shadow={false} />
+            <Box w={Math.max(w - 24, 5)} h={55} d={1.4} y={45} z={d / 2 + 1.2} mat={unitMat} />
+          </>
+        )}
         {!inWorktopRun && <Box w={w + 3} h={4} d={d + 3} y={89} mat={MAT.worktop} />}
         {sink && <Box w={Math.min(w - 16, w * 0.75)} h={3} d={Math.min(d - 16, 44)} y={92} mat={MAT.chrome} />}
         {(t === "cooker" || t === "range_cooker") && <Box w={w - 10} h={2} d={d - 10} y={92} mat={MAT.screen} />}
@@ -557,11 +584,22 @@ function ItemShape({ item, wallHeight, inWorktopRun = false }: { item: Furniture
   };
   if (t in tallUnits) {
     const applianceTall = t === "fridge" || t === "fridge_american";
-    return <Box w={w} h={tallUnits[t]} d={d} mat={applianceTall ? MAT.appliance : t === "wardrobe" ? catMat : MAT.wood} />;
+    return <Box w={w} h={tallUnits[t]} d={d} mat={override ?? (applianceTall ? MAT.appliance : t === "wardrobe" ? catMat : MAT.wood)} />;
   }
   if (item.heightFromFloor !== undefined || t.startsWith("wall_cupboard")) {
     const lift = item.heightFromFloor ?? 145;
-    return <Box w={w} h={70} d={d} y={lift + 35} mat={MAT.kitchenUnit} />;
+    return (
+      <>
+        <Box w={w} h={70} d={d} y={lift + 35} mat={unitMat} />
+        {item.doorStyle === "shaker" && (
+          <>
+            <Box w={Math.max(w - 8, 8)} h={56} d={1.4} y={lift + 35} z={d / 2 + 0.7} mat={unitMat} />
+            <Box w={Math.max(w - 20, 5)} h={44} d={1} y={lift + 35} z={d / 2 + 0.9} mat={MAT.dark} shadow={false} />
+            <Box w={Math.max(w - 22, 4)} h={42} d={1.2} y={lift + 35} z={d / 2 + 1.1} mat={unitMat} />
+          </>
+        )}
+      </>
+    );
   }
 
   // --- Bathroom ---
@@ -707,6 +745,17 @@ function ModelItem({ item, model }: { item: FurnitureItem; model: ModelDef }) {
       if ((o as THREE.Mesh).isMesh) {
         o.castShadow = true;
         o.receiveShadow = true;
+        if (item.colorOverride) {
+          const mesh = o as THREE.Mesh;
+          const tint = (m: THREE.Material) => {
+            const c = m.clone() as THREE.MeshStandardMaterial;
+            if (c.color) c.color.set(item.colorOverride!);
+            return c;
+          };
+          mesh.material = Array.isArray(mesh.material)
+            ? mesh.material.map(tint)
+            : tint(mesh.material);
+        }
       }
     });
     const box = new THREE.Box3().setFromObject(clone);
@@ -717,7 +766,7 @@ function ModelItem({ item, model }: { item: FurnitureItem; model: ModelDef }) {
     const holder = new THREE.Group();
     holder.add(clone);
     return { holder, size: sz };
-  }, [scene]);
+  }, [scene, item.colorOverride]);
 
   // Model sizes are in metres; the plan works in cm
   const bw = size.x * 100;
@@ -744,11 +793,40 @@ function ModelItem({ item, model }: { item: FurnitureItem; model: ModelDef }) {
   );
 }
 
-function Item3D({ item, wallHeight, inWorktopRun = false }: { item: FurnitureItem; wallHeight: number; inWorktopRun?: boolean }) {
+function Item3D({
+  item,
+  wallHeight,
+  inWorktopRun = false,
+  selected = false,
+  onSelect,
+  onDragStart,
+}: {
+  item: FurnitureItem;
+  wallHeight: number;
+  inWorktopRun?: boolean;
+  selected?: boolean;
+  onSelect?: (id: string) => void;
+  onDragStart?: (id: string, point: THREE.Vector3) => void;
+}) {
   const cx = item.x + item.width / 2;
   const cy = item.y + item.height / 2;
   return (
-    <group position={[cx, 0, cy]} rotation={[0, -(item.rotation * Math.PI) / 180, 0]}>
+    <group
+      position={[cx, 0, cy]}
+      rotation={[0, -(item.rotation * Math.PI) / 180, 0]}
+      onClick={(e) => { e.stopPropagation(); onSelect?.(item.id); }}
+      onPointerDown={(e) => {
+        if (!selected) return;
+        e.stopPropagation();
+        onDragStart?.(item.id, e.point);
+      }}
+    >
+      {selected && (
+        <mesh position={[0, 1, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[Math.max(item.width, item.height) * 0.62, Math.max(item.width, item.height) * 0.62 + 5, 40]} />
+          <meshBasicMaterial color="#01696f" transparent opacity={0.8} />
+        </mesh>
+      )}
       <group scale={[item.mirrored ? -1 : 1, 1, 1]}>
         {MODEL_MAP[item.type] ? (
           <Suspense fallback={<ItemShape item={item} wallHeight={wallHeight} inWorktopRun={inWorktopRun} />}>
@@ -888,16 +966,71 @@ function SnapshotEngine({
 interface View3DProps {
   state: EditorState;
   isDark: boolean;
+  onUpdateFurniture?: (id: string, updates: Partial<FurnitureItem>) => void;
+  onPushUndo?: () => void;
 }
 
-export default function View3D({ state, isDark }: View3DProps) {
+export default function View3D({ state, isDark, onUpdateFurniture, onPushUndo }: View3DProps) {
   const [wallHeight, setWallHeight] = useState(DEFAULT_WALL_HEIGHT);
   const [style, setStyle] = useState<StyleState>(loadStyle);
   const [stylePanelOpen, setStylePanelOpen] = useState(false);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const dragRef = useRef<{ id: string; offX: number; offY: number } | null>(null);
   const [snapshotRequest, setSnapshotRequest] = useState<SnapshotRequest | null>(null);
   const [snapshotProgress, setSnapshotProgress] = useState(0);
   const snapshotStartRef = useRef(0);
   const lightRef = useRef<THREE.DirectionalLight>(null);
+
+  const selectedItem = state.furniture.find((f) => f.id === selectedId) ?? null;
+
+  const handleDragStart = (id: string, point: THREE.Vector3) => {
+    const item = state.furniture.find((f) => f.id === id);
+    if (!item || !onUpdateFurniture) return;
+    onPushUndo?.();
+    dragRef.current = {
+      id,
+      offX: item.x + item.width / 2 - point.x,
+      offY: item.y + item.height / 2 - point.z,
+    };
+    setDragging(true);
+  };
+
+  const handleDragMove = (point: THREE.Vector3) => {
+    const d = dragRef.current;
+    if (!d || !onUpdateFurniture) return;
+    const item = state.furniture.find((f) => f.id === d.id);
+    if (!item) return;
+    onUpdateFurniture(d.id, {
+      x: Math.round(point.x + d.offX - item.width / 2),
+      y: Math.round(point.z + d.offY - item.height / 2),
+    });
+  };
+
+  const endDrag = () => {
+    dragRef.current = null;
+    setDragging(false);
+  };
+
+  const rotateSelected = () => {
+    if (!selectedItem || !onUpdateFurniture) return;
+    onPushUndo?.();
+    const template = FURNITURE_LIBRARY.find((t) => t.type === selectedItem.type);
+    const snap = template?.rotationSnap ?? 90;
+    onUpdateFurniture(selectedItem.id, { rotation: (selectedItem.rotation + snap) % 360 });
+  };
+
+  const setItemColor = (color: string | undefined) => {
+    if (!selectedItem || !onUpdateFurniture) return;
+    onPushUndo?.();
+    onUpdateFurniture(selectedItem.id, { colorOverride: color });
+  };
+
+  const setDoorStyle = (doorStyle: "flat" | "shaker") => {
+    if (!selectedItem || !onUpdateFurniture) return;
+    onPushUndo?.();
+    onUpdateFurniture(selectedItem.id, { doorStyle });
+  };
 
   const startSnapshot = () => {
     if (snapshotRequest) return;
@@ -1043,8 +1176,10 @@ export default function View3D({ state, isDark }: View3DProps) {
         frameloop={snapshotRequest ? "never" : "always"}
         shadows={enableShadows}
         dpr={[1, 2]}
+        onPointerMissed={() => setSelectedId(null)}
         camera={{ fov: 45, near: 10, far: 50000, position: camPos }}
       >
+        <Environment files="/textures/env_interior_1k.hdr" />
         <color attach="background" args={[style.evening ? "#232830" : isDark ? "#20242a" : "#e9edf2"]} />
         <SceneSettings brightness={style.brightness} evening={style.evening} />
         <hemisphereLight
@@ -1077,8 +1212,28 @@ export default function View3D({ state, isDark }: View3DProps) {
           <WallMesh key={d.wall.id} data={d} height={wallHeight} />
         ))}
         {items.map((item) => (
-          <Item3D key={item.id} item={item} wallHeight={wallHeight} inWorktopRun={worktopCovered.has(item.id)} />
+          <Item3D
+            key={item.id}
+            item={item}
+            wallHeight={wallHeight}
+            inWorktopRun={worktopCovered.has(item.id)}
+            selected={item.id === selectedId}
+            onSelect={onUpdateFurniture ? setSelectedId : undefined}
+            onDragStart={handleDragStart}
+          />
         ))}
+        {/* Invisible floor-plane that receives drag moves */}
+        {dragging && (
+          <mesh
+            rotation={[-Math.PI / 2, 0, 0]}
+            position={[center.x, 0.1, center.y]}
+            onPointerMove={(e) => handleDragMove(e.point)}
+            onPointerUp={endDrag}
+          >
+            <planeGeometry args={[radius * 10, radius * 10]} />
+            <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+          </mesh>
+        )}
         <WorktopRuns runs={worktopRuns} />
 
         <SnapshotEngine
@@ -1088,6 +1243,7 @@ export default function View3D({ state, isDark }: View3DProps) {
           onDone={finishSnapshot}
         />
         <OrbitControls
+          enabled={!dragging}
           target={[center.x, 60, center.y]}
           maxPolarAngle={Math.PI / 2 - 0.03}
           minDistance={120}
@@ -1265,6 +1421,76 @@ export default function View3D({ state, isDark }: View3DProps) {
               Cancel
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Selected item panel */}
+      {selectedItem && onUpdateFurniture && !snapshotRequest && (
+        <div className="absolute top-3 right-3 z-10 bg-card/95 backdrop-blur border border-border rounded-lg shadow-md p-3 w-56 space-y-2.5" data-testid="item-3d-panel">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-sm font-semibold truncate">{selectedItem.customName || selectedItem.label}</p>
+            <button
+              type="button"
+              className="text-xs text-muted-foreground hover:text-foreground"
+              onClick={() => setSelectedId(null)}
+              aria-label="Close"
+            >
+              ✕
+            </button>
+          </div>
+
+          <div>
+            <p className="text-xs font-medium mb-1">Colour</p>
+            <div className="flex flex-wrap gap-1.5">
+              {ITEM_COLORS.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => setItemColor(c)}
+                  className={`h-6 w-6 rounded-full border-2 ${selectedItem.colorOverride === c ? "border-primary" : "border-border"}`}
+                  style={{ backgroundColor: c }}
+                  aria-label={`Colour ${c}`}
+                />
+              ))}
+              <button
+                type="button"
+                onClick={() => setItemColor(undefined)}
+                className={`h-6 px-1.5 rounded-full border text-[10px] ${!selectedItem.colorOverride ? "border-primary text-primary" : "border-border text-muted-foreground"}`}
+              >
+                Default
+              </button>
+            </div>
+          </div>
+
+          {["worktop","kitchen_sink_s","kitchen_sink_d","floor_cupboard","drawer_unit_2","drawer_unit_3","larder_unit","wall_cupboard_single","wall_cupboard_double","wall_cupboard_corner","island"].includes(selectedItem.type) && (
+            <div>
+              <p className="text-xs font-medium mb-1">Door style</p>
+              <div className="flex gap-1.5">
+                {(["flat", "shaker"] as const).map((ds) => (
+                  <button
+                    key={ds}
+                    type="button"
+                    onClick={() => setDoorStyle(ds)}
+                    className={`flex-1 text-[11px] py-1 rounded-md border capitalize ${(selectedItem.doorStyle ?? "flat") === ds ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground"}`}
+                  >
+                    {ds}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={rotateSelected}
+            className="w-full text-xs py-1.5 rounded-md border border-border hover:border-primary/60"
+            data-testid="btn-3d-rotate"
+          >
+            ↻ Rotate
+          </button>
+          <p className="text-[10px] text-muted-foreground">
+            Drag the selected item to move it · changes save with your plan
+          </p>
         </div>
       )}
 
