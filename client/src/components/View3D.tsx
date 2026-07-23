@@ -335,9 +335,49 @@ function WallMesh({ data, height }: { data: WallWithOpenings; height: number }) 
 // ---------------------------------------------------------------------------
 // Floors from detected rooms
 // ---------------------------------------------------------------------------
+/**
+ * Snap wall endpoints that nearly touch (within tolerance) onto a shared
+ * point so room detection still closes rooms drawn with small gaps. 2D
+ * detection uses a strict 15cm threshold; for the 3D floor we are happy to
+ * bridge gaps up to 30cm — a floor that appears is better than a void.
+ */
+function snapWallsForDetection(walls: Wall[], tolerance = 30): Wall[] {
+  const points: Point[] = [];
+  walls.forEach((w) => { points.push(w.start, w.end); });
+  // Union-find over endpoints
+  const parent = points.map((_, i) => i);
+  const find = (i: number): number => (parent[i] === i ? i : (parent[i] = find(parent[i])));
+  for (let i = 0; i < points.length; i++) {
+    for (let j = i + 1; j < points.length; j++) {
+      const dx = points[i].x - points[j].x;
+      const dy = points[i].y - points[j].y;
+      if (dx * dx + dy * dy <= tolerance * tolerance) {
+        parent[find(i)] = find(j);
+      }
+    }
+  }
+  // Cluster centroids
+  const sums = new Map<number, { x: number; y: number; n: number }>();
+  points.forEach((pt, i) => {
+    const r = find(i);
+    const s = sums.get(r) ?? { x: 0, y: 0, n: 0 };
+    s.x += pt.x; s.y += pt.y; s.n += 1;
+    sums.set(r, s);
+  });
+  const snapped = (i: number): Point => {
+    const s = sums.get(find(i))!;
+    return { x: s.x / s.n, y: s.y / s.n };
+  };
+  return walls.map((w, wi) => ({
+    ...w,
+    start: snapped(wi * 2),
+    end: snapped(wi * 2 + 1),
+  }));
+}
+
 function Floors({ walls }: { walls: Wall[] }) {
   const shapes = useMemo(() => {
-    const rooms = detectRooms(walls);
+    const rooms = detectRooms(snapWallsForDetection(walls));
     return rooms.map((room) => {
       const shape = new THREE.Shape();
       room.vertices.forEach((v: Point, i: number) => {
@@ -646,8 +686,8 @@ const MODEL_MAP: Record<string, ModelDef> = {
   bedside_table: def("ClassicNightstand_01", 60),
   chest_drawers: def("drawer_cabinet", 80),
   wardrobe: def("drawer_cabinet", 200),
-  dining_table_4: def("dining_table", 75),
-  dining_table_6: def("dining_table", 75),
+  dining_table_4: def("wooden_table_02", 75),
+  dining_table_6: def("painted_wooden_table", 76),
   dining_table_round: def("round_wooden_table_01", 75),
   dining_chair: def("dining_chair_02", 90, Math.PI),
   bar_stool: def("bar_chair_round_01", 75),
