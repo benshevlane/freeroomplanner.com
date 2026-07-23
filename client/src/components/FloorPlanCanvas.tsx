@@ -77,6 +77,10 @@ interface FloorPlanCanvasProps {
   snapEnabled: boolean;
   measureMode: MeasureMode;
   showAllMeasurements: boolean;
+  /** Master toggle: hide every measurement on the plan */
+  measurementsVisible?: boolean;
+  /** When true, dragging a wall moves it alone without pulling connected walls */
+  detachWalls?: boolean;
   onAddWall: (start: Point, end: Point) => void;
   onSelectItem: (id: string | null) => void;
   onMoveFurniture: (id: string, x: number, y: number) => void;
@@ -119,6 +123,8 @@ export default function FloorPlanCanvas({
   snapEnabled,
   measureMode,
   showAllMeasurements,
+  measurementsVisible = true,
+  detachWalls = false,
   onAddWall,
   onSelectItem,
   onMoveFurniture,
@@ -217,6 +223,7 @@ export default function FloorPlanCanvas({
     endX: number; endY: number;
     mouseWorldX: number; mouseWorldY: number;
     constraintAxis: "x" | "y" | "none";
+    detach: boolean;
   } | null>(null);
 
   // Wall measurement label dragging state
@@ -452,11 +459,13 @@ export default function FloorPlanCanvas({
       state.furniture,
       rooms,
       hoveredWallLabelIdRef.current,
-      { showAll: showAllMeasurements, hoveredClusterIds },
+      { showAll: showAllMeasurements, hoveredClusterIds, hideAll: !measurementsVisible },
     );
 
     // Measurement indicator lines (on top of walls, below labels/furniture)
-    drawMeasurementIndicatorLines(ctx, state.walls, rooms, state.gridSize, state.zoom, state.panOffset, measureMode);
+    if (measurementsVisible) {
+      drawMeasurementIndicatorLines(ctx, state.walls, rooms, state.gridSize, state.zoom, state.panOffset, measureMode);
+    }
 
     // Parallel wall discrepancy detection
     const flaggedWalls = findParallelWallDiscrepancies(state.walls);
@@ -636,7 +645,9 @@ export default function FloorPlanCanvas({
     }
 
     // Segment measurements for walls with doors/windows (drawn after furniture so worktops don't obscure them)
-    drawWallSegmentMeasurements(ctx, state.walls, state.furniture, state.gridSize, state.zoom, state.panOffset, isDark, state.units, measureMode, rooms, wallLabelObstacles);
+    if (measurementsVisible) {
+      drawWallSegmentMeasurements(ctx, state.walls, state.furniture, state.gridSize, state.zoom, state.panOffset, isDark, state.units, measureMode, rooms, wallLabelObstacles);
+    }
 
     // Wall snap indicator lines (during drag)
     if (isDragging && wallSnapEdges.length > 0) {
@@ -1103,8 +1114,11 @@ export default function FloorPlanCanvas({
             }
             return false;
           });
+          // Detach mode (toolbar toggle or Alt held): move this wall alone,
+          // free in both axes, without pulling connected walls along.
+          const detach = detachWalls || e.altKey;
           // Connected walls: constrain to perpendicular axis; detached walls: free drag
-          const constraintAxis: "x" | "y" | "none" = isConnected
+          const constraintAxis: "x" | "y" | "none" = isConnected && !detach
             ? (Math.abs(wdx) >= Math.abs(wdy) ? "y" : "x")
             : "none";
           setWallDragStart({
@@ -1113,6 +1127,7 @@ export default function FloorPlanCanvas({
             endX: hitW.end.x, endY: hitW.end.y,
             mouseWorldX: world.x, mouseWorldY: world.y,
             constraintAxis,
+            detach,
           });
           (e.target as HTMLElement).setPointerCapture(e.pointerId);
           return;
@@ -1636,6 +1651,7 @@ export default function FloorPlanCanvas({
         // frame's state due to React batching), not the original mousedown position.
         // This prevents connectivity from breaking after dragging >15cm.
         const CONNECT_THRESH = 15;
+        if (wallDragStart.detach) return; // detached drag: leave connected walls where they are
         const currentDraggedWall = state.walls.find(w => w.id === wallDragStart.id);
         const curStart = currentDraggedWall ? currentDraggedWall.start : { x: wallDragStart.startX, y: wallDragStart.startY };
         const curEnd = currentDraggedWall ? currentDraggedWall.end : { x: wallDragStart.endX, y: wallDragStart.endY };

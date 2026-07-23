@@ -644,6 +644,8 @@ function convexHull(points: { x: number; y: number }[]): { x: number; y: number 
 export interface WallLabelDisplayOptions {
   showAll: boolean;
   hoveredClusterIds: Set<string> | null;
+  /** Master switch: when true, no wall measurement labels are drawn at all */
+  hideAll?: boolean;
 }
 
 const DEFAULT_WALL_LABEL_MIN_CM = 100; // walls shorter than 1 m hide in default mode
@@ -866,6 +868,7 @@ export function drawWalls(
 
   // Individual labels for non-merged walls (skip if wall has door/window occupants — total shown separately)
   walls.forEach((wall) => {
+    if (labelDisplay.hideAll) return; // measurements master-switched off
     if (mergedWallIds.has(wall.id)) return; // will be labeled by group
 
     const wallThick = wall.thickness || DEFAULT_WALL_THICKNESS;
@@ -914,6 +917,7 @@ export function drawWalls(
 
   // Merged labels for collinear groups (skip if group has door/window occupants)
   for (const group of collinearGroups.values()) {
+    if (labelDisplay.hideAll) break; // measurements master-switched off
     const representativeWallForThickness = walls.find((w) => group.wallIds.has(w.id));
     const thickness = representativeWallForThickness?.thickness ?? DEFAULT_WALL_THICKNESS;
 

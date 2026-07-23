@@ -178,8 +178,56 @@ export function dimensionSuffix(units: UnitSystem): string {
     case "m": return "m";
     case "cm": return "cm";
     case "mm": return "mm";
-    case "ft": return "in";
+    case "ft": return "ft/in";
   }
+}
+
+/** Format cm as feet-and-inches, e.g. 198cm -> 6'6" */
+export function formatFtIn(cm: number): string {
+  const totalInches = cm / 2.54;
+  let feet = Math.floor(totalInches / 12);
+  let inches = Math.round(totalInches % 12);
+  if (inches === 12) { feet += 1; inches = 0; }
+  if (feet === 0) return `${inches}"`;
+  return `${feet}'${inches}"`;
+}
+
+/** String shown inside dimension inputs for the active unit */
+export function displayString(cm: number, units: UnitSystem): string {
+  if (units === "ft") return formatFtIn(cm);
+  const d = cmToDisplay(cm, units);
+  // Trim float noise (e.g. 1.2000000000000002)
+  return String(Math.round(d * 100) / 100);
+}
+
+/**
+ * Parse a user-typed dimension in the active unit and return cm (or null).
+ *
+ * Imperial accepts: 6'6", 6' 6, 6ft 6in, 6 ft, 78", 78in — and a plain
+ * number means FEET (people type room sizes in feet). Metric parses the
+ * number in the active unit as before.
+ */
+export function parseDimension(raw: string, units: UnitSystem): number | null {
+  const str = raw.trim().toLowerCase().replace(/″|”/g, '"').replace(/′|’/g, "'");
+  if (!str) return null;
+  if (units !== "ft") {
+    const n = parseFloat(str.replace(/[^0-9.\-]/g, ""));
+    return isNaN(n) ? null : displayToCm(n, units);
+  }
+  // feet + optional inches: 6'6", 6' 6, 6ft 6in, 6 feet 6, 6'
+  let m = str.match(/^(\d+(?:\.\d+)?)\s*(?:'|ft|feet)\s*(\d+(?:\.\d+)?)?\s*(?:"|in|inches)?\s*$/);
+  if (m) {
+    const feet = parseFloat(m[1]);
+    const inches = m[2] ? parseFloat(m[2]) : 0;
+    return feet * 30.48 + inches * 2.54;
+  }
+  // inches only: 78", 78in
+  m = str.match(/^(\d+(?:\.\d+)?)\s*(?:"|in|inches)\s*$/);
+  if (m) return parseFloat(m[1]) * 2.54;
+  // plain number = feet
+  const n = parseFloat(str);
+  if (!isNaN(n)) return n * 30.48;
+  return null;
 }
 
 export type MeasureMode = "full" | "inside";
