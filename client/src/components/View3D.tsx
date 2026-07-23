@@ -929,13 +929,21 @@ function SnapshotEngine({
           const targetSamples = request.frames; // ~70-140 samples
           const started = performance.now();
           const MAX_MS = 90_000;
-          while (!cancelled && pathTracer.samples < targetSamples && performance.now() - started < MAX_MS) {
+          while (!cancelled) {
             pathTracer.renderSample();
             onProgress(Math.min(99, Math.round((pathTracer.samples / targetSamples) * 100)));
+            const done =
+              pathTracer.samples >= targetSamples ||
+              performance.now() - started >= MAX_MS;
+            if (done) {
+              // Capture IN THE SAME TASK as the final present — waiting even
+              // one frame lets the browser clear the WebGL buffer (black photo)
+              actx.globalAlpha = 1;
+              actx.drawImage(canvas, 0, 0, outW, outH);
+              break;
+            }
             await new Promise((r) => requestAnimationFrame(r));
           }
-          actx.globalAlpha = 1;
-          actx.drawImage(canvas, 0, 0, outW, outH);
         } else {
           // --- Fallback: jittered accumulation (works everywhere) ---
           for (let i = 0; i < request.frames; i++) {
