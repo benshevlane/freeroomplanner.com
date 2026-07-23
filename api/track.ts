@@ -20,7 +20,7 @@ const db =
     : null;
 
 const eventSchema = z.object({
-  event: z.enum(["plan_started", "affiliate_click", "affiliate_message_copied"]),
+  event: z.enum(["plan_started", "affiliate_click", "affiliate_message_copied", "plan_downloaded"]),
   roomType: z.string().max(40).optional(),
 });
 

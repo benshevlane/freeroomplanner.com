@@ -365,6 +365,10 @@ function ActivityReport() {
   const { data, isLoading, error } = useQuery<{
     days: number;
     totalPlansAllTime: number | null;
+    plansDownloaded: number;
+    categoryBreakdown: { room_type: string; count: number }[];
+    ratingAvg: number | null;
+    ratingCount: number;
     starts: { total: number; byRoom: Record<string, number>; byCountry: Record<string, number> };
     saves: { total: number; byRoom: Record<string, number>; byCountry: Record<string, number> };
     affiliateClicks: { total: number; byRoom: Record<string, number>; byCountry: Record<string, number> };
@@ -385,8 +389,10 @@ function ActivityReport() {
           className="text-sm border border-[#e8e3d8] rounded-lg px-2 py-1 bg-white"
           data-testid="activity-range"
         >
+          <option value={1}>Last 24 hours</option>
           <option value={7}>Last 7 days</option>
           <option value={30}>Last 30 days</option>
+          <option value={60}>Last 60 days</option>
           <option value={90}>Last 90 days</option>
         </select>
       </div>
@@ -399,11 +405,19 @@ function ActivityReport() {
 
       {data && (
         <>
-          <div className="grid grid-cols-3 gap-3 mb-4">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
             {[
               { label: "Plans started", value: data.starts.total },
               { label: "Plans saved", value: data.saves.total },
+              { label: "Plans downloaded", value: data.plansDownloaded },
               { label: "Affiliate clicks", value: data.affiliateClicks.total },
+              {
+                label: "Avg rating",
+                value:
+                  data.ratingAvg != null
+                    ? `${data.ratingAvg} (${data.ratingCount})`
+                    : "—",
+              },
             ].map((c) => (
               <div key={c.label} className="rounded-xl border border-[#e8e3d8] bg-white p-4 shadow-sm">
                 <div className="text-2xl font-semibold tabular-nums">{c.value}</div>
@@ -437,6 +451,21 @@ function ActivityReport() {
               </div>
             ))}
           </div>
+          {data.categoryBreakdown.length > 0 && (
+            <div className="rounded-xl border border-[#e8e3d8] bg-white p-4 shadow-sm mt-3">
+              <h3 className="text-sm font-medium text-[#6b6457] mb-2">By category</h3>
+              <table className="w-full text-sm">
+                <tbody>
+                  {data.categoryBreakdown.map((c) => (
+                    <tr key={c.room_type} className="border-b border-[#f0ece3] last:border-0">
+                      <td className="py-1.5 text-[#374151] capitalize">{c.room_type.replace(/_/g, " ")}</td>
+                      <td className="py-1.5 text-right font-medium tabular-nums">{c.count}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
           <p className="text-xs text-[#9a9488] mt-3">
             {data.totalPlansAllTime ?? "—"} plans saved all time.
           </p>
@@ -779,27 +808,7 @@ export default function Admin() {
         </div>
 
         <h1 className="text-3xl font-bold mb-2">Admin</h1>
-        <p className="text-[#6b6457] mb-10">Manage the homepage hero image and view embed analytics.</p>
-
-        {/* Upload area */}
-        <div
-          ref={dropRef}
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={onDrop}
-          onClick={() => fileRef.current?.click()}
-          className="border-2 border-dashed border-[#d8d2c4] rounded-xl p-10 text-center cursor-pointer hover:border-[#3d8a7c] transition-colors"
-        >
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={(e) => { if (e.target.files?.[0]) upload(e.target.files[0]); }}
-          />
-          <div className="text-4xl mb-3 text-[#c4bfb4]">{uploading ? "..." : "+"}</div>
-          <p className="font-medium">{uploading ? "Uploading..." : "Drop an image here or click to browse"}</p>
-          <p className="text-sm text-[#9a9488] mt-1">PNG, JPG, or WebP. Will be compressed and saved as the homepage hero image.</p>
-        </div>
+        <p className="text-[#6b6457] mb-10">Planner activity, downloads, and embed analytics.</p>
 
         {message && (
           <p className={`mt-4 text-sm font-medium ${messageType === "error" ? "text-red-600" : "text-[#3d8a7c]"}`}>{message}</p>

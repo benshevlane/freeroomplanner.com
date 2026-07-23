@@ -37,6 +37,16 @@ function breakdown(rows: Row[]) {
   return { byRoom: sort(byRoom), byCountry: sort(byCountry) };
 }
 
+// Escape user-supplied feedback text before placing it in the email HTML.
+function esc(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function tableHtml(title: string, entries: [string, number][]): string {
   if (entries.length === 0) return "";
   const rows = entries
@@ -71,7 +81,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const start = new Date(end.getTime() - 24 * 60 * 60 * 1000);
     const dateLabel = start.toISOString().slice(0, 10);
 
-    const [startsQ, savesQ, totalPlansQ] = await Promise.all([
+    const [startsQ, savesQ, totalPlansQ, downloadsQ, ratingsQ, feedbackQ] = await Promise.all([
       db
         .from("usage_events")
         .select("room_type, country")
@@ -84,6 +94,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .gte("created_at", start.toISOString())
         .lt("created_at", end.toISOString()),
       db.from("room_plans").select("id", { count: "exact", head: true }),
+      db
+        .from("usage_events")
+        .select("id", { count: "exact", head: true })
+        .eq("event_type", "plan_downloaded")
+        .gte("created_at", start.toISOString())
+        .lt("created_at", end.toISOString()),
+      db
+        .from("feedback")
+        .select("rating")
+        .not("rating", "is", null)
+        .gte("created_at", start.toISOString())
+        .lt("created_at", end.toISOString()),
+      db
+        .from("feedback")
+        .select("rating, message, created_at")
+        .gte("created_at", start.toISOString())
+        .lt("created_at", end.toISOString())
+        .order("created_at", { ascending: false })
+        .limit(5),
     ]);
     if (startsQ.error) throw startsQ.error;
     if (savesQ.error) throw savesQ.error;
@@ -93,14 +122,46 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const startsB = breakdown(starts);
     const savesB = breakdown(saves);
 
+    // Category breakdown for saved plans this window (top 8, skip null).
+    const categoryBreakdown = savesB.byRoom
+      .filter(([k]) => k && k !== "unknown")
+      .slice(0, 8);
+
+    // Ratings + recent feedback from the feedback table (this window).
+    const ratingRows = (ratingsQ.data ?? []) as { rating: number | null }[];
+    const ratingValues = ratingRows
+      .map((r) => r.rating)
+      .filter((v): v is number => typeof v === "number");
+    const ratingCount = ratingValues.length;
+    const ratingAvg =
+      ratingCount > 0
+        ? Number(
+            (ratingValues.reduce((a, b) => a + b, 0) / ratingCount).toFixed(1)
+          )
+        : null;
+    const recentFeedback = ((feedbackQ.data ?? []) as {
+      rating: number | null;
+      message: string | null;
+      created_at: string | null;
+    }[]).map((r) => ({
+      rating: r.rating,
+      message: (r.message ?? "").slice(0, 200),
+      created_at: r.created_at,
+    }));
+
     const summary = {
       date: dateLabel,
       plansStarted: starts.length,
       plansSaved: saves.length,
+      plansDownloaded: downloadsQ.count ?? 0,
       savedByRoom: Object.fromEntries(savesB.byRoom),
       savedByCountry: Object.fromEntries(savesB.byCountry),
       startedByRoom: Object.fromEntries(startsB.byRoom),
       startedByCountry: Object.fromEntries(startsB.byCountry),
+      categoryBreakdown: Object.fromEntries(categoryBreakdown),
+      ratingAvg,
+      ratingCount,
+      recentFeedback,
       totalPlansAllTime: totalPlansQ.count ?? null,
     };
 
@@ -123,20 +184,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   <table style="border-collapse:collapse;font-size:15px;margin:10px 0">
     <tr><td style="padding:4px 12px 4px 0">Plans started</td><td style="font-weight:700">${summary.plansStarted}</td></tr>
     <tr><td style="padding:4px 12px 4px 0">Plans saved (new links)</td><td style="font-weight:700">${summary.plansSaved}</td></tr>
+    <tr><td style="padding:4px 12px 4px 0">Plans downloaded</td><td style="font-weight:700">${summary.plansDownloaded}</td></tr>
+    <tr><td style="padding:4px 12px 4px 0">Avg rating</td><td style="font-weight:700">${summary.ratingAvg != null ? `${summary.ratingAvg} (${summary.ratingCount})` : "—"}</td></tr>
     <tr><td style="padding:4px 12px 4px 0;color:#6b7280">Total saved plans, all time</td><td style="color:#6b7280">${summary.totalPlansAllTime ?? "—"}</td></tr>
   </table>
+  ${tableHtml("By category", categoryBreakdown)}
   ${tableHtml("Saved — by room", savesB.byRoom)}
   ${tableHtml("Saved — by country", savesB.byCountry)}
   ${tableHtml("Started — by room", startsB.byRoom)}
   ${tableHtml("Started — by country", startsB.byCountry)}
+  ${
+    recentFeedback.length
+      ? `<h3 style="margin:18px 0 6px;font-size:14px;color:#0f766e">Recent feedback</h3>` +
+        recentFeedback
+          .map(
+            (f) =>
+              `<div style="font-size:13px;color:#374151;margin:0 0 8px;padding:6px 8px;background:#f9fafb;border-radius:6px"><strong>${
+                f.rating != null ? `${f.rating}★` : "—"
+              }</strong> ${esc(f.message)}<div style="color:#9ca3af;font-size:11px;margin-top:2px">${
+                f.created_at ? new Date(f.created_at).toISOString().slice(0, 16).replace("T", " ") : ""
+              }</div></div>`
+          )
+          .join("")
+      : ""
+  }
   <p style="color:#9ca3af;font-size:12px;margin-top:22px">Automated daily report · freeroomplanner.com</p>
 </div>`;
 
     const resend = new Resend(apiKey);
     const { error } = await resend.emails.send({
-      from: process.env.EMAIL_FROM || "Free Room Planner <noreply@send.freeroomplanner.com>",
+      from: process.env.EMAIL_FROM || "Free Room Planner <noreply@freeroomplanner.com>",
       to: process.env.REPORT_EMAIL || "ben@freeroomplanner.com",
-      subject: `Room Planner daily: ${summary.plansSaved} saved / ${summary.plansStarted} started — ${dateLabel}`,
+      subject: `Room Planner daily: ${summary.plansSaved} saved / ${summary.plansStarted} started / ${summary.plansDownloaded} downloaded — ${dateLabel}`,
       html,
     });
     if (error) {

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, lazy, Suspense } from "react";
 import { useEditor } from "../hooks/use-editor";
 import { useIsMobile } from "../hooks/use-mobile";
 import FloorPlanCanvas from "./FloorPlanCanvas";
@@ -7,6 +7,7 @@ import FurniturePanel from "./FurniturePanel";
 import PropertiesPanel from "./PropertiesPanel";
 import RoomTabs from "./RoomTabs";
 import { embedPlanInPng, extractPlanFromPng } from "../lib/png-plan";
+import { getRecentPlans, recordRecentPlan, type RecentPlan } from "../lib/recent-plans";
 import { FurnitureTemplate, FurnitureItem, RoomLabel, TextBox, Arrow, Point, UnitSystem, MeasureMode, isWallCupboard } from "../lib/types";
 import { trackEvent } from "@/lib/analytics";
 import {
@@ -29,16 +30,19 @@ import {
   snapFurnitureToNearest,
 } from "../lib/canvas-renderer";
 import { detectRooms } from "../lib/room-detection";
+
+// Lazy-loaded so Three.js is only downloaded when the user opens the 3D view
+const View3D = lazy(() => import("./View3D"));
 import { safeGetItem, safeSetItem } from "../lib/safe-storage";
 import SavePlanDialog from "./SavePlanDialog";
 import RatingPromptDialog from "./RatingPromptDialog";
 import type { SharedPlanResult } from "../lib/plan-share";
-import { getPlanCodeForSlot, rememberPlanCodeForSlot, forgetPlanCodeForSlot } from "../lib/plan-share";
+import { getPlanCodeForSlot, rememberPlanCodeForSlot, forgetPlanCodeForSlot, intentToRoomType } from "../lib/plan-share";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
-import { Check } from "lucide-react";
+import { Check, Box as BoxIcon, PencilRuler } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -118,6 +122,8 @@ export default function EditorCore({
     });
   }, []);
 
+  const [recentPlans, setRecentPlans] = useState<RecentPlan[]>(() => getRecentPlans());
+
   const [droppingFurniture, setDroppingFurniture] = useState<FurnitureTemplate | null>(null);
   const [autoEditTextBoxId, setAutoEditTextBoxId] = useState<string | null>(null);
   const [showClearDialog, setShowClearDialog] = useState(false);
@@ -125,23 +131,79 @@ export default function EditorCore({
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [showRatingPrompt, setShowRatingPrompt] = useState(false);
 
-  // Ask "are you enjoying it?" once per browser, about two minutes into use —
-  // long enough to have formed an opinion, never in an embed, and never tied
-  // to saving (so it can't stack with the share/affiliate window).
-  useEffect(() => {
+  // Snapping preference. Snapping is on by default (it's what most people want),
+  // but it can now be turned off — previously it was always on with no escape,
+  // which was the single most common complaint in the feedback inbox.
+  const [snapEnabled, setSnapEnabled] = useState<boolean>(() => {
+    try {
+      return safeGetItem("freeroomplanner-snap-enabled") !== "false";
+    } catch {
+      return true;
+    }
+  });
+
+  // Ask "are you enjoying it?" once per browser, after the user has actually
+  // succeeded at something — saved a share link or downloaded their plan.
+  // It used to fire on a two-minute timer, which interrupted people mid-drawing
+  // and collected opinions at the moment of peak frustration rather than at a
+  // natural high point. Never shown inside an embed.
+  const [ratingPromptMode, setRatingPromptMode] = useState<"rating" | "review">("rating");
+
+  //   1. First success -> the full flow: stars, acknowledgement, review invite.
+  //   2. A later visit -> at most ONE more review invite, on its own.
+  //
+  // The invite goes to everyone regardless of score. Inviting only the happy
+  // raters is "review gating": it breaches Trustpilot's Guidelines for
+  // Businesses and, since April 2025, the UK DMCC Act 2024. We stop asking the
+  // moment someone opens the review site, and never ask twice in one day.
+  const REVIEW_STATE_KEY = "freeroomplanner-review-state";
+
+  const readReviewState = useCallback((): { asks: number; lastAskDay: string; opened: boolean } => {
+    try {
+      const raw = safeGetItem(REVIEW_STATE_KEY);
+      if (raw) return { asks: 0, lastAskDay: "", opened: false, ...JSON.parse(raw) };
+    } catch { /* fall through to defaults */ }
+    return { asks: 0, lastAskDay: "", opened: false };
+  }, []);
+
+  const writeReviewState = useCallback((next: Partial<{ asks: number; lastAskDay: string; opened: boolean }>) => {
+    try {
+      safeSetItem(REVIEW_STATE_KEY, JSON.stringify({ ...readReviewState(), ...next }));
+    } catch { /* best-effort */ }
+  }, [readReviewState]);
+
+  const handleReviewOpened = useCallback(() => {
+    writeReviewState({ opened: true });
+  }, [writeReviewState]);
+
+  const requestRatingPrompt = useCallback(() => {
+    let mode: "rating" | "review";
+    const today = new Date().toDateString();
     try {
       if (window.location.pathname.startsWith("/embed")) return;
-      if (safeGetItem("freeroomplanner-rating-prompted")) return;
-    } catch { return; }
-    const timer = setTimeout(() => {
-      try {
-        if (safeGetItem("freeroomplanner-rating-prompted")) return;
+
+      const st = readReviewState();
+      if (st.opened) return;               // already reviewed — never ask again
+      if (st.asks >= 2) return;            // one initial ask + one re-ask, then stop
+      if (st.lastAskDay === today) return; // never twice in the same day
+
+      if (!safeGetItem("freeroomplanner-rating-prompted")) {
         safeSetItem("freeroomplanner-rating-prompted", new Date().toISOString());
-      } catch { /* prompting must never break the app */ }
-      setShowRatingPrompt(true);
-    }, 120000);
-    return () => clearTimeout(timer);
-  }, []);
+        mode = "rating";                   // first success: the full flow
+      } else {
+        mode = "review";                   // later visit: the review invite alone
+      }
+
+      // Count the ask when it is shown, not when it is declined — someone who
+      // dismisses the dialog outright has still been asked.
+      writeReviewState({ asks: st.asks + 1, lastAskDay: today });
+    } catch {
+      return; /* prompting must never break the app */
+    }
+    setRatingPromptMode(mode);
+    // Let the save/share dialog finish closing so the two never stack.
+    setTimeout(() => setShowRatingPrompt(true), 900);
+  }, [readReviewState, writeReviewState]);
   const [currentPlanCode, setCurrentPlanCode] = useState<string | null>(initialShareCode ?? getPlanCodeForSlot(storageKey));
 
   const handleShareLink = useCallback(() => {
@@ -160,10 +222,12 @@ export default function EditorCore({
           /* URL update is cosmetic — never break the save */
         }
       }
+      requestRatingPrompt();
     },
-    [updateUrlOnSave, storageKey]
+    [updateUrlOnSave, storageKey, requestRatingPrompt]
   );
   const [furniturePanelOpen, setFurniturePanelOpen] = useState(false);
+  const [is3D, setIs3D] = useState(false);
   const [propertiesPanelOpen, setPropertiesPanelOpen] = useState(false);
   const [dimEditing, setDimEditing] = useState<"width" | "height" | null>(null);
   const [toast, setToast] = useState<{ message: string; visible: boolean }>({ message: "", visible: false });
@@ -180,13 +244,22 @@ export default function EditorCore({
     }, 2500);
   }, []);
 
+  const handleToggleSnap = useCallback(() => {
+    const next = !snapEnabled;
+    setSnapEnabled(next);
+    try {
+      safeSetItem("freeroomplanner-snap-enabled", next ? "true" : "false");
+    } catch { /* preference persistence is best-effort */ }
+    trackEvent("snap_toggled", { enabled: next });
+    showToast(next ? "Snapping on — hold Alt to place freely" : "Snapping off — hold Alt to snap");
+  }, [snapEnabled, showToast]);
+
   const selectedWall = state.walls.find((w) => w.id === state.selectedItemId) || null;
   const selectedFurniture = state.furniture.find((f) => f.id === state.selectedItemId) || null;
   const selectedLabel = state.labels.find((l) => l.id === state.selectedItemId) || null;
   const selectedTextBox = state.textBoxes.find((t) => t.id === state.selectedItemId) || null;
   const selectedArrow = state.arrows.find((a) => a.id === state.selectedItemId) || null;
   const hasSelection = !!(selectedWall || selectedFurniture || selectedLabel || selectedTextBox || selectedArrow);
-
 
   // Copy/paste/duplicate handlers
   const handleCopy = useCallback(() => {
@@ -376,11 +449,12 @@ export default function EditorCore({
         handleDeleteSelected();
       }
 
-      // Arrow keys: nudge selected furniture by 1cm
+      // Arrow keys: nudge selected furniture by 1cm (Shift = 1mm fine step)
       if (selectedFurniture && (e.key === "ArrowUp" || e.key === "ArrowDown" || e.key === "ArrowLeft" || e.key === "ArrowRight")) {
         e.preventDefault();
-        const dx = e.key === "ArrowLeft" ? -1 : e.key === "ArrowRight" ? 1 : 0;
-        const dy = e.key === "ArrowUp" ? -1 : e.key === "ArrowDown" ? 1 : 0;
+        const step = e.shiftKey ? 0.1 : 1; // 0.1cm = 1mm
+        const dx = e.key === "ArrowLeft" ? -step : e.key === "ArrowRight" ? step : 0;
+        const dy = e.key === "ArrowUp" ? -step : e.key === "ArrowDown" ? step : 0;
         editor.nudgeFurniture(selectedFurniture.id, dx, dy);
       }
     };
@@ -566,6 +640,7 @@ export default function EditorCore({
         a.click();
         URL.revokeObjectURL(url);
         showToast("Plan saved as PNG image");
+        try { setRecentPlans(recordRecentPlan(state.roomName, JSON.stringify(editor.exportState()))); } catch { /* history is best-effort */ }
         try {
           const intent = safeGetItem("freeroomplanner-intent");
           const planType = intent ? JSON.parse(intent)?.intent ?? "room" : "room";
@@ -574,13 +649,15 @@ export default function EditorCore({
             room_name: state.roomName,
             timestamp: new Date().toISOString(),
           });
+          fetch("/api/track", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ event: "plan_downloaded", roomType: intentToRoomType() }) }).catch(() => {});
         } catch { /* analytics should never break the app */ }
         try { onExport?.(); } catch { /* never break the app */ }
+        requestRatingPrompt();
       }, "image/png");
     } catch {
       showToast("Failed to save image");
     }
-  }, [state, measureMode, showToast, onExport, editor]);
+  }, [state, measureMode, showToast, onExport, editor, requestRatingPrompt]);
 
   const handleSaveJSON = useCallback(() => {
     try {
@@ -593,6 +670,7 @@ export default function EditorCore({
       a.click();
       URL.revokeObjectURL(url);
       showToast("Room saved as JSON");
+      try { setRecentPlans(recordRecentPlan(state.roomName, JSON.stringify(data))); } catch { /* history is best-effort */ }
     } catch {
       showToast("Failed to save JSON");
     }
@@ -679,6 +757,15 @@ export default function EditorCore({
     input.click();
   }, [applyLoadedPlan, showToast]);
 
+  const handleLoadRecent = useCallback((p: RecentPlan) => {
+    try {
+      const plan = JSON.parse(p.data);
+      if (!applyLoadedPlan(plan)) showToast("Couldn't open that plan");
+    } catch {
+      showToast("Couldn't open that plan");
+    }
+  }, [applyLoadedPlan, showToast]);
+
   const handleSelectFurniture = useCallback(
     (template: FurnitureTemplate) => {
       const canvasEl = document.querySelector('[data-testid="floor-plan-canvas"]');
@@ -734,6 +821,8 @@ export default function EditorCore({
         <EditorToolbar
           selectedTool={state.selectedTool}
           onSetTool={editor.setTool}
+          snapEnabled={snapEnabled}
+          onToggleSnap={handleToggleSnap}
           onUndo={editor.undo}
           onRedo={editor.redo}
           canUndo={editor.canUndo}
@@ -750,6 +839,8 @@ export default function EditorCore({
           onSaveAllJSON={handleSaveAllJSON}
           onShareLink={handleShareLink}
           onLoadPlan={handleLoadPlan}
+          recentPlans={recentPlans}
+          onLoadRecent={handleLoadRecent}
           onClearAll={() => setShowClearDialog(true)}
           zoom={state.zoom}
           units={state.units}
@@ -834,11 +925,24 @@ export default function EditorCore({
           <FurniturePanel onSelectFurniture={handleSelectFurniture} onSwitchToSelect={() => editor.setTool("select")} />
         )}
 
-        {/* Canvas */}
-        <FloorPlanCanvas
+        {/* Canvas area: 2D plan or 3D view */}
+        <div className="flex-1 relative overflow-hidden flex flex-col">
+          {is3D ? (
+            <Suspense
+              fallback={
+                <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
+                  Loading 3D view…
+                </div>
+              }
+            >
+              <View3D state={state} isDark={isDark} />
+            </Suspense>
+          ) : (
+            <FloorPlanCanvas
           state={state}
           dimEditing={dimEditing}
           isDark={isDark}
+          snapEnabled={snapEnabled}
           measureMode={measureMode}
           showAllMeasurements={showAllMeasurements}
           onAddWall={editor.addWall}
@@ -875,6 +979,31 @@ export default function EditorCore({
           autoEditTextBoxId={autoEditTextBoxId}
           onClearAutoEditTextBox={() => setAutoEditTextBoxId(null)}
         />
+          )}
+
+          {/* 2D/3D toggle */}
+          <div className="absolute top-3 right-3 z-20">
+          <Button
+            size="sm"
+            variant={is3D ? "default" : "secondary"}
+            className="shadow-md gap-1.5"
+            onClick={() => {
+              setIs3D((v) => {
+                const next = !v;
+                if (next) trackEvent("view3d_opened", { walls: state.walls.length, furniture: state.furniture.length });
+                return next;
+              });
+            }}
+            data-testid="btn-3d-toggle"
+          >
+            {is3D ? (
+              <><PencilRuler className="h-4 w-4" /> 2D Plan</>
+            ) : (
+              <><BoxIcon className="h-4 w-4" /> 3D View <span className="text-[9px] font-semibold uppercase tracking-wide opacity-70">beta</span></>
+            )}
+          </Button>
+          </div>
+        </div>
 
         {/* Desktop: Properties sidebar */}
         {!isMobile && (
@@ -937,7 +1066,12 @@ export default function EditorCore({
       />
 
       {/* One-time rating prompt */}
-      <RatingPromptDialog open={showRatingPrompt} onOpenChange={setShowRatingPrompt} />
+      <RatingPromptDialog
+        open={showRatingPrompt}
+        onOpenChange={setShowRatingPrompt}
+        mode={ratingPromptMode}
+        onReviewOpened={handleReviewOpened}
+      />
 
       {/* Toast notification */}
       {toast.visible && (

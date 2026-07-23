@@ -113,6 +113,7 @@ export default function SavePlanDialog({
       if (onDownloadImage) {
         try { onDownloadImage(); } catch { /* download is best-effort */ }
         trackEvent("plan_image_downloaded", { plan_code: saved.code });
+        fetch("/api/track", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ event: "plan_downloaded", roomType: intentToRoomType() }) }).catch(() => {});
       }
     } catch {
       if (runId !== runIdRef.current) return;

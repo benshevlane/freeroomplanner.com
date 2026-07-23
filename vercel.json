@@ -206,6 +206,31 @@
       "source": "/how-to-plan-furniture-arrangement-online",
       "destination": "/blog/furniture-arrangement-tool-online",
       "permanent": true
+    },
+    {
+      "source": "/blog/how-to-use-a-room-layout-planner",
+      "destination": "/blog/virtual-room-layout-creator",
+      "permanent": true
+    },
+    {
+      "source": "/blog/bathroom-layout-planner",
+      "destination": "/blog/design-bathroom-space-planner",
+      "permanent": true
+    },
+    {
+      "source": "/blog/best-free-virtual-bathroom-planner",
+      "destination": "/blog/virtual-bathroom-designer-no-download",
+      "permanent": true
+    },
+    {
+      "source": "/blog/small-bathroom-layout-planner",
+      "destination": "/blog/small-bathroom-layout-ideas-6x8",
+      "permanent": true
+    },
+    {
+      "source": "/blog/home-office-layout-planner",
+      "destination": "/blog/how-to-plan-a-home-office-layout",
+      "permanent": true
     }
   ],
   "buildCommand": "npx vite build && node scripts/postbuild.mjs",

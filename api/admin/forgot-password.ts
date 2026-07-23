@@ -57,7 +57,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const host = req.headers["host"] || "freeroomplanner.com";
       const resetUrl = `${proto}://${host}/admin?reset=${token}`;
       await resend.emails.send({
-        from: process.env.EMAIL_FROM || "Free Room Planner <noreply@send.freeroomplanner.com>",
+        from: process.env.EMAIL_FROM || "Free Room Planner <noreply@freeroomplanner.com>",
         to: admin.email,
         subject: "Reset your admin password",
         html: `<h2>Password Reset</h2>

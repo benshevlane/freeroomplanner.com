@@ -234,7 +234,7 @@ export async function registerRoutes(
         const baseUrl = `${req.protocol}://${req.get("host")}`;
         const resetUrl = `${baseUrl}/admin?reset=${token}`;
         await resend.emails.send({
-          from: process.env.EMAIL_FROM || "Free Room Planner <noreply@send.freeroomplanner.com>",
+          from: process.env.EMAIL_FROM || "Free Room Planner <noreply@freeroomplanner.com>",
           to: admin.email,
           subject: "Reset your admin password",
           html: `<h2>Password Reset</h2>
@@ -505,7 +505,7 @@ export async function registerRoutes(
       return res.status(400).json({ error: parsed.error.flatten().fieldErrors });
     }
     const { partnerId, contactName, businessName, email, websiteUrl, embedCode } = parsed.data;
-    const fromAddr = process.env.EMAIL_FROM || "Free Room Planner <noreply@send.freeroomplanner.com>";
+    const fromAddr = process.env.EMAIL_FROM || "Free Room Planner <noreply@freeroomplanner.com>";
     const resend = new Resend(process.env.RESEND_API_KEY);
 
     // 1. Owner notification
@@ -572,7 +572,7 @@ ${websiteUrl ? `<p><strong>Website:</strong> <a href="${websiteUrl}">${websiteUr
     try {
       const resend = new Resend(process.env.RESEND_API_KEY);
       await resend.emails.send({
-        from: process.env.EMAIL_FROM || "Free Room Planner <noreply@send.freeroomplanner.com>",
+        from: process.env.EMAIL_FROM || "Free Room Planner <noreply@freeroomplanner.com>",
         to: process.env.CONTACT_EMAIL || "ben@freeroomplanner.com",
         replyTo: email,
         subject: `[Contact] ${subject}`,
@@ -602,7 +602,7 @@ ${websiteUrl ? `<p><strong>Website:</strong> <a href="${websiteUrl}">${websiteUr
     try {
       const resend = new Resend(process.env.RESEND_API_KEY);
       await resend.emails.send({
-        from: process.env.EMAIL_FROM || "Free Room Planner <noreply@send.freeroomplanner.com>",
+        from: process.env.EMAIL_FROM || "Free Room Planner <noreply@freeroomplanner.com>",
         to: process.env.CONTACT_EMAIL || "ben@freeroomplanner.com",
         ...(email ? { replyTo: email } : {}),
         subject: `[Feedback - ${type}] New feedback from Free Room Planner`,

@@ -889,6 +889,13 @@ export function drawWalls(
       ? Math.max(0, lengthCm - wallThick)
       : lengthCm;
     const mode = resolveLabelMode(wall.id, displayLengthCmRaw);
+    // "Show all measurements" OFF declutters by hiding short-wall (<1 m) labels
+    // unless the wall is in the hovered cluster. ON shows every wall.
+    if (
+      displayLengthCmRaw < DEFAULT_WALL_LABEL_MIN_CM &&
+      !labelDisplay.showAll &&
+      !(labelDisplay.hoveredClusterIds && labelDisplay.hoveredClusterIds.has(wall.id))
+    ) return;
 
     const { startExtension, endExtension } = measureMode === "full"
       ? getEndpointExtensions(wall.start, wall.end, wallThick, walls)
@@ -939,6 +946,9 @@ export function drawWalls(
     } else {
       groupMode = groupTotalDisplayCm >= DEFAULT_WALL_LABEL_MIN_CM ? "default" : "showAll";
     }
+
+    // Declutter: hide short combined-wall labels when "show all" is off.
+    if (groupMode !== "hover" && !labelDisplay.showAll && groupTotalDisplayCm < DEFAULT_WALL_LABEL_MIN_CM) continue;
 
     const { startExtension, endExtension } = measureMode === "full"
       ? getEndpointExtensions(group.minP, group.maxP, thickness, walls)
@@ -8711,6 +8721,10 @@ export function drawTextBoxes(
 
   for (const tb of ordered) {
     const pxPerCmBase = gridSize / 100;
+    // Notes scale with the plan; font + spacing use the same world scale as the
+    // box so text and box stay locked (matches RichTextBox in the editor).
+    const NOTE_FONT_BASE = 0.8;
+    const fontScale = pxPerCm > 0 ? pxPerCm / NOTE_FONT_BASE : 1;
     const x = tb.x * pxPerCm + panOffset.x;
     const y = tb.y * pxPerCm + panOffset.y;
     const w = tb.width * pxPerCmBase;
@@ -8726,9 +8740,9 @@ export function drawTextBoxes(
     // Drop shadow
     if (tb.shadowEnabled) {
       ctx.shadowColor = "rgba(0, 0, 0, 0.2)";
-      ctx.shadowBlur = (tb.shadowBlur ?? 8) * zoom;
-      ctx.shadowOffsetX = (tb.shadowOffsetX ?? 2) * zoom;
-      ctx.shadowOffsetY = (tb.shadowOffsetY ?? 2) * zoom;
+      ctx.shadowBlur = (tb.shadowBlur ?? 8) * fontScale;
+      ctx.shadowOffsetX = (tb.shadowOffsetX ?? 2) * fontScale;
+      ctx.shadowOffsetY = (tb.shadowOffsetY ?? 2) * fontScale;
     }
 
     // Background fill
@@ -8762,7 +8776,7 @@ export function drawTextBoxes(
     // Border
     if (tb.borderEnabled) {
       ctx.strokeStyle = tb.borderColor || "#000000";
-      ctx.lineWidth = (tb.borderWidth || 1) * zoom;
+      ctx.lineWidth = (tb.borderWidth || 1) * fontScale;
       if (tb.borderStyle === "dashed") ctx.setLineDash([6, 3]);
       else if (tb.borderStyle === "dotted") ctx.setLineDash([2, 2]);
       else ctx.setLineDash([]);
@@ -8783,8 +8797,8 @@ export function drawTextBoxes(
         .replace(/&quot;/g, '"')
         .replace(/&#39;/g, "'");
       if (textContent.trim()) {
-        const padding = (tb.padding ?? 2) * zoom;
-        const fontSize = Math.max(8, tb.fontSize || 14);
+        const padding = (tb.padding ?? 2) * fontScale;
+        const fontSize = Math.max(8, (tb.fontSize || 14) * fontScale);
         ctx.font = `400 ${fontSize}px ${tb.fontFamily || "sans-serif"}`;
         ctx.fillStyle = "#28251d";
         ctx.textAlign = "left";

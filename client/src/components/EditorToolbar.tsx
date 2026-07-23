@@ -1,4 +1,5 @@
 import { EditorTool, UnitSystem, MeasureMode, UNIT_LABELS, UNIT_SHORT } from "../lib/types";
+import type { RecentPlan } from "../lib/recent-plans";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Separator } from "@/components/ui/separator";
@@ -6,6 +7,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -34,6 +36,7 @@ import {
   Tags,
   TextCursorInput,
   Ruler,
+  Magnet,
 } from "lucide-react";
 
 interface EditorToolbarProps {
@@ -55,6 +58,8 @@ interface EditorToolbarProps {
   onSaveAllJSON: () => void;
   onShareLink: () => void;
   onLoadPlan: () => void;
+  recentPlans?: RecentPlan[];
+  onLoadRecent?: (p: RecentPlan) => void;
   onClearAll: () => void;
   zoom: number;
   units: UnitSystem;
@@ -69,6 +74,8 @@ interface EditorToolbarProps {
   onTogglePropertiesPanel?: () => void;
   componentLabelsVisible: boolean;
   onToggleComponentLabels: () => void;
+  snapEnabled: boolean;
+  onToggleSnap: () => void;
 }
 
 const tools: { tool: EditorTool; icon: typeof MousePointer2; label: string; shortcut: string }[] = [
@@ -97,6 +104,8 @@ export default function EditorToolbar({
   onSaveAllJSON,
   onShareLink,
   onLoadPlan,
+  recentPlans,
+  onLoadRecent,
   onClearAll,
   zoom,
   units,
@@ -110,6 +119,8 @@ export default function EditorToolbar({
   onToggleFurniturePanel,
   onTogglePropertiesPanel,
   componentLabelsVisible,
+  snapEnabled,
+  onToggleSnap,
   onToggleComponentLabels,
 }: EditorToolbarProps) {
   if (isMobile) {
@@ -219,8 +230,21 @@ export default function EditorToolbar({
               </DropdownMenuItem>
               <DropdownMenuItem onClick={onLoadPlan}>
                 <FolderOpen className="h-4 w-4 mr-2" />
-                Load Plan
+                Load Plan (from file)
               </DropdownMenuItem>
+              {recentPlans && recentPlans.length > 0 && onLoadRecent && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel className="text-xs text-muted-foreground">Recent plans</DropdownMenuLabel>
+                  {recentPlans.map((p) => (
+                    <DropdownMenuItem key={p.id} onClick={() => onLoadRecent(p)} className="text-sm">
+                      <FolderOpen className="h-4 w-4 mr-2 opacity-60" />
+                      <span className="truncate max-w-[160px]">{p.name}</span>
+                      <span className="ml-auto pl-3 text-[10px] text-muted-foreground">{new Date(p.ts).toLocaleDateString()}</span>
+                    </DropdownMenuItem>
+                  ))}
+                </>
+              )}
               <DropdownMenuSeparator />
               {(["m", "cm", "mm", "ft"] as UnitSystem[]).map((u) => (
                 <DropdownMenuItem key={u} onClick={() => onSetUnits(u)}>
@@ -233,6 +257,10 @@ export default function EditorToolbar({
               <DropdownMenuItem onClick={onToggleShowAllMeasurements}>
                 <Ruler className="h-4 w-4 mr-2" />
                 Show all measurements: {showAllMeasurements ? "On" : "Off"}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onToggleSnap}>
+                <Magnet className="h-4 w-4 mr-2" />
+                Snapping: {snapEnabled ? "On" : "Off"}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={onToggleComponentLabels}>
                 <Tags className="h-4 w-4 mr-2" />
@@ -438,7 +466,7 @@ export default function EditorToolbar({
             </Button>
           </TooltipTrigger>
           <TooltipContent>
-            <p>{showAllMeasurements ? "Using full-size labels for all walls" : "Enlarge labels for short walls"}</p>
+            <p>{showAllMeasurements ? "Showing measurements on every wall — click to hide short-wall labels" : "Short-wall labels hidden — click to show measurements on all walls"}</p>
           </TooltipContent>
         </Tooltip>
         <DropdownMenu>
@@ -466,6 +494,28 @@ export default function EditorToolbar({
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              size="sm"
+              variant={snapEnabled ? "default" : "outline"}
+              onClick={onToggleSnap}
+              data-testid="btn-toggle-snap"
+              className="text-xs px-2"
+              aria-pressed={snapEnabled}
+            >
+              <Magnet className="h-3.5 w-3.5 mr-1" />
+              Snap
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>
+              {snapEnabled
+                ? "Snapping on — hold Alt to place freely"
+                : "Snapping off — hold Alt to snap"}
+            </p>
+          </TooltipContent>
+        </Tooltip>
         <Tooltip>
           <TooltipTrigger asChild>
             <Button

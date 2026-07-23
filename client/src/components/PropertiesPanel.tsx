@@ -129,6 +129,10 @@ export default function PropertiesPanel({
   const [heightFocused, setHeightFocused] = useState(false);
   const [hffLocal, setHffLocal] = useState("");
   const [hffFocused, setHffFocused] = useState(false);
+  const [xLocal, setXLocal] = useState("");
+  const [xFocused, setXFocused] = useState(false);
+  const [yLocal, setYLocal] = useState("");
+  const [yFocused, setYFocused] = useState(false);
 
   if (selectedWall) {
     const dx = selectedWall.end.x - selectedWall.start.x;
@@ -145,10 +149,10 @@ export default function PropertiesPanel({
     const commitLength = (val: string) => {
       setEditingLength(false);
       if (!onUpdateWall) return;
-      const parsed = parseFloat(val.replace(/m$/i, ""));
+      const parsed = parseFloat(val.replace(/[^0-9.\-]/g, ""));
       if (isNaN(parsed)) return;
-      // Interpret entered value in the currently active mode, then back-convert to full length
-      const enteredCm = Math.max(10, parsed * 100); // min 0.10m = 10cm
+      // Interpret entered value in the ACTIVE unit, then back-convert to full length
+      const enteredCm = Math.max(10, snapToMm(displayToCm(parsed, units))); // min 10cm
       const newFullCm = isInside ? enteredCm + wallThickness : enteredCm;
       if (Math.abs(newFullCm - lengthCm) < 0.01) return;
       const len = lengthCm;
@@ -185,9 +189,9 @@ export default function PropertiesPanel({
     const commitThickness = (val: string) => {
       setEditingThickness(false);
       if (!onUpdateWall) return;
-      const parsed = parseFloat(val.replace(/m$/i, ""));
+      const parsed = parseFloat(val.replace(/[^0-9.\-]/g, ""));
       if (isNaN(parsed)) return;
-      const newThickCm = Math.max(5, Math.min(60, parsed * 100)); // 0.05m–0.60m
+      const newThickCm = Math.max(5, Math.min(60, snapToMm(displayToCm(parsed, units)))); // 5–60cm
       if (Math.abs(newThickCm - selectedWall.thickness) < 0.01) return;
       onUpdateWall(selectedWall.id, { thickness: Math.round(newThickCm) });
     };
@@ -213,7 +217,7 @@ export default function PropertiesPanel({
             ) : (
               <span
                 className="font-medium cursor-pointer border-b border-dashed border-teal-500/60 hover:border-teal-500 transition-colors inline-flex items-center gap-1"
-                onClick={() => { setLengthInput((displayLengthCm / 100).toFixed(2)); setEditingLength(true); }}
+                onClick={() => { setLengthInput(String(displayForUnit(displayLengthCm, units))); setEditingLength(true); }}
                 title="Click to type an exact length"
               >
                 {formatDimension(displayLengthCm, units)}
@@ -237,7 +241,7 @@ export default function PropertiesPanel({
             ) : (
               <span
                 className="font-medium cursor-pointer border-b border-dashed border-teal-500/60 hover:border-teal-500 transition-colors inline-flex items-center gap-1"
-                onClick={() => { setThicknessInput((selectedWall.thickness / 100).toFixed(2)); setEditingThickness(true); }}
+                onClick={() => { setThicknessInput(String(displayForUnit(selectedWall.thickness, units))); setEditingThickness(true); }}
                 title="Click to type an exact thickness"
               >
                 {formatDimension(selectedWall.thickness, units)}
@@ -398,6 +402,52 @@ export default function PropertiesPanel({
             />
             <span className="text-muted-foreground text-xs">{dimensionSuffix(units)}</span>
           </div>
+          <div className="flex items-center gap-2">
+            <span className="text-muted-foreground">X:</span>
+            <Input
+              type="number"
+              step={stepForUnit(units)}
+              value={xFocused ? xLocal : displayForUnit(selectedFurniture.x, units)}
+              onFocus={() => { setXLocal(String(displayForUnit(selectedFurniture.x, units))); setXFocused(true); }}
+              onChange={(e) => {
+                setXLocal(e.target.value);
+                const parsed = parseFloat(e.target.value);
+                if (!isNaN(parsed)) onUpdateFurniture(selectedFurniture.id, { x: snapToMm(displayToCm(parsed, units)) });
+              }}
+              onBlur={() => {
+                setXFocused(false);
+                const parsed = parseFloat(xLocal);
+                if (!isNaN(parsed)) onUpdateFurniture(selectedFurniture.id, { x: snapToMm(displayToCm(parsed, units)) });
+              }}
+              onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
+              className="h-9 w-24 text-sm md:h-7 md:w-20"
+              data-testid="input-furniture-x"
+            />
+            <span className="text-muted-foreground text-xs">{dimensionSuffix(units)}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-muted-foreground">Y:</span>
+            <Input
+              type="number"
+              step={stepForUnit(units)}
+              value={yFocused ? yLocal : displayForUnit(selectedFurniture.y, units)}
+              onFocus={() => { setYLocal(String(displayForUnit(selectedFurniture.y, units))); setYFocused(true); }}
+              onChange={(e) => {
+                setYLocal(e.target.value);
+                const parsed = parseFloat(e.target.value);
+                if (!isNaN(parsed)) onUpdateFurniture(selectedFurniture.id, { y: snapToMm(displayToCm(parsed, units)) });
+              }}
+              onBlur={() => {
+                setYFocused(false);
+                const parsed = parseFloat(yLocal);
+                if (!isNaN(parsed)) onUpdateFurniture(selectedFurniture.id, { y: snapToMm(displayToCm(parsed, units)) });
+              }}
+              onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
+              className="h-9 w-24 text-sm md:h-7 md:w-20"
+              data-testid="input-furniture-y"
+            />
+            <span className="text-muted-foreground text-xs">{dimensionSuffix(units)}</span>
+          </div>
           {isWallCup && (
             <div className="flex items-center gap-2">
               <span className="text-muted-foreground">Height from floor:</span>
@@ -459,22 +509,22 @@ export default function PropertiesPanel({
           })()}
           {onNudge && (
             <div className="space-y-1">
-              <span className="text-muted-foreground text-xs">Nudge (1cm)</span>
+              <span className="text-muted-foreground text-xs">Nudge (Shift = 1&thinsp;mm)</span>
               <div className="grid grid-cols-3 w-fit gap-1">
                 <div />
-                <Button size="sm" variant="outline" className="h-8 w-8 p-0" onClick={() => onNudge(0, -1)} aria-label="Nudge up">
+                <Button size="sm" variant="outline" className="h-8 w-8 p-0" onClick={(e) => onNudge(0, e.shiftKey ? -0.1 : -1)} aria-label="Nudge up">
                   <ArrowUp className="h-3.5 w-3.5" />
                 </Button>
                 <div />
-                <Button size="sm" variant="outline" className="h-8 w-8 p-0" onClick={() => onNudge(-1, 0)} aria-label="Nudge left">
+                <Button size="sm" variant="outline" className="h-8 w-8 p-0" onClick={(e) => onNudge(e.shiftKey ? -0.1 : -1, 0)} aria-label="Nudge left">
                   <ArrowLeft className="h-3.5 w-3.5" />
                 </Button>
                 <div />
-                <Button size="sm" variant="outline" className="h-8 w-8 p-0" onClick={() => onNudge(1, 0)} aria-label="Nudge right">
+                <Button size="sm" variant="outline" className="h-8 w-8 p-0" onClick={(e) => onNudge(e.shiftKey ? 0.1 : 1, 0)} aria-label="Nudge right">
                   <ArrowRight className="h-3.5 w-3.5" />
                 </Button>
                 <div />
-                <Button size="sm" variant="outline" className="h-8 w-8 p-0" onClick={() => onNudge(0, 1)} aria-label="Nudge down">
+                <Button size="sm" variant="outline" className="h-8 w-8 p-0" onClick={(e) => onNudge(0, e.shiftKey ? 0.1 : 1)} aria-label="Nudge down">
                   <ArrowDown className="h-3.5 w-3.5" />
                 </Button>
                 <div />
