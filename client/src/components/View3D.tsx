@@ -1,5 +1,5 @@
-import { Suspense, useMemo, useState } from "react";
-import { Canvas } from "@react-three/fiber";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { Canvas, useThree } from "@react-three/fiber";
 import { OrbitControls, useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import { EditorState, Wall, FurnitureItem, Point } from "../lib/types";
@@ -56,6 +56,65 @@ const MAT = {
   rug: std("#b3937a", { roughness: 1 }),
   radiator: std("#e3e1dc", { roughness: 0.5, metalness: 0.2 }),
 };
+
+
+// ---------------------------------------------------------------------------
+// Style choices: floor material, wall / unit / worktop colours, lighting.
+// Persisted in localStorage so a user's look survives reloads.
+// ---------------------------------------------------------------------------
+interface FloorChoice { id: string; label: string; texture?: string; color: string; tileM: number }
+
+const FLOORS: FloorChoice[] = [
+  { id: "oak", label: "Oak", texture: "/textures/laminate_floor_02.jpg", color: "#ffffff", tileM: 2 },
+  { id: "herringbone", label: "Herringbone", texture: "/textures/herringbone_parquet.jpg", color: "#ffffff", tileM: 2 },
+  { id: "darkwood", label: "Dark wood", texture: "/textures/wood_floor.jpg", color: "#ffffff", tileM: 2.5 },
+  { id: "tiles", label: "Tiles", texture: "/textures/floor_tiles_06.jpg", color: "#ffffff", tileM: 1.5 },
+  { id: "concrete", label: "Concrete", texture: "/textures/concrete_floor_painted.jpg", color: "#ffffff", tileM: 3 },
+  { id: "carpet", label: "Carpet", color: "#b8ab98", tileM: 1 },
+];
+
+const WALL_COLORS = ["#eae4d8", "#f2efe9", "#d9c8a8", "#b6c2ae", "#bccfd8", "#e3c9c0", "#3f4f63", "#4a4c4f"];
+const UNIT_COLORS = ["#8fa3ad", "#8fa38f", "#45586e", "#e8e2d2", "#494b4d", "#f0efec", "#b08968", "#01696f"];
+const WORKTOPS = [
+  { id: "oak", label: "Oak", color: "#c9b18a", roughness: 0.7 },
+  { id: "stone", label: "Stone", color: "#9a9d9f", roughness: 0.5 },
+  { id: "quartz", label: "White quartz", color: "#e9e8e4", roughness: 0.4 },
+];
+
+interface StyleState {
+  floor: string;
+  wallColor: string;
+  unitColor: string;
+  worktop: string;
+  brightness: number;
+  evening: boolean;
+}
+
+const DEFAULT_STYLE: StyleState = {
+  floor: "oak",
+  wallColor: "#eae4d8",
+  unitColor: "#8fa3ad",
+  worktop: "oak",
+  brightness: 1,
+  evening: false,
+};
+
+function loadStyle(): StyleState {
+  try {
+    const raw = localStorage.getItem("freeroomplanner-3d-style");
+    if (raw) return { ...DEFAULT_STYLE, ...JSON.parse(raw) };
+  } catch { /* corrupted / unavailable storage falls back to defaults */ }
+  return DEFAULT_STYLE;
+}
+
+/** Applies exposure (brightness dial + evening dimming) to the renderer */
+function SceneSettings({ brightness, evening }: { brightness: number; evening: boolean }) {
+  const { gl } = useThree();
+  useEffect(() => {
+    gl.toneMappingExposure = brightness * (evening ? 0.72 : 1);
+  }, [gl, brightness, evening]);
+  return null;
+}
 
 function categoryMaterial(category: string): THREE.MeshStandardMaterial {
   switch (category) {
@@ -568,17 +627,19 @@ function ItemShape({ item, wallHeight, inWorktopRun = false }: { item: Furniture
 interface ModelDef {
   url: string;
   targetH: number; // cm
+  /** Extra rotation (radians) so the model's front matches the item's front */
+  yaw?: number;
 }
 
-function def(file: string, targetH: number): ModelDef {
-  return { url: `/models/${file}.glb`, targetH };
+function def(file: string, targetH: number, yaw = 0): ModelDef {
+  return { url: `/models/${file}.glb`, targetH, yaw };
 }
 
 const MODEL_MAP: Record<string, ModelDef> = {
-  sofa_3: def("sofa_03", 80),
-  sofa_2: def("sofa_02", 75),
-  sofa_bed: def("sofa_02", 75),
-  armchair: def("modern_arm_chair_01", 90),
+  sofa_3: def("sofa_03", 80, Math.PI),
+  sofa_2: def("sofa_02", 75, Math.PI),
+  sofa_bed: def("sofa_02", 75, Math.PI),
+  armchair: def("modern_arm_chair_01", 90, Math.PI),
   footstool: def("Ottoman_01", 45),
   coffee_table: def("modern_coffee_table_01", 40),
   side_table: def("side_table_01", 50),
@@ -588,7 +649,7 @@ const MODEL_MAP: Record<string, ModelDef> = {
   dining_table_4: def("dining_table", 75),
   dining_table_6: def("dining_table", 75),
   dining_table_round: def("round_wooden_table_01", 75),
-  dining_chair: def("dining_chair_02", 90),
+  dining_chair: def("dining_chair_02", 90, Math.PI),
   bar_stool: def("bar_chair_round_01", 75),
   desk: def("metal_office_desk", 75),
   bookshelf: def("Shelf_01", 180),
@@ -635,7 +696,7 @@ function ModelItem({ item, model }: { item: FurnitureItem; model: ModelDef }) {
 
   return (
     <group scale={[sx, sy, sz2]}>
-      <group rotation={[0, rotate90 ? Math.PI / 2 : 0, 0]}>
+      <group rotation={[0, (rotate90 ? Math.PI / 2 : 0) + (model.yaw ?? 0), 0]}>
         <primitive object={holder} />
       </group>
     </group>
@@ -670,6 +731,57 @@ interface View3DProps {
 
 export default function View3D({ state, isDark }: View3DProps) {
   const [wallHeight, setWallHeight] = useState(DEFAULT_WALL_HEIGHT);
+  const [style, setStyle] = useState<StyleState>(loadStyle);
+  const [stylePanelOpen, setStylePanelOpen] = useState(false);
+
+  const updateStyle = (patch: Partial<StyleState>) => {
+    setStyle((prev) => {
+      const next = { ...prev, ...patch };
+      try { localStorage.setItem("freeroomplanner-3d-style", JSON.stringify(next)); } catch { /* best effort */ }
+      return next;
+    });
+  };
+
+  // Shadows are the main mobile GPU cost — leave them to bigger screens.
+  const enableShadows = useMemo(
+    () => typeof window !== "undefined" && window.matchMedia("(min-width: 768px)").matches,
+    []
+  );
+
+  // Apply style choices to the shared materials. Mutating them is safe here:
+  // one scene exists at a time and the render loop picks changes up next frame.
+  useEffect(() => {
+    MAT.wall.color.set(style.wallColor);
+    MAT.wallInterior.color.set(style.wallColor);
+    MAT.kitchenUnit.color.set(style.unitColor);
+    const wt = WORKTOPS.find((w) => w.id === style.worktop) ?? WORKTOPS[0];
+    MAT.worktop.color.set(wt.color);
+    MAT.worktop.roughness = wt.roughness;
+  }, [style.wallColor, style.unitColor, style.worktop]);
+
+  useEffect(() => {
+    const floor = FLOORS.find((f) => f.id === style.floor) ?? FLOORS[0];
+    if (!floor.texture) {
+      if (MAT.floor.map) { MAT.floor.map.dispose(); MAT.floor.map = null; }
+      MAT.floor.color.set(floor.color);
+      MAT.floor.needsUpdate = true;
+      return;
+    }
+    let cancelled = false;
+    new THREE.TextureLoader().load(floor.texture, (tex) => {
+      if (cancelled) { tex.dispose(); return; }
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+      // Floor geometry UVs are in plan centimetres — repeat once per tileM metres
+      tex.repeat.set(1 / (floor.tileM * 100), 1 / (floor.tileM * 100));
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.anisotropy = 4;
+      if (MAT.floor.map) MAT.floor.map.dispose();
+      MAT.floor.map = tex;
+      MAT.floor.color.set("#ffffff");
+      MAT.floor.needsUpdate = true;
+    });
+    return () => { cancelled = true; };
+  }, [style.floor]);
 
   const wallData = useMemo(
     () => buildWallData(state.walls, state.furniture),
@@ -715,15 +827,21 @@ export default function View3D({ state, isDark }: View3DProps) {
   return (
     <div className="flex-1 relative overflow-hidden select-none" data-testid="view-3d">
       <Canvas
-        shadows
+        shadows={enableShadows}
         dpr={[1, 2]}
         camera={{ fov: 45, near: 10, far: 50000, position: camPos }}
       >
-        <color attach="background" args={[isDark ? "#20242a" : "#e9edf2"]} />
-        <hemisphereLight intensity={0.5} color="#ffffff" groundColor="#8a8a80" />
+        <color attach="background" args={[style.evening ? "#232830" : isDark ? "#20242a" : "#e9edf2"]} />
+        <SceneSettings brightness={style.brightness} evening={style.evening} />
+        <hemisphereLight
+          intensity={style.evening ? 0.28 : 0.5}
+          color={style.evening ? "#dfd4c0" : "#ffffff"}
+          groundColor="#8a8a80"
+        />
         <directionalLight
           position={[center.x + 900, 1500, center.y + 500]}
-          intensity={1.15}
+          color={style.evening ? "#ffd9a6" : "#ffffff"}
+          intensity={style.evening ? 0.55 : 1.15}
           castShadow
           shadow-mapSize={[2048, 2048]}
           shadow-camera-left={-radius * 1.2}
@@ -758,20 +876,145 @@ export default function View3D({ state, isDark }: View3DProps) {
         />
       </Canvas>
 
-      {/* Wall height control */}
-      <div className="absolute top-3 left-3 z-10 bg-card/90 backdrop-blur border border-border rounded-lg shadow-md px-3 py-2 flex items-center gap-2">
-        <span className="text-xs text-muted-foreground whitespace-nowrap">Wall height</span>
-        <input
-          type="range"
-          min={200}
-          max={320}
-          step={10}
-          value={wallHeight}
-          onChange={(e) => setWallHeight(Number(e.target.value))}
-          className="w-24 accent-primary"
-          aria-label="Wall height"
-        />
-        <span className="text-xs font-medium tabular-nums w-9">{(formatMeters(wallHeight))}</span>
+      {/* Wall height + style controls */}
+      <div className="absolute top-3 left-3 z-10 flex flex-col gap-2 items-start">
+        <div className="bg-card/90 backdrop-blur border border-border rounded-lg shadow-md px-3 py-2 flex items-center gap-2">
+          <span className="text-xs text-muted-foreground whitespace-nowrap">Wall height</span>
+          <input
+            type="range"
+            min={200}
+            max={320}
+            step={10}
+            value={wallHeight}
+            onChange={(e) => setWallHeight(Number(e.target.value))}
+            className="w-24 accent-primary"
+            aria-label="Wall height"
+          />
+          <span className="text-xs font-medium tabular-nums w-9">{(formatMeters(wallHeight))}</span>
+          <button
+            type="button"
+            onClick={() => setStylePanelOpen((o) => !o)}
+            className={`text-xs px-2 py-1 rounded-md border transition-colors ${
+              stylePanelOpen
+                ? "bg-primary text-primary-foreground border-primary"
+                : "bg-background text-foreground border-border hover:border-primary/60"
+            }`}
+            data-testid="btn-3d-style"
+          >
+            Style
+          </button>
+        </div>
+
+        {stylePanelOpen && (
+          <div className="bg-card/95 backdrop-blur border border-border rounded-lg shadow-md p-3 w-64 space-y-3 max-h-[70vh] overflow-y-auto" data-testid="style-panel">
+            <div>
+              <p className="text-xs font-medium mb-1.5">Floor</p>
+              <div className="grid grid-cols-3 gap-1.5">
+                {FLOORS.map((f) => (
+                  <button
+                    key={f.id}
+                    type="button"
+                    onClick={() => updateStyle({ floor: f.id })}
+                    className={`rounded-md border-2 overflow-hidden ${style.floor === f.id ? "border-primary" : "border-transparent"}`}
+                    title={f.label}
+                    data-testid={`floor-${f.id}`}
+                  >
+                    {f.texture ? (
+                      <img src={f.texture} alt={f.label} className="w-full h-10 object-cover" loading="lazy" />
+                    ) : (
+                      <div className="w-full h-10" style={{ backgroundColor: f.color }} />
+                    )}
+                    <span className="block text-[10px] py-0.5 text-muted-foreground truncate">{f.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <p className="text-xs font-medium mb-1.5">Wall colour</p>
+              <div className="flex flex-wrap gap-1.5">
+                {WALL_COLORS.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => updateStyle({ wallColor: c })}
+                    className={`h-7 w-7 rounded-full border-2 ${style.wallColor === c ? "border-primary" : "border-border"}`}
+                    style={{ backgroundColor: c }}
+                    aria-label={`Wall colour ${c}`}
+                  />
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <p className="text-xs font-medium mb-1.5">Kitchen unit colour</p>
+              <div className="flex flex-wrap gap-1.5">
+                {UNIT_COLORS.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => updateStyle({ unitColor: c })}
+                    className={`h-7 w-7 rounded-full border-2 ${style.unitColor === c ? "border-primary" : "border-border"}`}
+                    style={{ backgroundColor: c }}
+                    aria-label={`Unit colour ${c}`}
+                  />
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <p className="text-xs font-medium mb-1.5">Worktop</p>
+              <div className="flex gap-1.5">
+                {WORKTOPS.map((wt) => (
+                  <button
+                    key={wt.id}
+                    type="button"
+                    onClick={() => updateStyle({ worktop: wt.id })}
+                    className={`flex-1 text-[11px] px-1.5 py-1 rounded-md border ${
+                      style.worktop === wt.id ? "border-primary bg-primary/10" : "border-border"
+                    }`}
+                  >
+                    <span className="inline-block h-3 w-3 rounded-sm mr-1 align-middle" style={{ backgroundColor: wt.color }} />
+                    {wt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <p className="text-xs font-medium mb-1.5">Lighting</p>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] text-muted-foreground">Brightness</span>
+                <input
+                  type="range"
+                  min={0.6}
+                  max={1.6}
+                  step={0.05}
+                  value={style.brightness}
+                  onChange={(e) => updateStyle({ brightness: Number(e.target.value) })}
+                  className="flex-1 accent-primary"
+                  aria-label="Brightness"
+                />
+              </div>
+              <div className="flex gap-1.5 mt-1.5">
+                <button
+                  type="button"
+                  onClick={() => updateStyle({ evening: false })}
+                  className={`flex-1 text-[11px] py-1 rounded-md border ${!style.evening ? "border-primary bg-primary/10" : "border-border"}`}
+                >
+                  Day
+                </button>
+                <button
+                  type="button"
+                  onClick={() => updateStyle({ evening: true })}
+                  className={`flex-1 text-[11px] py-1 rounded-md border ${style.evening ? "border-primary bg-primary/10" : "border-border"}`}
+                >
+                  Evening
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Hint / empty state */}
