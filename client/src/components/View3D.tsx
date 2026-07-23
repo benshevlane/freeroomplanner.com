@@ -768,18 +768,28 @@ export default function View3D({ state, isDark }: View3DProps) {
       return;
     }
     let cancelled = false;
-    new THREE.TextureLoader().load(floor.texture, (tex) => {
-      if (cancelled) { tex.dispose(); return; }
+    // Plain Image + THREE.Texture (rather than TextureLoader) so a failure is
+    // loggable and the load path matches ordinary <img> behaviour exactly.
+    const img = new Image();
+    img.onload = () => {
+      if (cancelled) return;
+      const tex = new THREE.Texture(img);
       tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
       // Floor geometry UVs are in plan centimetres — repeat once per tileM metres
       tex.repeat.set(1 / (floor.tileM * 100), 1 / (floor.tileM * 100));
       tex.colorSpace = THREE.SRGBColorSpace;
       tex.anisotropy = 4;
+      tex.needsUpdate = true;
       if (MAT.floor.map) MAT.floor.map.dispose();
       MAT.floor.map = tex;
       MAT.floor.color.set("#ffffff");
       MAT.floor.needsUpdate = true;
-    });
+      console.info("[3d-style] floor texture applied:", floor.id);
+    };
+    img.onerror = () => {
+      if (!cancelled) console.error("[3d-style] floor texture failed to load:", floor.texture);
+    };
+    img.src = floor.texture;
     return () => { cancelled = true; };
   }, [style.floor]);
 
