@@ -240,6 +240,9 @@ interface Opening {
   /** original item type, for door-leaf rendering */
   openType: string;
   mirrored?: boolean;
+  itemId: string;
+  /** 0–100, how far the door stands open (0 = closed) */
+  doorOpen: number;
 }
 
 interface WallWithOpenings {
@@ -285,14 +288,24 @@ function buildWallData(walls: Wall[], furniture: FurnitureItem[]): WallWithOpeni
       item.type === "archway" ? "archway" : "door";
     const t0 = Math.max(0, best.t - half);
     const t1 = Math.min(best.d.length, best.t + half);
-    if (t1 - t0 > 5) best.d.openings.push({ t0, t1, kind, openType: item.type, mirrored: item.mirrored });
+    if (t1 - t0 > 5) best.d.openings.push({ t0, t1, kind, openType: item.type, mirrored: item.mirrored, itemId: item.id, doorOpen: item.doorOpen ?? 0 });
   }
 
   for (const d of data) d.openings.sort((a, b) => a.t0 - b.t0);
   return data;
 }
 
-function WallMesh({ data, height }: { data: WallWithOpenings; height: number }) {
+function WallMesh({
+  data,
+  height,
+  selectedId,
+  onSelectOpening,
+}: {
+  data: WallWithOpenings;
+  height: number;
+  selectedId?: string | null;
+  onSelectOpening?: (id: string) => void;
+}) {
   const { wall, length, angle, openings } = data;
   const th = Math.max(wall.thickness, 4);
   const material = wall.wallType === "interior" ? MAT.wallInterior : MAT.wall;
@@ -377,10 +390,21 @@ function WallMesh({ data, height }: { data: WallWithOpenings; height: number }) 
           );
         }
         const leafW = doubleLeaf ? w / 2 - 5 : w - 8;
-        const openAngle = 0.5 * (op.mirrored ? -1 : 1);
+        // 0 = closed (leaf flush in the wall), 100 = wide open (~100°)
+        const openAngle = (op.doorOpen / 100) * 1.75 * (op.mirrored ? -1 : 1);
+        const selected = selectedId === op.itemId;
         return (
-          <group key={`d${i}`}>
+          <group
+            key={`d${i}`}
+            onClick={onSelectOpening ? (e) => { e.stopPropagation(); onSelectOpening(op.itemId); } : undefined}
+          >
             {frame}
+            {selected && (
+              <mesh position={[mid, 1.5, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+                <ringGeometry args={[w * 0.62, w * 0.62 + 5, 40]} />
+                <meshBasicMaterial color="#01696f" transparent opacity={0.85} />
+              </mesh>
+            )}
             <group position={[op.t0 + 4, 0, 0]} rotation={[0, -openAngle, 0]}>
               <mesh position={[leafW / 2, DOOR_HEIGHT / 2 - 2, 0]} material={MAT.cream} castShadow>
                 <boxGeometry args={[leafW, DOOR_HEIGHT - 6, 4]} />
@@ -1587,7 +1611,13 @@ export default function View3D({ state, isDark, onUpdateFurniture, onRemoveFurni
 
         <Floors walls={state.walls} />
         {wallData.map((d) => (
-          <WallMesh key={d.wall.id} data={d} height={wallHeight} />
+          <WallMesh
+            key={d.wall.id}
+            data={d}
+            height={wallHeight}
+            selectedId={selectedId}
+            onSelectOpening={onUpdateFurniture ? setSelectedId : undefined}
+          />
         ))}
         {items.map((item) => (
           <Item3D
@@ -1817,6 +1847,31 @@ export default function View3D({ state, isDark, onUpdateFurniture, onRemoveFurni
             </button>
           </div>
 
+          {OPENING_TYPES.has(selectedItem.type) && selectedItem.type !== "window" && selectedItem.type !== "bay_window" && selectedItem.type !== "archway" ? (
+            <div>
+              <p className="text-xs font-medium mb-1">Door opening</p>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-muted-foreground">Closed</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  step={5}
+                  value={selectedItem.doorOpen ?? 0}
+                  onPointerDown={() => onPushUndo?.()}
+                  onChange={(e) => onUpdateFurniture(selectedItem.id, { doorOpen: Number(e.target.value) })}
+                  className="flex-1 accent-primary"
+                  aria-label="Door opening amount"
+                  data-testid="door-open-slider"
+                />
+                <span className="text-[10px] text-muted-foreground">Open</span>
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-1.5">
+                The door stays how you leave it — saved with your plan.
+              </p>
+            </div>
+          ) : (
+          <>
           <div>
             <p className="text-xs font-medium mb-1">Colour</p>
             <div className="flex flex-wrap gap-1.5">
@@ -1866,9 +1921,13 @@ export default function View3D({ state, isDark, onUpdateFurniture, onRemoveFurni
           >
             ↻ Rotate
           </button>
+          </>
+          )}
+          {!OPENING_TYPES.has(selectedItem.type) && (
           <p className="text-[10px] text-muted-foreground">
             Drag the selected item to move it · changes save with your plan
           </p>
+          )}
         </div>
       )}
 
