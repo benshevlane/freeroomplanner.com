@@ -108,7 +108,7 @@ export default function Editor() {
   useEffect(() => {
     const isReturning =
       sgi("freeroomplanner-desktop-wizard-shown") || sgi("freeroomplanner-mobile-wizard-shown");
-    if (isReturning && !sgi("freeroomplanner-3d-announce-shown")) {
+    if (isReturning && !sgi("freeroomplanner-3d-announce-shown-v2")) {
       const t = setTimeout(() => {
         setShow3DAnnounce(true);
         te("announce_3d_shown");
@@ -117,7 +117,7 @@ export default function Editor() {
     }
   }, []);
   const close3DAnnounce = (openIn3D: boolean) => {
-    ssi("freeroomplanner-3d-announce-shown", "true");
+    ssi("freeroomplanner-3d-announce-shown-v2", "true");
     setShow3DAnnounce(false);
     te(openIn3D ? "announce_3d_cta" : "announce_3d_dismissed");
     if (openIn3D) {
