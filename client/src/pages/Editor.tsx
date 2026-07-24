@@ -116,16 +116,12 @@ export default function Editor() {
       return () => clearTimeout(t);
     }
   }, []);
-  const close3DAnnounce = (openIn3D: boolean) => {
+  const close3DAnnounce = (acknowledged: boolean) => {
     ssi("freeroomplanner-3d-announce-shown-v2", "true");
     setShow3DAnnounce(false);
-    te(openIn3D ? "announce_3d_cta" : "announce_3d_dismissed");
-    if (openIn3D) {
-      // The 3D toggle lives on the editor canvas
-      setTimeout(() => {
-        (document.querySelector('[data-testid="btn-3d-toggle"]') as HTMLElement | null)?.click();
-      }, 150);
-    }
+    te(acknowledged ? "announce_3d_cta" : "announce_3d_dismissed");
+    // Deliberately no auto-switch: the glowing 3D View button on the canvas
+    // keeps pulsing until they press it themselves, so they learn where it is.
   };
 
   // Mobile onboarding wizard
@@ -403,19 +399,17 @@ export default function Editor() {
             <AnnounceTitle className="text-center">Your plans just went 3D</AnnounceTitle>
             <AnnounceDescription className="text-center">
               Every plan you've made — including the ones you've already built — can now be
-              viewed in 3D. Press the <span className="font-semibold text-foreground">3D View</span> button
-              on the canvas to step inside your room: drag to look around, click any item to
-              recolour it, choose floors and wall colours with{" "}
+              viewed in 3D. Look for the glowing{" "}
+              <span className="font-semibold text-foreground">3D View</span> button at the top
+              right of your plan and press it to step inside your room: drag to look around,
+              click any item to recolour it, choose floors and wall colours with{" "}
               <span className="font-semibold text-foreground">Style</span>, and download a photo
               of the result. All free.
             </AnnounceDescription>
           </AnnounceHeader>
-          <AnnounceFooter className="gap-2 sm:justify-center">
-            <AnnounceButton variant="ghost" size="sm" onClick={() => close3DAnnounce(false)}>
-              Later
-            </AnnounceButton>
+          <AnnounceFooter className="sm:justify-center">
             <AnnounceButton size="sm" onClick={() => close3DAnnounce(true)} data-testid="announce-3d-cta">
-              See my plan in 3D
+              Got it — show me the button
             </AnnounceButton>
           </AnnounceFooter>
         </AnnounceContent>
