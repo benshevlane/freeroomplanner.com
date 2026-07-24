@@ -554,20 +554,130 @@ function ItemShape({ item, wallHeight, inWorktopRun = false }: { item: Furniture
   if (kitchenBase.has(t)) {
     const appliance = new Set(["dishwasher", "washing_machine", "tumble_dryer", "oven_builtin", "cooker", "range_cooker", "boiler"]).has(t);
     const sink = t === "kitchen_sink_s" || t === "kitchen_sink_d";
-    return (
-      <>
-        <Box w={w} h={87} d={d} mat={appliance ? applianceMat : unitMat} />
-        {item.doorStyle === "shaker" && !appliance && (
+    const drawers = t === "drawer_unit_2" ? 2 : t === "drawer_unit_3" ? 3 : 0;
+    const island = t === "island";
+    const frontZ = d / 2;
+    const shaker = item.doorStyle === "shaker";
+
+    // Kitchen anatomy: recessed dark plinth (0–10), carcass (10–85),
+    // door/drawer fronts proud of the carcass with visible dark gaps,
+    // chrome bar handles, worktop on top.
+    const doorBottom = 12;
+    const doorTop = 83;
+    const doorH = doorTop - doorBottom;
+    const doorCY = (doorTop + doorBottom) / 2;
+    const hasDoors = !appliance && drawers === 0;
+    const twoDoors = hasDoors && w >= 75;
+    const doorW = twoDoors ? (w - 8) / 2 : w - 5;
+
+    const doorPanel = (x: number, dw: number, key: string) => (
+      <group key={key}>
+        <Box w={dw} h={doorH} d={1.6} x={x} y={doorCY} z={frontZ + 0.8} mat={unitMat} />
+        {shaker && (
           <>
-            {/* Shaker front: raised frame + recessed centre panel */}
-            <Box w={Math.max(w - 8, 10)} h={71} d={1.6} y={45} z={d / 2 + 0.8} mat={unitMat} />
-            <Box w={Math.max(w - 22, 6)} h={57} d={1} y={45} z={d / 2 + 1.0} mat={MAT.dark} shadow={false} />
-            <Box w={Math.max(w - 24, 5)} h={55} d={1.4} y={45} z={d / 2 + 1.2} mat={unitMat} />
+            <Box w={Math.max(dw - 9, 4)} h={doorH - 9} d={0.8} x={x} y={doorCY} z={frontZ + 1.7} mat={MAT.dark} shadow={false} />
+            <Box w={Math.max(dw - 11, 3)} h={doorH - 11} d={1} x={x} y={doorCY} z={frontZ + 1.9} mat={unitMat} />
           </>
         )}
+        {/* bar handle near the top, inner edge for door pairs */}
+        <Box
+          w={Math.min(11, dw * 0.5)}
+          h={1.3}
+          d={1.3}
+          x={twoDoors ? (x > 0 ? x - dw / 2 + 7 : x + dw / 2 - 7) : x}
+          y={doorTop - 5}
+          z={frontZ + 2.4}
+          mat={MAT.chrome}
+        />
+      </group>
+    );
+
+    return (
+      <>
+        {/* plinth + carcass */}
+        <Box w={Math.max(w - 5, 8)} h={10} d={Math.max(d - 5, 8)} mat={MAT.dark} />
+        <Box w={w} h={75} d={d} y={47.5} mat={appliance ? applianceMat : unitMat} />
+        {/* dark gap backing so fronts read as separate doors */}
+        {(hasDoors || drawers > 0) && (
+          <Box w={w - 3} h={doorH + 2} d={0.5} y={doorCY} z={frontZ + 0.3} mat={MAT.dark} shadow={false} />
+        )}
+        {hasDoors && (twoDoors
+          ? [doorPanel(-(doorW / 2 + 1.5), doorW, "dl"), doorPanel(doorW / 2 + 1.5, doorW, "dr")]
+          : doorPanel(0, doorW, "d"))}
+        {island && <Box w={w - 3} h={doorH + 2} d={0.5} y={doorCY} z={-frontZ - 0.3} mat={MAT.dark} shadow={false} />}
+        {/* drawer stacks */}
+        {drawers > 0 &&
+          Array.from({ length: drawers }, (_, i) => {
+            const dh = (doorH - (drawers - 1) * 1.5) / drawers;
+            const cy = doorBottom + dh / 2 + i * (dh + 1.5);
+            return (
+              <group key={i}>
+                <Box w={w - 5} h={dh} d={1.6} y={cy} z={frontZ + 0.8} mat={unitMat} />
+                {shaker && (
+                  <>
+                    <Box w={Math.max(w - 14, 4)} h={Math.max(dh - 8, 3)} d={0.8} y={cy} z={frontZ + 1.7} mat={MAT.dark} shadow={false} />
+                    <Box w={Math.max(w - 16, 3)} h={Math.max(dh - 10, 2)} d={1} y={cy} z={frontZ + 1.9} mat={unitMat} />
+                  </>
+                )}
+                <Box w={Math.min(12, w * 0.4)} h={1.3} d={1.3} y={cy + dh / 2 - 3} z={frontZ + 2.4} mat={MAT.chrome} />
+              </group>
+            );
+          })}
+        {/* appliance fronts */}
+        {t === "dishwasher" && (
+          <>
+            <Box w={w - 5} h={doorH} d={1.4} y={doorCY} z={frontZ + 0.7} mat={applianceMat} />
+            <Box w={w - 9} h={1.5} d={1.5} y={doorTop - 4} z={frontZ + 2.2} mat={MAT.chrome} />
+            <Box w={w - 8} h={4} d={0.6} y={doorTop - 11} z={frontZ + 1.5} mat={MAT.screen} shadow={false} />
+          </>
+        )}
+        {(t === "washing_machine" || t === "tumble_dryer") && (
+          <>
+            <Box w={w - 5} h={doorH} d={1.4} y={doorCY} z={frontZ + 0.7} mat={applianceMat} />
+            <mesh position={[0, doorCY - 4, frontZ + 1.6]} rotation={[Math.PI / 2, 0, 0]} material={MAT.chrome} castShadow>
+              <cylinderGeometry args={[15, 15, 1.4, 28]} />
+            </mesh>
+            <mesh position={[0, doorCY - 4, frontZ + 2.0]} rotation={[Math.PI / 2, 0, 0]} material={MAT.screen} castShadow={false}>
+              <cylinderGeometry args={[11.5, 11.5, 1.2, 28]} />
+            </mesh>
+            <Box w={w - 10} h={4} d={0.6} y={doorTop - 5} z={frontZ + 1.5} mat={MAT.screen} shadow={false} />
+          </>
+        )}
+        {t === "oven_builtin" && (
+          <>
+            <Box w={w - 5} h={doorH} d={1.4} y={doorCY} z={frontZ + 0.7} mat={applianceMat} />
+            <Box w={w - 10} h={34} d={1} y={doorCY - 6} z={frontZ + 1.6} mat={MAT.screen} shadow={false} />
+            <Box w={w - 9} h={1.6} d={1.6} y={doorCY + 15} z={frontZ + 2.6} mat={MAT.chrome} />
+            <Box w={w - 10} h={5} d={0.6} y={doorTop - 5} z={frontZ + 1.5} mat={MAT.screen} shadow={false} />
+          </>
+        )}
+        {/* worktop + top-side details */}
         {!inWorktopRun && <Box w={w + 3} h={4} d={d + 3} y={89} mat={MAT.worktop} />}
-        {sink && <Box w={Math.min(w - 16, w * 0.75)} h={3} d={Math.min(d - 16, 44)} y={92} mat={MAT.chrome} />}
-        {(t === "cooker" || t === "range_cooker") && <Box w={w - 10} h={2} d={d - 10} y={92} mat={MAT.screen} />}
+        {sink && (
+          <>
+            <Box w={Math.min(w - 16, w * 0.75)} h={3} d={Math.min(d - 16, 44)} y={92} mat={MAT.chrome} />
+            {/* tap: riser + spout */}
+            <mesh position={[0, 98, -d / 2 + 9]} material={MAT.chrome} castShadow>
+              <cylinderGeometry args={[1.2, 1.4, 14, 12]} />
+            </mesh>
+            <Box w={2} h={2} d={10} y={104} z={-d / 2 + 14} mat={MAT.chrome} />
+          </>
+        )}
+        {(t === "cooker" || t === "range_cooker") && (
+          <>
+            <Box w={w - 10} h={2} d={d - 10} y={92} mat={MAT.screen} />
+            {[[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([sx, sz], i) => (
+              <mesh
+                key={i}
+                position={[sx * (w / 4 - 2), 93.4, sz * (d / 4 - 2)]}
+                material={MAT.dark}
+                castShadow={false}
+              >
+                <cylinderGeometry args={[Math.min(7, w / 6), Math.min(7, w / 6), 0.8, 20]} />
+              </mesh>
+            ))}
+          </>
+        )}
       </>
     );
   }
