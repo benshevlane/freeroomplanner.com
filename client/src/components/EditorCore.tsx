@@ -256,6 +256,16 @@ export default function EditorCore({
   );
   const [furniturePanelOpen, setFurniturePanelOpen] = useState(false);
   const [is3D, setIs3D] = useState(false);
+  // Glow on the 3D button until first press; the "now in 3D" announcement
+  // re-arms it so everyone it greets gets pointed at the button.
+  const [triedThreeD, setTriedThreeD] = useState<boolean>(() => {
+    try { return !!safeGetItem("freeroomplanner-3d-tried"); } catch { return false; }
+  });
+  useEffect(() => {
+    const rearm = () => setTriedThreeD(false);
+    window.addEventListener("frp-reglow-3d", rearm);
+    return () => window.removeEventListener("frp-reglow-3d", rearm);
+  }, []);
   const [propertiesPanelOpen, setPropertiesPanelOpen] = useState(false);
   const [dimEditing, setDimEditing] = useState<"width" | "height" | null>(null);
   const [toast, setToast] = useState<{ message: string; visible: boolean }>({ message: "", visible: false });
@@ -1036,15 +1046,16 @@ export default function EditorCore({
 
           {/* 2D/3D toggle — glows until the user has tried it once */}
           <div className="absolute top-3 right-3 z-20">
-          {!is3D && !safeGetItem("freeroomplanner-3d-tried") && (
+          {!is3D && !triedThreeD && (
             <span className="pointer-events-none absolute inset-0 rounded-md bg-primary/50 animate-ping" aria-hidden="true" />
           )}
           <Button
             size="sm"
             variant={is3D ? "default" : "secondary"}
-            className={`shadow-md gap-1.5 relative ${!is3D && !safeGetItem("freeroomplanner-3d-tried") ? "ring-2 ring-primary/60" : ""}`}
+            className={`shadow-md gap-1.5 relative ${!is3D && !triedThreeD ? "ring-2 ring-primary/60" : ""}`}
             onClick={() => {
               safeSetItem("freeroomplanner-3d-tried", "true");
+              setTriedThreeD(true);
               setIs3D((v) => {
                 const next = !v;
                 if (next) trackEvent("view3d_opened", { walls: state.walls.length, furniture: state.furniture.length });
