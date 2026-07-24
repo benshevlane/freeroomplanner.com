@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, lazy, Suspense } from "react";
 import { useEditor } from "../hooks/use-editor";
 import { useIsMobile } from "../hooks/use-mobile";
 import FloorPlanCanvas from "./FloorPlanCanvas";
@@ -30,6 +30,9 @@ import {
   snapFurnitureToNearest,
 } from "../lib/canvas-renderer";
 import { detectRooms } from "../lib/room-detection";
+
+// Lazy-loaded so Three.js is only downloaded when the user opens the 3D view
+const View3D = lazy(() => import("./View3D"));
 import { safeGetItem, safeSetItem } from "../lib/safe-storage";
 import SavePlanDialog from "./SavePlanDialog";
 import RatingPromptDialog from "./RatingPromptDialog";
@@ -39,7 +42,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
-import { Check } from "lucide-react";
+import { Check, Box as BoxIcon, PencilRuler } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -224,6 +227,17 @@ export default function EditorCore({
     [updateUrlOnSave, storageKey, requestRatingPrompt]
   );
   const [furniturePanelOpen, setFurniturePanelOpen] = useState(false);
+  const [is3D, setIs3D] = useState(false);
+  // Glow on the 3D button until first press; the "now in 3D" announcement
+  // re-arms it so everyone it greets gets pointed at the button.
+  const [triedThreeD, setTriedThreeD] = useState<boolean>(() => {
+    try { return !!safeGetItem("freeroomplanner-3d-tried"); } catch { return false; }
+  });
+  useEffect(() => {
+    const rearm = () => setTriedThreeD(false);
+    window.addEventListener("frp-reglow-3d", rearm);
+    return () => window.removeEventListener("frp-reglow-3d", rearm);
+  }, []);
   const [propertiesPanelOpen, setPropertiesPanelOpen] = useState(false);
   const [dimEditing, setDimEditing] = useState<"width" | "height" | null>(null);
   const [toast, setToast] = useState<{ message: string; visible: boolean }>({ message: "", visible: false });
@@ -921,8 +935,20 @@ export default function EditorCore({
           <FurniturePanel onSelectFurniture={handleSelectFurniture} onSwitchToSelect={() => editor.setTool("select")} />
         )}
 
-        {/* Canvas */}
-        <FloorPlanCanvas
+        {/* Canvas area: 2D plan or 3D view */}
+        <div className="flex-1 relative overflow-hidden flex flex-col">
+          {is3D ? (
+            <Suspense
+              fallback={
+                <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
+                  Loading 3D view…
+                </div>
+              }
+            >
+              <View3D state={state} isDark={isDark} onUpdateFurniture={editor.updateFurniture} onRemoveFurniture={editor.removeFurniture} onPushUndo={editor.pushUndo} />
+            </Suspense>
+          ) : (
+            <FloorPlanCanvas
           state={state}
           dimEditing={dimEditing}
           isDark={isDark}
@@ -963,6 +989,36 @@ export default function EditorCore({
           autoEditTextBoxId={autoEditTextBoxId}
           onClearAutoEditTextBox={() => setAutoEditTextBoxId(null)}
         />
+          )}
+
+          {/* 2D/3D toggle — glows until the user has tried it once */}
+          <div className="absolute top-3 right-3 z-20">
+          {!is3D && !triedThreeD && (
+            <span className="pointer-events-none absolute inset-0 rounded-md bg-primary/50 animate-ping" aria-hidden="true" />
+          )}
+          <Button
+            size="sm"
+            variant={is3D ? "default" : "secondary"}
+            className={`shadow-md gap-1.5 relative ${!is3D && !triedThreeD ? "ring-2 ring-primary/60" : ""}`}
+            onClick={() => {
+              safeSetItem("freeroomplanner-3d-tried", "true");
+              setTriedThreeD(true);
+              setIs3D((v) => {
+                const next = !v;
+                if (next) trackEvent("view3d_opened", { walls: state.walls.length, furniture: state.furniture.length });
+                return next;
+              });
+            }}
+            data-testid="btn-3d-toggle"
+          >
+            {is3D ? (
+              <><PencilRuler className="h-4 w-4" /> 2D Plan</>
+            ) : (
+              <><BoxIcon className="h-4 w-4" /> 3D View <span className="text-[9px] font-semibold uppercase tracking-wide opacity-70">beta</span></>
+            )}
+          </Button>
+          </div>
+        </div>
 
         {/* Desktop: Properties sidebar */}
         {!isMobile && (
