@@ -935,7 +935,7 @@ export default function EditorCore({
                 </div>
               }
             >
-              <View3D state={state} isDark={isDark} onUpdateFurniture={editor.updateFurniture} onPushUndo={editor.pushUndo} />
+              <View3D state={state} isDark={isDark} onUpdateFurniture={editor.updateFurniture} onRemoveFurniture={editor.removeFurniture} onPushUndo={editor.pushUndo} />
             </Suspense>
           ) : (
             <FloorPlanCanvas
