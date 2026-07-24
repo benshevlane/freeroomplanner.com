@@ -40,6 +40,8 @@ export interface FurnitureItem {
   colorOverride?: string;
   /** 3D view: cabinet front style for kitchen units */
   doorStyle?: "flat" | "shaker";
+  /** 3D view: how far a door stands open, 0 (closed) to 100 (wide open) */
+  doorOpen?: number;
 }
 
 export type LabelSize = "small" | "medium" | "large";
