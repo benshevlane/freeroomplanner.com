@@ -825,26 +825,40 @@ function def(file: string, targetH: number, yaw = 0): ModelDef {
   return { url: `/models/${file}.glb`, targetH, yaw };
 }
 
+// Premium collection (licensed pack content — filenames intentionally
+// non-descriptive per marketplace licence; served only in the premium build)
+const PREMIUM = {
+  bedA: "/models/p/5f35b8d5b2.glb",
+  bedB: "/models/p/614624ff03.glb",
+  wardrobeA: "/models/p/7c129c844b.glb",
+  wardrobeB: "/models/p/9a6618c3ec.glb",
+  chest: "/models/p/7f49a7e0c2.glb",
+  bedside: "/models/p/2eed34cec5.glb",
+  desk: "/models/p/62208216c1.glb",
+  sofa: "/models/p/2489726fe1.glb",
+  chair: "/models/p/a878a07eb1.glb",
+};
+
 const MODEL_MAP: Record<string, ModelDef> = {
-  bed_double: def("fm_bed_grey", 95),
-  bed_king: def("fm_bed_grey", 95),
-  bed_superking: def("fm_bed_grey", 95),
-  sofa_3: def("sofa_03", 80, Math.PI),
+  bed_double: { url: PREMIUM.bedA, targetH: 100 },
+  bed_king: { url: PREMIUM.bedA, targetH: 100 },
+  bed_superking: { url: PREMIUM.bedB, targetH: 100 },
+  wardrobe: { url: PREMIUM.wardrobeA, targetH: 200 },
+  chest_drawers: { url: PREMIUM.chest, targetH: 92 },
+  bedside_table: { url: PREMIUM.bedside, targetH: 58 },
+  sofa_3: { url: PREMIUM.sofa, targetH: 78 },
   sofa_2: def("sofa_02", 75, Math.PI),
   sofa_bed: def("sofa_02", 75, Math.PI),
   armchair: def("modern_arm_chair_01", 90, Math.PI),
   footstool: def("Ottoman_01", 45),
   coffee_table: def("modern_coffee_table_01", 40),
   side_table: def("side_table_01", 50),
-  bedside_table: def("ClassicNightstand_01", 60),
-  chest_drawers: def("drawer_cabinet", 80),
-  wardrobe: def("drawer_cabinet", 200),
   dining_table_4: def("wooden_table_02", 75),
   dining_table_6: def("painted_wooden_table", 76),
   dining_table_round: def("round_wooden_table_01", 75),
-  dining_chair: def("dining_chair_02", 90, Math.PI),
+  dining_chair: { url: PREMIUM.chair, targetH: 84 },
   bar_stool: def("bar_chair_round_01", 75),
-  desk: def("metal_office_desk", 75),
+  desk: { url: PREMIUM.desk, targetH: 76 },
   bookshelf: def("Shelf_01", 180),
   sideboard: def("modern_wooden_cabinet", 70),
   cooker: def("electric_stove", 90),
