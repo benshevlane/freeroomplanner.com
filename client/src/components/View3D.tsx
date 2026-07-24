@@ -1392,7 +1392,9 @@ export default function View3D({ state, isDark, onUpdateFurniture, onRemoveFurni
     trackEvent("snapshot_clicked", { mobile });
     snapshotStartRef.current = performance.now();
     setSnapshotProgress(0);
-    setSnapshotRequest({ frames: mobile ? 70 : 140, width: mobile ? 1600 : 2560 });
+    // Free tier renders at 1600px wide; the full-resolution 2560px+ export is
+    // reserved for the paid tier (2026-07-24). Sample count (quality) unchanged.
+    setSnapshotRequest({ frames: mobile ? 70 : 140, width: 1600 });
   };
 
   const finishSnapshot = (dataUrl: string | null) => {
