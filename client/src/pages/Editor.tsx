@@ -10,6 +10,18 @@ import RoomGeneratorWizard from "../components/RoomGeneratorWizard";
 import IntentCapture from "../components/IntentCapture";
 import { FurnitureItem } from "../lib/types";
 import { detectRooms } from "../lib/room-detection";
+import { safeGetItem as sgi, safeSetItem as ssi } from "../lib/safe-storage";
+import { trackEvent as te } from "@/lib/analytics";
+import {
+  Dialog as AnnounceDialog,
+  DialogContent as AnnounceContent,
+  DialogHeader as AnnounceHeader,
+  DialogTitle as AnnounceTitle,
+  DialogDescription as AnnounceDescription,
+  DialogFooter as AnnounceFooter,
+} from "@/components/ui/dialog";
+import { Button as AnnounceButton } from "@/components/ui/button";
+import { Box as BoxIcon3D } from "lucide-react";
 import { getRoomKey } from "../lib/canvas-renderer";
 import { safeGetItem } from "../lib/safe-storage";
 import { fetchSharedPlan, intentToRoomType, type FetchedPlan } from "../lib/plan-share";
@@ -89,6 +101,32 @@ export default function Editor() {
       body: JSON.stringify({ event: "plan_started", roomType: intentToRoomType() }),
     }).catch(() => {});
   }, [showIntentCapture]);
+
+  // One-time "we now do 3D" announcement for returning users. New users get
+  // the 3D step inside the onboarding wizard instead.
+  const [show3DAnnounce, setShow3DAnnounce] = useState(false);
+  useEffect(() => {
+    const isReturning =
+      sgi("freeroomplanner-desktop-wizard-shown") || sgi("freeroomplanner-mobile-wizard-shown");
+    if (isReturning && !sgi("freeroomplanner-3d-announce-shown")) {
+      const t = setTimeout(() => {
+        setShow3DAnnounce(true);
+        te("announce_3d_shown");
+      }, 1200);
+      return () => clearTimeout(t);
+    }
+  }, []);
+  const close3DAnnounce = (openIn3D: boolean) => {
+    ssi("freeroomplanner-3d-announce-shown", "true");
+    setShow3DAnnounce(false);
+    te(openIn3D ? "announce_3d_cta" : "announce_3d_dismissed");
+    if (openIn3D) {
+      // The 3D toggle lives on the editor canvas
+      setTimeout(() => {
+        (document.querySelector('[data-testid="btn-3d-toggle"]') as HTMLElement | null)?.click();
+      }, 150);
+    }
+  };
 
   // Mobile onboarding wizard
   const [showMobileWizard, setShowMobileWizard] = useState(false);
@@ -354,6 +392,34 @@ export default function Editor() {
 
       {/* Desktop onboarding wizard */}
       {!isMobile && <DesktopWizard open={showDesktopWizard} onClose={() => setShowDesktopWizard(false)} />}
+
+      {/* "We now do 3D" one-time announcement for returning users */}
+      <AnnounceDialog open={show3DAnnounce} onOpenChange={(o) => { if (!o) close3DAnnounce(false); }}>
+        <AnnounceContent className="max-w-md" data-testid="announce-3d">
+          <AnnounceHeader>
+            <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+              <BoxIcon3D className="h-6 w-6 text-primary" />
+            </div>
+            <AnnounceTitle className="text-center">Your plans just went 3D</AnnounceTitle>
+            <AnnounceDescription className="text-center">
+              Every plan you've made — including the ones you've already built — can now be
+              viewed in 3D. Press the <span className="font-semibold text-foreground">3D View</span> button
+              on the canvas to step inside your room: drag to look around, click any item to
+              recolour it, choose floors and wall colours with{" "}
+              <span className="font-semibold text-foreground">Style</span>, and download a photo
+              of the result. All free.
+            </AnnounceDescription>
+          </AnnounceHeader>
+          <AnnounceFooter className="gap-2 sm:justify-center">
+            <AnnounceButton variant="ghost" size="sm" onClick={() => close3DAnnounce(false)}>
+              Later
+            </AnnounceButton>
+            <AnnounceButton size="sm" onClick={() => close3DAnnounce(true)} data-testid="announce-3d-cta">
+              See my plan in 3D
+            </AnnounceButton>
+          </AnnounceFooter>
+        </AnnounceContent>
+      </AnnounceDialog>
 
       {/* Room generator wizard */}
       <RoomGeneratorWizard
