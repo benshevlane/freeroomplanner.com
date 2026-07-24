@@ -1195,12 +1195,12 @@ function SnapshotEngine({
         // Watermark: the scene background/ground already carry the tiled
         // marks (they sit behind the room, never on it); add the corner tag
         actx.globalAlpha = 1;
-        const fs = Math.max(16, Math.round(outW / 90));
-        actx.font = `600 ${fs}px 'General Sans', 'DM Sans', sans-serif`;
+        const fs = Math.max(22, Math.round(outW / 60));
+        actx.font = `700 ${fs}px 'General Sans', 'DM Sans', sans-serif`;
         actx.textAlign = "right";
-        actx.fillStyle = "rgba(255,255,255,0.85)";
-        actx.shadowColor = "rgba(0,0,0,0.45)";
-        actx.shadowBlur = 6;
+        actx.fillStyle = "rgba(255,255,255,0.95)";
+        actx.shadowColor = "rgba(0,0,0,0.55)";
+        actx.shadowBlur = 8;
         actx.fillText("made with freeroomplanner.com", outW - fs, outH - fs);
 
         onDone(cancelled ? null : acc.toDataURL("image/jpeg", 0.92));
@@ -1244,13 +1244,13 @@ function makeWatermarkTexture(bg: string, text = "freeroomplanner.com"): THREE.C
   ctx.save();
   ctx.translate(512, 512);
   ctx.rotate(-0.28);
-  ctx.font = "600 46px 'General Sans', 'DM Sans', sans-serif";
+  ctx.font = "700 52px 'General Sans', 'DM Sans', sans-serif";
   ctx.textAlign = "center";
-  ctx.fillStyle = "rgba(255,255,255,0.55)";
-  ctx.globalAlpha = 0.16;
-  for (let row = -4; row <= 4; row++) {
+  ctx.fillStyle = "rgba(255,255,255,0.9)";
+  ctx.globalAlpha = 0.3;
+  for (let row = -5; row <= 5; row++) {
     for (let col = -1; col <= 1; col++) {
-      ctx.fillText(text, col * 620 + (row % 2) * 260, row * 170);
+      ctx.fillText(text, col * 560 + (row % 2) * 240, row * 130);
     }
   }
   ctx.restore();
