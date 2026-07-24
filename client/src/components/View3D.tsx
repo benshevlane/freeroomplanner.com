@@ -1232,7 +1232,7 @@ function SnapshotEngine({
 // Free-tier watermark: tiled marks on the scene BACKDROP and the ground
 // around the room — never on the room itself, which naturally occludes them.
 // The premium build sets FREE_WATERMARK to false.
-const FREE_WATERMARK = true;
+const FREE_WATERMARK = false; // premium build: no watermark
 
 function makeWatermarkTexture(bg: string, text = "freeroomplanner.com"): THREE.CanvasTexture {
   const c = document.createElement("canvas");
