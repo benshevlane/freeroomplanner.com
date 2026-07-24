@@ -122,3 +122,35 @@ export function detectRooms(walls: Wall[]): DetectedRoom[] {
 
   return rooms;
 }
+
+
+/**
+ * Snap wall endpoints that nearly touch (within tolerance cm) onto a shared
+ * centroid so detection closes rooms drawn with small gaps. Used for
+ * summaries and the 3D floor, where a best-effort answer beats none.
+ */
+export function snapWallsForDetection(walls: Wall[], tolerance = 30): Wall[] {
+  const points: Point[] = [];
+  walls.forEach((w) => { points.push(w.start, w.end); });
+  const parent = points.map((_, i) => i);
+  const find = (i: number): number => (parent[i] === i ? i : (parent[i] = find(parent[i])));
+  for (let i = 0; i < points.length; i++) {
+    for (let j = i + 1; j < points.length; j++) {
+      const dx = points[i].x - points[j].x;
+      const dy = points[i].y - points[j].y;
+      if (dx * dx + dy * dy <= tolerance * tolerance) parent[find(i)] = find(j);
+    }
+  }
+  const sums = new Map<number, { x: number; y: number; n: number }>();
+  points.forEach((pt, i) => {
+    const r = find(i);
+    const acc = sums.get(r) ?? { x: 0, y: 0, n: 0 };
+    acc.x += pt.x; acc.y += pt.y; acc.n += 1;
+    sums.set(r, acc);
+  });
+  const snapped = (i: number): Point => {
+    const acc = sums.get(find(i))!;
+    return { x: acc.x / acc.n, y: acc.y / acc.n };
+  };
+  return walls.map((w, wi) => ({ ...w, start: snapped(wi * 2), end: snapped(wi * 2 + 1) }));
+}

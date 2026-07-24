@@ -29,7 +29,7 @@ import {
   collectDistanceMeasurementRects,
   snapFurnitureToNearest,
 } from "../lib/canvas-renderer";
-import { detectRooms } from "../lib/room-detection";
+import { detectRooms, snapWallsForDetection } from "../lib/room-detection";
 import { safeGetItem, safeSetItem } from "../lib/safe-storage";
 import SavePlanDialog from "./SavePlanDialog";
 import RatingPromptDialog from "./RatingPromptDialog";
@@ -138,6 +138,34 @@ export default function EditorCore({
       return true;
     }
   });
+
+  // Master measurements toggle — some people want a clean, dimension-free plan.
+  const [measurementsVisible, setMeasurementsVisible] = useState<boolean>(() => {
+    try {
+      return safeGetItem("freeroomplanner-measurements-visible") !== "false";
+    } catch {
+      return true;
+    }
+  });
+  const handleToggleMeasurements = useCallback(() => {
+    setMeasurementsVisible((v) => {
+      const next = !v;
+      safeSetItem("freeroomplanner-measurements-visible", String(next));
+      trackEvent("measurements_toggled", { visible: next });
+      return next;
+    });
+  }, []);
+
+  // Detach mode: drag a wall without pulling its connected walls along.
+  // Session-only on purpose — leaving it stuck on would surprise people later.
+  const [detachWalls, setDetachWalls] = useState(false);
+  const handleToggleDetachWalls = useCallback(() => {
+    setDetachWalls((v) => {
+      const next = !v;
+      trackEvent("detach_walls_toggled", { enabled: next });
+      return next;
+    });
+  }, []);
 
   // Ask "are you enjoying it?" once per browser, after the user has actually
   // succeeded at something — saved a share link or downloaded their plan.
@@ -807,6 +835,23 @@ export default function EditorCore({
     [editor, state.furniture, state.walls]
   );
 
+  // Live plan overview for the properties panel's empty state
+  const detectedForSummary = detectRooms(snapWallsForDetection(state.walls)); // area already in m²; tolerant of small wall gaps
+  const planSummary = {
+    areaM2: detectedForSummary.reduce((sum, r) => sum + r.area, 0),
+    perimeterCm: state.walls.reduce((sum, w) => {
+      const dx = w.end.x - w.start.x;
+      const dy = w.end.y - w.start.y;
+      return sum + Math.sqrt(dx * dx + dy * dy);
+    }, 0),
+    rooms: detectedForSummary.length,
+    walls: state.walls.length,
+    items: state.furniture.length,
+    labels: state.labels.length,
+    textBoxes: state.textBoxes.length,
+    arrows: state.arrows.length,
+  };
+
   return (
     <>
       {/* Optional header */}
@@ -819,6 +864,10 @@ export default function EditorCore({
           onSetTool={editor.setTool}
           snapEnabled={snapEnabled}
           onToggleSnap={handleToggleSnap}
+          measurementsVisible={measurementsVisible}
+          onToggleMeasurements={handleToggleMeasurements}
+          detachWalls={detachWalls}
+          onToggleDetachWalls={handleToggleDetachWalls}
           onUndo={editor.undo}
           onRedo={editor.redo}
           canUndo={editor.canUndo}
@@ -910,6 +959,8 @@ export default function EditorCore({
                       onDimEditing={setDimEditing}
                       units={state.units}
                       measureMode={measureMode}
+                      planSummary={planSummary}
+                      onExportPng={handleSavePlan}
                     />
                   </ScrollArea>
                 </div>
@@ -927,6 +978,8 @@ export default function EditorCore({
           dimEditing={dimEditing}
           isDark={isDark}
           snapEnabled={snapEnabled}
+          measurementsVisible={measurementsVisible}
+          detachWalls={detachWalls}
           measureMode={measureMode}
           showAllMeasurements={showAllMeasurements}
           onAddWall={editor.addWall}
@@ -988,6 +1041,8 @@ export default function EditorCore({
                 onDimEditing={setDimEditing}
                 units={state.units}
                 measureMode={measureMode}
+                planSummary={planSummary}
+                onExportPng={handleSavePlan}
               />
             </ScrollArea>
 

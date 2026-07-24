@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { Wall, WallType, FurnitureItem, RoomLabel, TextBox, Arrow, ArrowStyle, ArrowHeadStyle, LabelSize, LabelColor, UnitSystem, MeasureMode, DEFAULT_WALL_THICKNESS, isWallCupboard, cmToDisplay, displayToCm, dimensionSuffix, FURNITURE_LIBRARY } from "../lib/types";
+import { Wall, WallType, FurnitureItem, RoomLabel, TextBox, Arrow, ArrowStyle, ArrowHeadStyle, LabelSize, LabelColor, UnitSystem, MeasureMode, DEFAULT_WALL_THICKNESS, isWallCupboard, cmToDisplay, displayToCm, dimensionSuffix, displayString, parseDimension, FURNITURE_LIBRARY } from "../lib/types";
 import { computeWallClearances } from "../lib/canvas-renderer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,18 @@ import { Switch } from "@/components/ui/switch";
 import { RotateCw, Trash2, Ruler, Copy, Bold, Square, FlipHorizontal, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Pencil } from "lucide-react";
 
 interface PropertiesPanelProps {
+  /** Live overview of the plan, shown when nothing is selected */
+  planSummary?: {
+    areaM2: number;
+    perimeterCm: number;
+    rooms: number;
+    walls: number;
+    items: number;
+    labels: number;
+    textBoxes: number;
+    arrows: number;
+  };
+  onExportPng?: () => void;
   selectedWall: Wall | null;
   selectedFurniture: FurnitureItem | null;
   selectedLabel: RoomLabel | null;
@@ -105,12 +117,56 @@ export default function PropertiesPanel({
   walls = [],
   units,
   measureMode = "full",
+  planSummary,
+  onExportPng,
 }: PropertiesPanelProps) {
   if (!selectedWall && !selectedFurniture && !selectedLabel && !selectedTextBox && !selectedArrow) {
+    const fmtArea = (m2: number) =>
+      units === "ft" ? `${(m2 * 10.7639).toFixed(1)} sq ft` : `${m2.toFixed(1)} m²`;
     return (
-      <div className="p-4 text-sm text-muted-foreground" data-testid="properties-empty">
-        <p className="font-medium text-foreground mb-1">Properties</p>
-        <p>Select an item to view its properties</p>
+      <div className="p-4 text-sm space-y-3" data-testid="properties-empty">
+        <div>
+          <p className="font-semibold">Room overview</p>
+          <p className="text-xs text-muted-foreground">
+            Nothing selected · select any wall or item to edit its exact size
+          </p>
+        </div>
+
+        {planSummary && (planSummary.walls > 0 || planSummary.items > 0) ? (
+          <>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="rounded-md border border-border p-2">
+                <p className="text-lg font-semibold tabular-nums leading-tight">{fmtArea(planSummary.areaM2)}</p>
+                <p className="text-[11px] text-muted-foreground">Floor area</p>
+              </div>
+              <div className="rounded-md border border-border p-2">
+                <p className="text-lg font-semibold tabular-nums leading-tight">{formatDimension(planSummary.perimeterCm, units)}</p>
+                <p className="text-[11px] text-muted-foreground">Walls total</p>
+              </div>
+            </div>
+            <div className="text-xs text-muted-foreground space-y-1">
+              {([
+                ["Walls", planSummary.walls],
+                ["Items", planSummary.items],
+                ["Labels", planSummary.labels],
+                ["Text boxes", planSummary.textBoxes],
+                ["Arrows", planSummary.arrows],
+              ] as const).map(([label, count]) => (
+                <div key={label} className="flex justify-between">
+                  <span>{label}</span>
+                  <span className="tabular-nums font-medium text-foreground">{count}</span>
+                </div>
+              ))}
+            </div>
+            {onExportPng && (
+              <Button size="sm" className="w-full" variant="outline" onClick={onExportPng} data-testid="btn-summary-export">
+                Download plan PNG
+              </Button>
+            )}
+          </>
+        ) : (
+          <p className="text-muted-foreground">Draw walls or add items to see your plan summary here.</p>
+        )}
       </div>
     );
   }
@@ -149,10 +205,10 @@ export default function PropertiesPanel({
     const commitLength = (val: string) => {
       setEditingLength(false);
       if (!onUpdateWall) return;
-      const parsed = parseFloat(val.replace(/[^0-9.\-]/g, ""));
-      if (isNaN(parsed)) return;
+      const parsedCm = parseDimension(val, units);
+      if (parsedCm === null) return;
       // Interpret entered value in the ACTIVE unit, then back-convert to full length
-      const enteredCm = Math.max(10, snapToMm(displayToCm(parsed, units))); // min 10cm
+      const enteredCm = Math.max(10, snapToMm(parsedCm)); // min 10cm
       const newFullCm = isInside ? enteredCm + wallThickness : enteredCm;
       if (Math.abs(newFullCm - lengthCm) < 0.01) return;
       const len = lengthCm;
@@ -189,9 +245,9 @@ export default function PropertiesPanel({
     const commitThickness = (val: string) => {
       setEditingThickness(false);
       if (!onUpdateWall) return;
-      const parsed = parseFloat(val.replace(/[^0-9.\-]/g, ""));
-      if (isNaN(parsed)) return;
-      const newThickCm = Math.max(5, Math.min(60, snapToMm(displayToCm(parsed, units)))); // 5–60cm
+      const parsedCm = parseDimension(val, units);
+      if (parsedCm === null) return;
+      const newThickCm = Math.max(5, Math.min(60, snapToMm(parsedCm))); // 5–60cm
       if (Math.abs(newThickCm - selectedWall.thickness) < 0.01) return;
       onUpdateWall(selectedWall.id, { thickness: Math.round(newThickCm) });
     };
@@ -217,7 +273,7 @@ export default function PropertiesPanel({
             ) : (
               <span
                 className="font-medium cursor-pointer border-b border-dashed border-teal-500/60 hover:border-teal-500 transition-colors inline-flex items-center gap-1"
-                onClick={() => { setLengthInput(String(displayForUnit(displayLengthCm, units))); setEditingLength(true); }}
+                onClick={() => { setLengthInput(displayString(displayLengthCm, units)); setEditingLength(true); }}
                 title="Click to type an exact length"
               >
                 {formatDimension(displayLengthCm, units)}
@@ -241,7 +297,7 @@ export default function PropertiesPanel({
             ) : (
               <span
                 className="font-medium cursor-pointer border-b border-dashed border-teal-500/60 hover:border-teal-500 transition-colors inline-flex items-center gap-1"
-                onClick={() => { setThicknessInput(String(displayForUnit(selectedWall.thickness, units))); setEditingThickness(true); }}
+                onClick={() => { setThicknessInput(displayString(selectedWall.thickness, units)); setEditingThickness(true); }}
                 title="Click to type an exact thickness"
               >
                 {formatDimension(selectedWall.thickness, units)}
@@ -319,19 +375,19 @@ export default function PropertiesPanel({
           <div className="flex items-center gap-2">
             <span className="text-muted-foreground">{widthLabel.slice(0, -1)} {widthAxis}:</span>
             <Input
-              type="number"
+              type={units === "ft" ? "text" : "number"}
               step={stepForUnit(units)}
               min={cmToDisplay(minWidth, units)}
-              value={widthFocused ? widthLocal : displayForUnit(selectedFurniture.width, units)}
+              value={widthFocused ? widthLocal : displayString(selectedFurniture.width, units)}
               onFocus={() => {
-                setWidthLocal(String(displayForUnit(selectedFurniture.width, units)));
+                setWidthLocal(displayString(selectedFurniture.width, units));
                 setWidthFocused(true); onDimEditing?.("width");
               }}
               onChange={(e) => {
                 setWidthLocal(e.target.value);
-                const parsed = parseFloat(e.target.value);
-                if (!isNaN(parsed) && parsed > 0) {
-                  const newCm = snapToMm(Math.max(minWidth, displayToCm(parsed, units)));
+                const parsedCm = parseDimension(e.target.value, units);
+                if (parsedCm !== null && parsedCm > 0) {
+                  const newCm = snapToMm(Math.max(minWidth, parsedCm));
                   const delta = newCm - selectedFurniture.width;
                   onUpdateFurniture(selectedFurniture.id, {
                     width: newCm,
@@ -341,9 +397,9 @@ export default function PropertiesPanel({
               }}
               onBlur={() => {
                 setWidthFocused(false); onDimEditing?.(null);
-                const parsed = parseFloat(widthLocal);
-                if (!isNaN(parsed) && parsed > 0) {
-                  const newCm = snapToMm(Math.max(minWidth, displayToCm(parsed, units)));
+                const parsedCm = parseDimension(widthLocal, units);
+                if (parsedCm !== null && parsedCm > 0) {
+                  const newCm = snapToMm(Math.max(minWidth, parsedCm));
                   const delta = newCm - selectedFurniture.width;
                   onUpdateFurniture(selectedFurniture.id, {
                     width: newCm,
@@ -362,19 +418,19 @@ export default function PropertiesPanel({
           <div className="flex items-center gap-2">
             <span className="text-muted-foreground">{heightLabel.slice(0, -1)} {heightAxis}:</span>
             <Input
-              type="number"
+              type={units === "ft" ? "text" : "number"}
               step={stepForUnit(units)}
               min={cmToDisplay(minHeight, units)}
-              value={heightFocused ? heightLocal : displayForUnit(selectedFurniture.height, units)}
+              value={heightFocused ? heightLocal : displayString(selectedFurniture.height, units)}
               onFocus={() => {
-                setHeightLocal(String(displayForUnit(selectedFurniture.height, units)));
+                setHeightLocal(displayString(selectedFurniture.height, units));
                 setHeightFocused(true); onDimEditing?.("height");
               }}
               onChange={(e) => {
                 setHeightLocal(e.target.value);
-                const parsed = parseFloat(e.target.value);
-                if (!isNaN(parsed) && parsed > 0) {
-                  const newCm = snapToMm(Math.max(minHeight, displayToCm(parsed, units)));
+                const parsedCm = parseDimension(e.target.value, units);
+                if (parsedCm !== null && parsedCm > 0) {
+                  const newCm = snapToMm(Math.max(minHeight, parsedCm));
                   const delta = newCm - selectedFurniture.height;
                   onUpdateFurniture(selectedFurniture.id, {
                     height: newCm,
@@ -384,9 +440,9 @@ export default function PropertiesPanel({
               }}
               onBlur={() => {
                 setHeightFocused(false); onDimEditing?.(null);
-                const parsed = parseFloat(heightLocal);
-                if (!isNaN(parsed) && parsed > 0) {
-                  const newCm = snapToMm(Math.max(minHeight, displayToCm(parsed, units)));
+                const parsedCm = parseDimension(heightLocal, units);
+                if (parsedCm !== null && parsedCm > 0) {
+                  const newCm = snapToMm(Math.max(minHeight, parsedCm));
                   const delta = newCm - selectedFurniture.height;
                   onUpdateFurniture(selectedFurniture.id, {
                     height: newCm,
@@ -405,19 +461,19 @@ export default function PropertiesPanel({
           <div className="flex items-center gap-2">
             <span className="text-muted-foreground">X:</span>
             <Input
-              type="number"
+              type={units === "ft" ? "text" : "number"}
               step={stepForUnit(units)}
-              value={xFocused ? xLocal : displayForUnit(selectedFurniture.x, units)}
-              onFocus={() => { setXLocal(String(displayForUnit(selectedFurniture.x, units))); setXFocused(true); }}
+              value={xFocused ? xLocal : displayString(selectedFurniture.x, units)}
+              onFocus={() => { setXLocal(displayString(selectedFurniture.x, units)); setXFocused(true); }}
               onChange={(e) => {
                 setXLocal(e.target.value);
-                const parsed = parseFloat(e.target.value);
-                if (!isNaN(parsed)) onUpdateFurniture(selectedFurniture.id, { x: snapToMm(displayToCm(parsed, units)) });
+                const parsedCm = parseDimension(e.target.value, units);
+                if (parsedCm !== null) onUpdateFurniture(selectedFurniture.id, { x: snapToMm(parsedCm) });
               }}
               onBlur={() => {
                 setXFocused(false);
-                const parsed = parseFloat(xLocal);
-                if (!isNaN(parsed)) onUpdateFurniture(selectedFurniture.id, { x: snapToMm(displayToCm(parsed, units)) });
+                const parsedCm = parseDimension(xLocal, units);
+                if (parsedCm !== null) onUpdateFurniture(selectedFurniture.id, { x: snapToMm(parsedCm) });
               }}
               onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
               className="h-9 w-24 text-sm md:h-7 md:w-20"
@@ -428,19 +484,19 @@ export default function PropertiesPanel({
           <div className="flex items-center gap-2">
             <span className="text-muted-foreground">Y:</span>
             <Input
-              type="number"
+              type={units === "ft" ? "text" : "number"}
               step={stepForUnit(units)}
-              value={yFocused ? yLocal : displayForUnit(selectedFurniture.y, units)}
-              onFocus={() => { setYLocal(String(displayForUnit(selectedFurniture.y, units))); setYFocused(true); }}
+              value={yFocused ? yLocal : displayString(selectedFurniture.y, units)}
+              onFocus={() => { setYLocal(displayString(selectedFurniture.y, units)); setYFocused(true); }}
               onChange={(e) => {
                 setYLocal(e.target.value);
-                const parsed = parseFloat(e.target.value);
-                if (!isNaN(parsed)) onUpdateFurniture(selectedFurniture.id, { y: snapToMm(displayToCm(parsed, units)) });
+                const parsedCm = parseDimension(e.target.value, units);
+                if (parsedCm !== null) onUpdateFurniture(selectedFurniture.id, { y: snapToMm(parsedCm) });
               }}
               onBlur={() => {
                 setYFocused(false);
-                const parsed = parseFloat(yLocal);
-                if (!isNaN(parsed)) onUpdateFurniture(selectedFurniture.id, { y: snapToMm(displayToCm(parsed, units)) });
+                const parsedCm = parseDimension(yLocal, units);
+                if (parsedCm !== null) onUpdateFurniture(selectedFurniture.id, { y: snapToMm(parsedCm) });
               }}
               onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
               className="h-9 w-24 text-sm md:h-7 md:w-20"
@@ -455,24 +511,24 @@ export default function PropertiesPanel({
                 type="number"
                 step={stepForUnit(units)}
                 min={0}
-                value={hffFocused ? hffLocal : Math.round(cmToDisplay(selectedFurniture.heightFromFloor ?? 145, units) * 100) / 100}
+                value={hffFocused ? hffLocal : displayString(selectedFurniture.heightFromFloor ?? 145, units)}
                 onFocus={() => {
-                  setHffLocal(String(Math.round(cmToDisplay(selectedFurniture.heightFromFloor ?? 145, units) * 100) / 100));
+                  setHffLocal(displayString(selectedFurniture.heightFromFloor ?? 145, units));
                   setHffFocused(true);
                 }}
                 onChange={(e) => {
                   setHffLocal(e.target.value);
-                  const parsed = parseFloat(e.target.value);
-                  if (!isNaN(parsed) && parsed >= 0) {
-                    const newCm = Math.max(0, displayToCm(parsed, units));
+                  const parsedCm = parseDimension(e.target.value, units);
+                  if (parsedCm !== null && parsedCm >= 0) {
+                    const newCm = Math.max(0, parsedCm);
                     onUpdateFurniture(selectedFurniture.id, { heightFromFloor: newCm });
                   }
                 }}
                 onBlur={() => {
                   setHffFocused(false);
-                  const parsed = parseFloat(hffLocal);
-                  if (!isNaN(parsed) && parsed >= 0) {
-                    const newCm = Math.max(0, displayToCm(parsed, units));
+                  const parsedCm = parseDimension(hffLocal, units);
+                  if (parsedCm !== null && parsedCm >= 0) {
+                    const newCm = Math.max(0, parsedCm);
                     onUpdateFurniture(selectedFurniture.id, { heightFromFloor: newCm });
                   }
                 }}
