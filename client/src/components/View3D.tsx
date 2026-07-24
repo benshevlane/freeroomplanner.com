@@ -1222,16 +1222,20 @@ function makeWatermarkTexture(bg: string, text = "freeroomplanner.com"): THREE.C
   const ctx = c.getContext("2d")!;
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, 1024, 1024);
+  // Contrast adapts to the backdrop: crisp dark text on light backgrounds,
+  // light text on dark ones
+  const rgb = bg.match(/[0-9a-f]{2}/gi)?.map((h) => parseInt(h, 16)) ?? [200, 200, 200];
+  const isLight = (rgb[0] + rgb[1] + rgb[2]) / 3 > 128;
   ctx.save();
   ctx.translate(512, 512);
   ctx.rotate(-0.28);
-  ctx.font = "700 52px 'General Sans', 'DM Sans', sans-serif";
+  ctx.font = "600 30px 'General Sans', 'DM Sans', sans-serif";
   ctx.textAlign = "center";
-  ctx.fillStyle = "rgba(255,255,255,0.9)";
-  ctx.globalAlpha = 0.3;
-  for (let row = -5; row <= 5; row++) {
-    for (let col = -1; col <= 1; col++) {
-      ctx.fillText(text, col * 560 + (row % 2) * 240, row * 130);
+  ctx.fillStyle = isLight ? "rgba(75, 82, 88, 1)" : "rgba(235, 238, 240, 1)";
+  ctx.globalAlpha = 0.32;
+  for (let row = -7; row <= 7; row++) {
+    for (let col = -2; col <= 2; col++) {
+      ctx.fillText(text, col * 340 + (row % 2) * 170, row * 84);
     }
   }
   ctx.restore();
