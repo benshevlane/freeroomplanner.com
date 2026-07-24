@@ -300,47 +300,44 @@ html.frp-anim-hold.frp-hero-shown #top [style*="animation: frp"]{ animation-play
   </section>
 
   <!-- ============ NOW IN 3D ============ -->
-  <section id="now-in-3d" style="background: linear-gradient(180deg,#f0fdfa 0%, #ffffff 100%); border-top: 1px solid #ccfbf1; border-bottom: 1px solid #eef2f6;">
-    <div style="max-width: 1240px; margin: 0 auto; padding: 96px 40px; display: grid; grid-template-columns: 1.05fr 1fr; gap: 56px; align-items: center;">
-      <div>
-        <div style="display: inline-flex; align-items: center; gap: 8px; background: #ffffff; border: 1px solid #ccfbf1; color: #0f766e; padding: 7px 14px; border-radius: 999px; font-size: 13px; font-weight: 700; letter-spacing: .02em; box-shadow: 0 2px 8px rgba(13,148,136,0.08);">
-          <span style="width: 7px; height: 7px; border-radius: 50%; background: #0d9488; display: inline-block;"></span>
-          New
+  <section id="in3d" style="background: #f8fafc; border-top: 1px solid #eef2f6; border-bottom: 1px solid #eef2f6;">
+    <div style="max-width: 1240px; margin: 0 auto; padding: 100px 40px;">
+      <div style="display: grid; grid-template-columns: 1.08fr 0.92fr; gap: 56px; align-items: center;">
+        <!-- render -->
+        <div style="position: relative; border-radius: 20px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 30px 60px -30px rgba(15,23,42,0.35); animation: frp-reveal 0.8s cubic-bezier(0.2,0.7,0.2,1) both; animation-timeline: view(); animation-range: entry 0% cover 22%;">
+          <img src="/home-3d-render.jpg" loading="lazy" decoding="async" alt="A kitchen floor plan rendered in 3D — walls, cabinets, an island and a fridge seen from above" style="width: 100%; display: block;">
+          <span style="position: absolute; top: 16px; left: 16px; display: inline-flex; align-items: center; gap: 7px; background: rgba(15,23,42,0.82); backdrop-filter: blur(4px); color: #fff; font-size: 13px; font-weight: 600; padding: 7px 13px; border-radius: 9px;">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5eead4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 3 7v10l9 5 9-5V7Z"></path><path d="M3 7l9 5 9-5M12 12v10"></path></svg>
+            3D View
+          </span>
         </div>
-        <h2 style="font-family: 'Space Grotesk', sans-serif; font-size: 42px; font-weight: 700; letter-spacing: -0.03em; margin: 16px 0 0; line-height: 1.08;">Your plan, now in 3D</h2>
-        <p style="font-size: 18px; line-height: 1.6; color: #475569; margin: 18px 0 0; max-width: 540px;">Draw your room flat, then press one button and step inside it. Spin around your kitchen before it&rsquo;s built, pick floors and wall colours, and download a realistic photo of the finished room &mdash; still free, and it works on every plan you&rsquo;ve already drawn.</p>
-        <div style="margin: 28px 0 0; display: flex; flex-wrap: wrap; gap: 14px; align-items: center;">
-          <a href="/app" style="display: inline-flex; align-items: center; gap: 9px; background: #0d9488; color: #fff; padding: 16px 28px; border-radius: 12px; font-size: 17px; font-weight: 700; text-decoration: none; box-shadow: 0 8px 22px rgba(13,148,136,0.35);">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><path d="M3.27 6.96 12 12.01l8.73-5.05"></path><path d="M12 22.08V12"></path></svg>
-            See your room in 3D &mdash; free
-          </a>
-          <span style="font-size: 14px; color: #64748b;">No sign-up &middot; works on desktop &amp; mobile</span>
+        <!-- copy -->
+        <div>
+          <div style="display: inline-flex; align-items: center; gap: 8px; background: #0d9488; color: #fff; font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 6px 13px; border-radius: 999px;">New · free for everyone</div>
+          <h2 style="font-family: 'Space Grotesk', sans-serif; font-size: 42px; font-weight: 700; letter-spacing: -0.03em; margin: 18px 0 0; line-height: 1.08;">Your plan, now in 3D</h2>
+          <p style="font-size: 18px; color: #475569; margin: 16px 0 0; line-height: 1.6;">Draw your room flat, then press one button and step inside it. Walk around your kitchen before it's built, try the layout from every angle, and see your colours on the walls — no software, no sign-up, still free.</p>
+          <div style="display: flex; flex-direction: column; gap: 18px; margin: 30px 0 0;">
+            <div style="display: flex; gap: 14px; align-items: flex-start;">
+              <div style="flex: none; width: 40px; height: 40px; border-radius: 11px; background: #f0fdfa; border: 1px solid #99f6e4; display: flex; align-items: center; justify-content: center; color: #0d9488;"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="1"></circle><path d="M12 8v6l-2 6m2-6 2 6M8 11l4 1 4-1"></path></svg></div>
+              <div><h3 style="font-family: 'Space Grotesk', sans-serif; font-size: 17px; font-weight: 700; margin: 2px 0 4px;">Step inside your room</h3><p style="font-size: 15px; color: #475569; line-height: 1.55; margin: 0;">One click turns your flat plan into a room you can spin, zoom and explore — walls, doors and windows and all.</p></div>
+            </div>
+            <div style="display: flex; gap: 14px; align-items: flex-start;">
+              <div style="flex: none; width: 40px; height: 40px; border-radius: 11px; background: #f0fdfa; border: 1px solid #99f6e4; display: flex; align-items: center; justify-content: center; color: #0d9488;"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 0 0 20 3 3 0 0 0 0-6h-1a2 2 0 0 1 0-4h3a5 5 0 0 0-5-10Z"></path><circle cx="7.5" cy="10.5" r="1" fill="currentColor"></circle><circle cx="12" cy="7.5" r="1" fill="currentColor"></circle><circle cx="16.5" cy="10.5" r="1" fill="currentColor"></circle></svg></div>
+              <div><h3 style="font-family: 'Space Grotesk', sans-serif; font-size: 17px; font-weight: 700; margin: 2px 0 4px;">Style every surface</h3><p style="font-size: 15px; color: #475569; line-height: 1.55; margin: 0;">Pick floors, wall colours and worktops. Click any item to recolour it — see your navy cabinets before you commit.</p></div>
+            </div>
+            <div style="display: flex; gap: 14px; align-items: flex-start;">
+              <div style="flex: none; width: 40px; height: 40px; border-radius: 11px; background: #f0fdfa; border: 1px solid #99f6e4; display: flex; align-items: center; justify-content: center; color: #0d9488;"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3Z"></path><circle cx="12" cy="13" r="3.5"></circle></svg></div>
+              <div><h3 style="font-family: 'Space Grotesk', sans-serif; font-size: 17px; font-weight: 700; margin: 2px 0 4px;">Download the photo</h3><p style="font-size: 15px; color: #475569; line-height: 1.55; margin: 0;">Render a realistic picture of your room to share with your partner, fitter or builder — light, shadows and all.</p></div>
+            </div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 18px; margin-top: 32px; flex-wrap: wrap;">
+            <a href="#top" style="display: inline-flex; align-items: center; gap: 9px; background: #0d9488; color: #fff; padding: 15px 28px; border-radius: 12px; font-size: 16px; font-weight: 700; text-decoration: none; box-shadow: 0 6px 18px rgba(13,148,136,0.35);" style-hover="background: #0f766e;">
+              See your room in 3D — free
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg>
+            </a>
+            <span style="font-size: 14px; color: #94a3b8;">Works on every plan you've already drawn</span>
+          </div>
         </div>
-      </div>
-      <div style="border-radius: 16px; overflow: hidden; box-shadow: 0 30px 70px -20px rgba(15,23,42,0.35), 0 0 0 1px rgba(15,23,42,0.04); background: #fbfdfc;">
-        <svg viewBox="0 0 640 460" width="100%" style="display:block;" role="img" aria-label="A room shown in 3D">
-          <rect width="640" height="460" fill="#fbfdfc"/>
-          <!-- floor -->
-          <polygon points="320,150 560,290 320,430 80,290" fill="#e7f2ef" stroke="#cfe6e0" stroke-width="2"/>
-          <!-- back-left wall -->
-          <polygon points="80,290 320,150 320,60 80,200" fill="#d6e8e3"/>
-          <!-- back-right wall -->
-          <polygon points="320,150 560,290 560,200 320,60" fill="#c4ded7"/>
-          <!-- rug -->
-          <polygon points="320,238 452,314 320,390 188,314" fill="#0d9488" opacity="0.16"/>
-          <!-- bed base -->
-          <polygon points="150,262 262,326 262,300 150,236" fill="#0f766e"/>
-          <polygon points="150,236 262,300 320,266 208,202" fill="#14b8a6"/>
-          <polygon points="262,300 262,326 320,292 320,266" fill="#0d9488"/>
-          <!-- headboard -->
-          <polygon points="208,202 236,186 236,150 208,166" fill="#0f766e"/>
-          <polygon points="208,166 236,150 292,182 264,198" fill="#5eead4"/>
-          <!-- pillow -->
-          <polygon points="214,190 250,169 274,183 238,204" fill="#ffffff" opacity="0.85"/>
-          <!-- side table -->
-          <polygon points="352,300 392,323 392,352 352,329" fill="#0f766e"/>
-          <polygon points="352,300 392,323 420,307 380,284" fill="#14b8a6"/>
-        </svg>
       </div>
     </div>
   </section>
