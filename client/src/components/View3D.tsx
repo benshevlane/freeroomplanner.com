@@ -807,8 +807,27 @@ function ItemShape({ item, wallHeight, inWorktopRun = false }: { item: Furniture
       </>
     );
   }
+  // Wardrobe: a tall solid carcass with two panelled doors + handles (was
+  // wrongly using the shelving drawer_cabinet model, 2026-07-24).
+  if (t === "wardrobe") {
+    const H = 200, frontZ = d / 2, doorW = (w - 6) / 2;
+    return (
+      <>
+        <Box w={w} h={H} d={d} mat={MAT.wood} />
+        {[-1, 1].map((sgn) => (
+          <group key={sgn}>
+            <Box w={doorW - 1} h={H - 10} d={1.4} x={sgn * (doorW / 2 + 0.5)} y={H / 2} z={frontZ + 0.7} mat={MAT.wood} />
+            <Box w={Math.max(doorW - 12, 6)} h={H - 26} d={0.8} x={sgn * (doorW / 2 + 0.5)} y={H / 2} z={frontZ + 1.5} mat={MAT.dark} shadow={false} />
+            <Box w={Math.max(doorW - 16, 4)} h={H - 30} d={1} x={sgn * (doorW / 2 + 0.5)} y={H / 2} z={frontZ + 1.7} mat={MAT.wood} />
+            <Box w={1.6} h={18} d={1.6} x={sgn > 0 ? 3 : -3} y={H / 2} z={frontZ + 2.2} mat={MAT.chrome} />
+          </group>
+        ))}
+      </>
+    );
+  }
+
   const tallUnits: Record<string, number> = {
-    fridge: 180, fridge_american: 180, larder_unit: 200, wardrobe: 200,
+    fridge: 180, fridge_american: 180, larder_unit: 200,
     bookshelf: 180, shelving_unit: 180, filing_cabinet: 72,
   };
   if (t in tallUnits) {
@@ -895,7 +914,24 @@ function ItemShape({ item, wallHeight, inWorktopRun = false }: { item: Furniture
     );
   }
   if (t === "sideboard") return <Box w={w} h={80} d={d} mat={MAT.wood} />;
-  if (t === "chest_drawers") return <Box w={w} h={75} d={d} mat={MAT.wood} />;
+  if (t === "chest_drawers") {
+    const H = 80, frontZ = d / 2, n = 3, gap = 2, bot = 6, top = H - 6;
+    const dh = (top - bot - (n - 1) * gap) / n;
+    return (
+      <>
+        <Box w={w} h={H} d={d} mat={MAT.wood} />
+        {Array.from({ length: n }, (_, i) => {
+          const cy = bot + dh / 2 + i * (dh + gap);
+          return (
+            <group key={i}>
+              <Box w={w - 6} h={dh} d={1.4} y={cy} z={frontZ + 0.7} mat={MAT.wood} />
+              <Box w={Math.min(16, w * 0.3)} h={1.4} d={1.4} y={cy} z={frontZ + 1.6} mat={MAT.chrome} />
+            </group>
+          );
+        })}
+      </>
+    );
+  }
   if (t === "rug") return <Box w={w} h={1.5} d={d} y={1.5} mat={MAT.rug} shadow={false} />;
   if (t === "fireplace") {
     return (
@@ -937,16 +973,20 @@ interface ModelDef {
   targetH: number; // cm
   /** Extra rotation (radians) so the model's front matches the item's front */
   yaw?: number;
+  /** Skip the aspect-based 90° auto-rotate. Beds are square-ish, so the
+   *  heuristic can spin the headboard to the wrong wall; their facing is
+   *  semantic (follow the 2D rotation), not derived from width vs depth. */
+  fixedFacing?: boolean;
 }
 
-function def(file: string, targetH: number, yaw = 0): ModelDef {
-  return { url: `/models/${file}.glb`, targetH, yaw };
+function def(file: string, targetH: number, yaw = 0, fixedFacing = false): ModelDef {
+  return { url: `/models/${file}.glb`, targetH, yaw, fixedFacing };
 }
 
 const MODEL_MAP: Record<string, ModelDef> = {
-  bed_double: def("fm_bed_grey", 95),
-  bed_king: def("fm_bed_grey", 95),
-  bed_superking: def("fm_bed_grey", 95),
+  bed_double: def("fm_bed_grey", 95, 0, true),
+  bed_king: def("fm_bed_grey", 95, 0, true),
+  bed_superking: def("fm_bed_grey", 95, 0, true),
   sofa_3: def("sofa_03", 80, Math.PI),
   sofa_2: def("sofa_02", 75, Math.PI),
   sofa_bed: def("sofa_02", 75, Math.PI),
@@ -955,8 +995,6 @@ const MODEL_MAP: Record<string, ModelDef> = {
   coffee_table: def("modern_coffee_table_01", 40),
   side_table: def("side_table_01", 50),
   bedside_table: def("ClassicNightstand_01", 60),
-  chest_drawers: def("drawer_cabinet", 80),
-  wardrobe: def("drawer_cabinet", 200),
   dining_table_4: def("wooden_table_02", 75),
   dining_table_6: def("painted_wooden_table", 76),
   dining_table_round: def("round_wooden_table_01", 75),
@@ -1005,8 +1043,9 @@ function ModelItem({ item, model }: { item: FurnitureItem; model: ModelDef }) {
   const bh = Math.max(size.y * 100, 1);
   const bd = size.z * 100;
 
-  // If the model's long axis doesn't match the item's, turn it 90°
-  const rotate90 = item.width >= item.height !== bw >= bd;
+  // If the model's long axis doesn't match the item's, turn it 90° —
+  // except for fixed-facing items (beds), whose orientation is semantic.
+  const rotate90 = model.fixedFacing ? false : (item.width >= item.height !== bw >= bd);
   const mw = rotate90 ? bd : bw;
   const md = rotate90 ? bw : bd;
 
