@@ -118,9 +118,9 @@ function loadStyle(): StyleState {
 function SceneSettings({ brightness, evening }: { brightness: number; evening: boolean }) {
   const { gl, scene } = useThree();
   useEffect(() => {
-    gl.toneMappingExposure = brightness * (evening ? 0.72 : 1);
+    gl.toneMappingExposure = brightness * (evening ? 0.75 : 1.18);
     // Image-based ambient light; dimmed in evening mode
-    (scene as THREE.Scene & { environmentIntensity?: number }).environmentIntensity = evening ? 0.3 : 0.85;
+    (scene as THREE.Scene & { environmentIntensity?: number }).environmentIntensity = evening ? 0.35 : 1.0;
   }, [gl, scene, brightness, evening]);
   return null;
 }
@@ -237,6 +237,9 @@ interface Opening {
   t0: number;
   t1: number;
   kind: "door" | "window" | "archway";
+  /** original item type, for door-leaf rendering */
+  openType: string;
+  mirrored?: boolean;
 }
 
 interface WallWithOpenings {
@@ -282,7 +285,7 @@ function buildWallData(walls: Wall[], furniture: FurnitureItem[]): WallWithOpeni
       item.type === "archway" ? "archway" : "door";
     const t0 = Math.max(0, best.t - half);
     const t1 = Math.min(best.d.length, best.t + half);
-    if (t1 - t0 > 5) best.d.openings.push({ t0, t1, kind });
+    if (t1 - t0 > 5) best.d.openings.push({ t0, t1, kind, openType: item.type, mirrored: item.mirrored });
   }
 
   for (const d of data) d.openings.sort((a, b) => a.t0 - b.t0);
@@ -295,6 +298,7 @@ function WallMesh({ data, height }: { data: WallWithOpenings; height: number }) 
   const material = wall.wallType === "interior" ? MAT.wallInterior : MAT.wall;
 
   const parts: { x: number; y: number; w: number; h: number; mat?: THREE.Material; depth?: number }[] = [];
+  const doorOpenings: Opening[] = [];
   let cursor = 0;
   for (const op of openings) {
     if (op.t0 > cursor + 1) {
@@ -305,6 +309,9 @@ function WallMesh({ data, height }: { data: WallWithOpenings; height: number }) 
     if (op.kind === "door" || op.kind === "archway") {
       if (height > DOOR_HEIGHT) {
         parts.push({ x: mid, y: (DOOR_HEIGHT + height) / 2, w, h: height - DOOR_HEIGHT });
+      }
+      if (op.kind === "door") {
+        doorOpenings.push(op);
       }
     } else {
       // window: sill below, header above, glass between
@@ -337,6 +344,64 @@ function WallMesh({ data, height }: { data: WallWithOpenings; height: number }) 
           <boxGeometry args={[p.w, p.h, p.depth ?? th]} />
         </mesh>
       ))}
+      {doorOpenings.map((op, i) => {
+        const w = op.t1 - op.t0;
+        const mid = (op.t0 + op.t1) / 2;
+        const glassy = op.openType === "door_patio" || op.openType === "door_sliding";
+        const doubleLeaf = op.openType === "door_double" || glassy;
+        const frame = (
+          <group key={`f${i}`}>
+            {/* jambs + head */}
+            <mesh position={[op.t0 + 2, DOOR_HEIGHT / 2, 0]} material={MAT.white} castShadow>
+              <boxGeometry args={[4, DOOR_HEIGHT, th + 2.5]} />
+            </mesh>
+            <mesh position={[op.t1 - 2, DOOR_HEIGHT / 2, 0]} material={MAT.white} castShadow>
+              <boxGeometry args={[4, DOOR_HEIGHT, th + 2.5]} />
+            </mesh>
+            <mesh position={[mid, DOOR_HEIGHT - 2, 0]} material={MAT.white} castShadow>
+              <boxGeometry args={[w, 4, th + 2.5]} />
+            </mesh>
+          </group>
+        );
+        if (glassy) {
+          return (
+            <group key={`d${i}`}>
+              {frame}
+              <mesh position={[mid - w / 4, DOOR_HEIGHT / 2 - 2, 0]} material={MAT.glass}>
+                <boxGeometry args={[w / 2 - 6, DOOR_HEIGHT - 8, 3]} />
+              </mesh>
+              <mesh position={[mid + w / 4, DOOR_HEIGHT / 2 - 2, th / 2 + 2]} material={MAT.glass}>
+                <boxGeometry args={[w / 2 - 6, DOOR_HEIGHT - 8, 3]} />
+              </mesh>
+            </group>
+          );
+        }
+        const leafW = doubleLeaf ? w / 2 - 5 : w - 8;
+        const openAngle = 0.5 * (op.mirrored ? -1 : 1);
+        return (
+          <group key={`d${i}`}>
+            {frame}
+            <group position={[op.t0 + 4, 0, 0]} rotation={[0, -openAngle, 0]}>
+              <mesh position={[leafW / 2, DOOR_HEIGHT / 2 - 2, 0]} material={MAT.cream} castShadow>
+                <boxGeometry args={[leafW, DOOR_HEIGHT - 6, 4]} />
+              </mesh>
+              <mesh position={[leafW - 8, 100, 3.5]} material={MAT.chrome} castShadow>
+                <boxGeometry args={[2.5, 12, 2.5]} />
+              </mesh>
+            </group>
+            {doubleLeaf && (
+              <group position={[op.t1 - 4, 0, 0]} rotation={[0, openAngle, 0]}>
+                <mesh position={[-leafW / 2, DOOR_HEIGHT / 2 - 2, 0]} material={MAT.cream} castShadow>
+                  <boxGeometry args={[leafW, DOOR_HEIGHT - 6, 4]} />
+                </mesh>
+                <mesh position={[-(leafW - 8), 100, 3.5]} material={MAT.chrome} castShadow>
+                  <boxGeometry args={[2.5, 12, 2.5]} />
+                </mesh>
+              </group>
+            )}
+          </group>
+        );
+      })}
     </group>
   );
 }
@@ -678,6 +743,35 @@ function ItemShape({ item, wallHeight, inWorktopRun = false }: { item: Furniture
             ))}
           </>
         )}
+      </>
+    );
+  }
+  if (t === "hob") {
+    // A hob is a worktop-level panel — place it over any unit or worktop run
+    return (
+      <>
+        <Box w={w} h={2} d={d} y={92} mat={MAT.screen} />
+        {[[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([sx, sz], i) => (
+          <mesh key={i} position={[sx * (w / 4 - 2), 93.6, sz * (d / 4 - 2)]} material={MAT.dark} castShadow={false}>
+            <cylinderGeometry args={[Math.min(7, w / 6), Math.min(7, w / 6), 0.8, 20]} />
+          </mesh>
+        ))}
+      </>
+    );
+  }
+  if (t === "oven_housing") {
+    return (
+      <>
+        <Box w={Math.max(w - 5, 8)} h={10} d={Math.max(d - 5, 8)} mat={MAT.dark} />
+        <Box w={w} h={190} d={d} y={105} mat={unitMat} />
+        {/* oven at eye level */}
+        <Box w={w - 6} h={58} d={2} y={110} z={d / 2 + 1} mat={applianceMat} />
+        <Box w={w - 12} h={40} d={1} y={106} z={d / 2 + 2} mat={MAT.screen} shadow={false} />
+        <Box w={w - 11} h={1.8} d={1.8} y={132} z={d / 2 + 3} mat={MAT.chrome} />
+        {/* doors above and below */}
+        <Box w={w - 6} h={52} d={1.6} y={40} z={d / 2 + 0.8} mat={unitMat} />
+        <Box w={w - 6} h={50} d={1.6} y={172} z={d / 2 + 0.8} mat={unitMat} />
+        <Box w={10} h={1.3} d={1.3} y={62} z={d / 2 + 2.2} mat={MAT.chrome} />
       </>
     );
   }
@@ -1079,8 +1173,20 @@ function SnapshotEngine({
           }
         }
 
-        // Watermark (free tier)
+        // Watermark (free tier): faint diagonal marks across the image so a
+        // crop can't remove them, plus the corner tag
         actx.globalAlpha = 1;
+        const dfs = Math.max(28, Math.round(outW / 34));
+        actx.save();
+        actx.translate(outW / 2, outH / 2);
+        actx.rotate(-0.35);
+        actx.font = `600 ${dfs}px 'General Sans', 'DM Sans', sans-serif`;
+        actx.textAlign = "center";
+        actx.fillStyle = "rgba(120, 120, 120, 0.13)";
+        for (let row = -1; row <= 1; row++) {
+          actx.fillText("freeroomplanner.com", 0, row * outH * 0.34);
+        }
+        actx.restore();
         const fs = Math.max(16, Math.round(outW / 90));
         actx.font = `600 ${fs}px 'General Sans', 'DM Sans', sans-serif`;
         actx.textAlign = "right";
@@ -1118,10 +1224,11 @@ interface View3DProps {
   state: EditorState;
   isDark: boolean;
   onUpdateFurniture?: (id: string, updates: Partial<FurnitureItem>) => void;
+  onRemoveFurniture?: (id: string) => void;
   onPushUndo?: () => void;
 }
 
-export default function View3D({ state, isDark, onUpdateFurniture, onPushUndo }: View3DProps) {
+export default function View3D({ state, isDark, onUpdateFurniture, onRemoveFurniture, onPushUndo }: View3DProps) {
   const [wallHeight, setWallHeight] = useState(DEFAULT_WALL_HEIGHT);
   const [style, setStyle] = useState<StyleState>(loadStyle);
   const [stylePanelOpen, setStylePanelOpen] = useState(false);
@@ -1134,6 +1241,21 @@ export default function View3D({ state, isDark, onUpdateFurniture, onPushUndo }:
   const lightRef = useRef<THREE.DirectionalLight>(null);
 
   const selectedItem = state.furniture.find((f) => f.id === selectedId) ?? null;
+
+  // Backspace / Delete removes the selected item (unless typing in a field)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Backspace" && e.key !== "Delete") return;
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      if (!selectedId || !onRemoveFurniture) return;
+      e.preventDefault();
+      onRemoveFurniture(selectedId);
+      setSelectedId(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selectedId, onRemoveFurniture]);
 
   const handleDragStart = (id: string, point: THREE.Vector3) => {
     const item = state.furniture.find((f) => f.id === id);
@@ -1152,10 +1274,42 @@ export default function View3D({ state, isDark, onUpdateFurniture, onPushUndo }:
     if (!d || !onUpdateFurniture) return;
     const item = state.furniture.find((f) => f.id === d.id);
     if (!item) return;
-    onUpdateFurniture(d.id, {
-      x: Math.round(point.x + d.offX - item.width / 2),
-      y: Math.round(point.z + d.offY - item.height / 2),
-    });
+    let nx = point.x + d.offX - item.width / 2;
+    let ny = point.z + d.offY - item.height / 2;
+
+    // Snap to wall inner faces (axis-aligned walls), like the 2D editor
+    const SNAP = 14;
+    let bestDX: number | null = null;
+    let bestDY: number | null = null;
+    for (const wall of state.walls) {
+      const wdx = wall.end.x - wall.start.x;
+      const wdy = wall.end.y - wall.start.y;
+      const horizontal = Math.abs(wdx) >= Math.abs(wdy);
+      const half = (wall.thickness || 5) / 2;
+      if (horizontal) {
+        const y = (wall.start.y + wall.end.y) / 2;
+        const minX = Math.min(wall.start.x, wall.end.x) - 10;
+        const maxX = Math.max(wall.start.x, wall.end.x) + 10;
+        if (nx + item.width < minX || nx > maxX) continue;
+        for (const face of [y + half, y - half - item.height]) {
+          const delta = face - ny;
+          if (Math.abs(delta) <= SNAP && (bestDY === null || Math.abs(delta) < Math.abs(bestDY))) bestDY = delta;
+        }
+      } else {
+        const x = (wall.start.x + wall.end.x) / 2;
+        const minY = Math.min(wall.start.y, wall.end.y) - 10;
+        const maxY = Math.max(wall.start.y, wall.end.y) + 10;
+        if (ny + item.height < minY || ny > maxY) continue;
+        for (const face of [x + half, x - half - item.width]) {
+          const delta = face - nx;
+          if (Math.abs(delta) <= SNAP && (bestDX === null || Math.abs(delta) < Math.abs(bestDX))) bestDX = delta;
+        }
+      }
+    }
+    if (bestDX !== null) nx += bestDX;
+    if (bestDY !== null) ny += bestDY;
+
+    onUpdateFurniture(d.id, { x: Math.round(nx), y: Math.round(ny) });
   };
 
   const endDrag = () => {
@@ -1335,7 +1489,7 @@ export default function View3D({ state, isDark, onUpdateFurniture, onPushUndo }:
         <color attach="background" args={[style.evening ? "#232830" : isDark ? "#20242a" : "#e9edf2"]} />
         <SceneSettings brightness={style.brightness} evening={style.evening} />
         <hemisphereLight
-          intensity={style.evening ? 0.28 : 0.5}
+          intensity={style.evening ? 0.3 : 0.62}
           color={style.evening ? "#dfd4c0" : "#ffffff"}
           groundColor="#8a8a80"
         />
