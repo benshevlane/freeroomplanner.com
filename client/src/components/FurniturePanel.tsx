@@ -1,5 +1,6 @@
-import { useState } from "react";
-import { FURNITURE_LIBRARY, FurnitureTemplate, isWallCupboard } from "../lib/types";
+import { useEffect, useRef, useState } from "react";
+import { FURNITURE_LIBRARY, FurnitureTemplate, FurnitureItem, isWallCupboard } from "../lib/types";
+import { drawFurniture } from "../lib/canvas-renderer";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -41,6 +42,61 @@ function WallCupboardIcon() {
       <line x1="1" y1="3" x2="15" y2="13" stroke="currentColor" strokeWidth="0.7" opacity="0.4" />
       <line x1="15" y1="3" x2="1" y2="13" stroke="currentColor" strokeWidth="0.7" opacity="0.4" />
     </svg>
+  );
+}
+
+/**
+ * Small top-down preview of an item, drawn by the SAME renderer that draws the
+ * plan — so the thumbnail always matches exactly what lands on the canvas.
+ */
+const THUMB_SIZE = 34;
+function ItemThumb({ template }: { template: FurnitureTemplate }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = THUMB_SIZE * dpr;
+    canvas.height = THUMB_SIZE * dpr;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.scale(dpr, dpr);
+    ctx.clearRect(0, 0, THUMB_SIZE, THUMB_SIZE);
+
+    const pad = 3;
+    const scale = (THUMB_SIZE - pad * 2) / Math.max(template.width, template.height);
+    const item: FurnitureItem = {
+      id: `thumb-${template.type}`,
+      type: template.type,
+      label: "",
+      x: 0,
+      y: 0,
+      width: template.width,
+      height: template.height,
+      rotation: 0,
+      category: template.category,
+    };
+    // pxPerCm inside drawFurniture is (gridSize * zoom) / 100 — with
+    // gridSize=100 and zoom=scale it becomes exactly our fitted scale.
+    const panOffset = {
+      x: (THUMB_SIZE - template.width * scale) / 2,
+      y: (THUMB_SIZE - template.height * scale) / 2,
+    };
+    try {
+      drawFurniture(ctx, [item], 100, scale, panOffset, false, null);
+    } catch {
+      // A failed thumbnail must never break the library list
+    }
+  }, [template]);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      style={{ width: THUMB_SIZE, height: THUMB_SIZE }}
+      className="flex-shrink-0 rounded-sm bg-background border border-border/60"
+      aria-hidden="true"
+    />
   );
 }
 
@@ -141,11 +197,7 @@ export default function FurniturePanel({ onSelectFurniture, onSwitchToSelect, cl
                 data-testid={`furniture-item-${template.type}`}
               >
                 <GripVertical className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-                {isWallCup ? (
-                  <WallCupboardIcon />
-                ) : (
-                  <CatIcon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                )}
+                <ItemThumb template={template} />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{template.label}</p>
                   <p className="text-xs text-muted-foreground">

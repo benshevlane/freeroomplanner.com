@@ -37,6 +37,7 @@ import {
   TextCursorInput,
   Ruler,
   Magnet,
+  Unlink,
 } from "lucide-react";
 
 interface EditorToolbarProps {
@@ -76,6 +77,10 @@ interface EditorToolbarProps {
   onToggleComponentLabels: () => void;
   snapEnabled: boolean;
   onToggleSnap: () => void;
+  measurementsVisible: boolean;
+  onToggleMeasurements: () => void;
+  detachWalls: boolean;
+  onToggleDetachWalls: () => void;
 }
 
 const tools: { tool: EditorTool; icon: typeof MousePointer2; label: string; shortcut: string }[] = [
@@ -121,6 +126,10 @@ export default function EditorToolbar({
   componentLabelsVisible,
   snapEnabled,
   onToggleSnap,
+  measurementsVisible,
+  onToggleMeasurements,
+  detachWalls,
+  onToggleDetachWalls,
   onToggleComponentLabels,
 }: EditorToolbarProps) {
   if (isMobile) {
@@ -139,8 +148,8 @@ export default function EditorToolbar({
             <Button
               key={tool}
               size="icon"
-              variant={selectedTool === tool ? "default" : "ghost"}
-              className={btnClass}
+              variant="ghost"
+              className={`${btnClass} ${selectedTool === tool ? "bg-foreground text-background hover:bg-foreground" : ""}`}
               onClick={() => onSetTool(tool)}
               data-testid={`tool-${tool}`}
             >
@@ -199,6 +208,26 @@ export default function EditorToolbar({
 
           <div className="flex-1" />
 
+          {/* Compact metric / imperial toggle */}
+          <div className="flex items-center rounded-md border border-border overflow-hidden mr-1" data-testid="units-toggle-mobile">
+            <Button
+              size="sm"
+              variant={units !== "ft" ? "default" : "ghost"}
+              className="text-xs px-2 h-8 rounded-none"
+              onClick={() => onSetUnits("m")}
+            >
+              {units !== "ft" ? UNIT_SHORT[units] : "m"}
+            </Button>
+            <Button
+              size="sm"
+              variant={units === "ft" ? "default" : "ghost"}
+              className="text-xs px-2 h-8 rounded-none"
+              onClick={() => onSetUnits("ft")}
+            >
+              ft/in
+            </Button>
+          </div>
+
           <Button size="icon" variant="ghost" className={btnClass} onClick={onTogglePropertiesPanel} data-testid="btn-properties">
             <SlidersHorizontal className="h-5 w-5" />
           </Button>
@@ -248,7 +277,7 @@ export default function EditorToolbar({
               <DropdownMenuSeparator />
               {(["m", "cm", "mm", "ft"] as UnitSystem[]).map((u) => (
                 <DropdownMenuItem key={u} onClick={() => onSetUnits(u)}>
-                  {units === u ? "\u2713 " : "   "}{UNIT_LABELS[u]}
+                  {units === u ? "✓ " : "   "}{UNIT_LABELS[u]}
                 </DropdownMenuItem>
               ))}
               <DropdownMenuItem onClick={onToggleMeasureMode}>
@@ -257,6 +286,14 @@ export default function EditorToolbar({
               <DropdownMenuItem onClick={onToggleShowAllMeasurements}>
                 <Ruler className="h-4 w-4 mr-2" />
                 Show all measurements: {showAllMeasurements ? "On" : "Off"}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onToggleMeasurements}>
+                <Ruler className="h-4 w-4 mr-2" />
+                Measurements: {measurementsVisible ? "On" : "Off"}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onToggleDetachWalls}>
+                <Unlink className="h-4 w-4 mr-2" />
+                Detach walls: {detachWalls ? "On" : "Off"}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={onToggleSnap}>
                 <Magnet className="h-4 w-4 mr-2" />
@@ -280,15 +317,16 @@ export default function EditorToolbar({
 
   // Desktop layout (unchanged)
   return (
-    <div className="flex items-center gap-1 px-3 py-2 border-b border-border bg-card" data-testid="editor-toolbar">
-      {/* Tools */}
-      <div className="flex items-center gap-0.5">
+    <div className="flex items-center gap-3 px-4 py-2 border-b border-border bg-muted/40" data-testid="editor-toolbar">
+      {/* Tools cluster */}
+      <div className="flex items-center gap-0.5 rounded-xl border border-border bg-background p-[3px] shadow-sm">
         {tools.map(({ tool, icon: Icon, label, shortcut }) => (
           <Tooltip key={tool}>
             <TooltipTrigger asChild>
               <Button
                 size="icon"
-                variant={selectedTool === tool ? "default" : "ghost"}
+                variant="ghost"
+                className={selectedTool === tool ? "bg-foreground text-background hover:bg-foreground" : ""}
                 onClick={() => onSetTool(tool)}
                 data-testid={`tool-${tool}`}
               >
@@ -300,17 +338,12 @@ export default function EditorToolbar({
             </TooltipContent>
           </Tooltip>
         ))}
-      </div>
-
-      <Separator orientation="vertical" className="h-6 mx-1" />
-
-      {/* Text / Annotation Tools */}
-      <div className="flex items-center gap-0.5">
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
               size="icon"
-              variant={selectedTool === "label" ? "default" : "ghost"}
+              variant="ghost"
+              className={selectedTool === "label" ? "bg-foreground text-background hover:bg-foreground" : ""}
               onClick={() => onSetTool("label")}
               data-testid="tool-label"
             >
@@ -329,10 +362,8 @@ export default function EditorToolbar({
         </Tooltip>
       </div>
 
-      <Separator orientation="vertical" className="h-6 mx-1" />
-
-      {/* Undo/Redo */}
-      <div className="flex items-center gap-0.5">
+      {/* History cluster */}
+      <div className="flex items-center gap-0.5 rounded-xl border border-border bg-background p-[3px] shadow-sm">
         <Tooltip>
           <TooltipTrigger asChild>
             <Button size="icon" variant="ghost" onClick={onUndo} disabled={!canUndo} data-testid="btn-undo">
@@ -351,10 +382,8 @@ export default function EditorToolbar({
         </Tooltip>
       </div>
 
-      <Separator orientation="vertical" className="h-6 mx-1" />
-
-      {/* Zoom */}
-      <div className="flex items-center gap-0.5">
+      {/* Zoom cluster */}
+      <div className="flex items-center gap-0.5 rounded-xl border border-border bg-background p-[3px] shadow-sm">
         <Tooltip>
           <TooltipTrigger asChild>
             <Button size="icon" variant="ghost" onClick={onZoomOut} data-testid="btn-zoom-out">
@@ -384,8 +413,6 @@ export default function EditorToolbar({
         </Tooltip>
       </div>
 
-      <Separator orientation="vertical" className="h-6 mx-1" />
-
       {/* Selection actions */}
       {hasSelection && (
         <div className="flex items-center gap-0.5">
@@ -411,97 +438,16 @@ export default function EditorToolbar({
         </div>
       )}
 
-      {/* Spacer */}
-      <div className="flex-1" />
-
-      {/* Actions */}
-      <div className="flex items-center gap-1">
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button size="sm" variant="ghost" onClick={onClearAll} className="text-destructive" data-testid="btn-clear">
-              <Trash className="h-4 w-4 mr-1" />
-              Clear
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent><p>Clear all items</p></TooltipContent>
-        </Tooltip>
-        {/* One press: opens the save window, which creates the shareable link
-            and downloads the plan image. The plan already auto-saves locally. */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button size="sm" onClick={onShareLink} data-testid="btn-save-plan">
-              <Download className="h-4 w-4 mr-1" />
-              Save
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent><p>Save your plan — downloads it and creates a shareable link</p></TooltipContent>
-        </Tooltip>
+      {/* View pills — mock order: Snap · Detach · Labels · Inside faces · Units */}
+      <div className="flex items-center gap-1.5">
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
               size="sm"
-              variant="outline"
-              onClick={onToggleMeasureMode}
-              data-testid="btn-toggle-measure"
-              className="text-xs px-2"
-            >
-              {measureMode === "full" ? "Full Wall" : "Inside"}
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>{measureMode === "full" ? "Showing full wall length — click for inside measurement" : "Showing inside measurement — click for full wall length"}</p>
-          </TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              size="sm"
-              variant={showAllMeasurements ? "default" : "outline"}
-              onClick={onToggleShowAllMeasurements}
-              data-testid="btn-toggle-show-all-measurements"
-              className="text-xs px-2"
-            >
-              <Ruler className="h-3.5 w-3.5 mr-1" />
-              All
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>{showAllMeasurements ? "Showing measurements on every wall — click to hide short-wall labels" : "Short-wall labels hidden — click to show measurements on all walls"}</p>
-          </TooltipContent>
-        </Tooltip>
-        <DropdownMenu>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  data-testid="btn-toggle-units"
-                  className="text-xs font-mono px-2"
-                >
-                  {UNIT_SHORT[units]}
-                </Button>
-              </DropdownMenuTrigger>
-            </TooltipTrigger>
-            <TooltipContent><p>Change measurement units</p></TooltipContent>
-          </Tooltip>
-          <DropdownMenuContent align="end">
-            {(["m", "cm", "mm", "ft"] as UnitSystem[]).map((u) => (
-              <DropdownMenuItem key={u} onClick={() => onSetUnits(u)} className={units === u ? "font-semibold" : ""}>
-                <span className="font-mono w-6 inline-block">{UNIT_SHORT[u]}</span>
-                {UNIT_LABELS[u]}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              size="sm"
-              variant={snapEnabled ? "default" : "outline"}
+              variant="ghost"
               onClick={onToggleSnap}
               data-testid="btn-toggle-snap"
-              className="text-xs px-2"
+              className={snapEnabled ? "h-9 rounded-[10px] border border-primary/40 bg-primary/10 text-primary hover:bg-primary/15 px-3 text-[13px] font-semibold gap-1.5" : "h-9 rounded-[10px] border border-border bg-background text-muted-foreground hover:bg-muted px-3 text-[13px] font-semibold gap-1.5"}
               aria-pressed={snapEnabled}
             >
               <Magnet className="h-3.5 w-3.5 mr-1" />
@@ -520,26 +466,175 @@ export default function EditorToolbar({
           <TooltipTrigger asChild>
             <Button
               size="sm"
-              variant={componentLabelsVisible ? "default" : "outline"}
-              onClick={onToggleComponentLabels}
-              data-testid="btn-toggle-labels"
-              className="text-xs px-2"
+              variant="ghost"
+              onClick={onToggleDetachWalls}
+              data-testid="btn-toggle-detach"
+              className={detachWalls ? "h-9 rounded-[10px] border border-primary/40 bg-primary/10 text-primary hover:bg-primary/15 px-3 text-[13px] font-semibold gap-1.5" : "h-9 rounded-[10px] border border-border bg-background text-muted-foreground hover:bg-muted px-3 text-[13px] font-semibold gap-1.5"}
+              aria-pressed={detachWalls}
             >
-              <Tags className="h-3.5 w-3.5 mr-1" />
-              Labels
+              <Unlink className="h-3.5 w-3.5 mr-1" />
+              Detach
             </Button>
           </TooltipTrigger>
-          <TooltipContent><p>{componentLabelsVisible ? "Hide component labels" : "Show component labels"}</p></TooltipContent>
+          <TooltipContent>
+            <p>
+              {detachWalls
+                ? "Detach on — dragging a wall moves it alone (hold Alt for the same)"
+                : "Drag moves connected walls together — turn on (or hold Alt) to move one wall alone"}
+            </p>
+          </TooltipContent>
         </Tooltip>
+        <DropdownMenu>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  data-testid="btn-toggle-labels"
+                  className={componentLabelsVisible || measurementsVisible ? "h-9 rounded-[10px] border border-primary/40 bg-primary/10 text-primary hover:bg-primary/15 px-3 text-[13px] font-semibold gap-1.5" : "h-9 rounded-[10px] border border-border bg-background text-muted-foreground hover:bg-muted px-3 text-[13px] font-semibold gap-1.5"}
+                >
+                  <Tags className="h-3.5 w-3.5 mr-1" />
+                  Labels
+                </Button>
+              </DropdownMenuTrigger>
+            </TooltipTrigger>
+            <TooltipContent><p>Show or hide item labels and measurements</p></TooltipContent>
+          </Tooltip>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={onToggleComponentLabels} data-testid="menu-toggle-item-labels">
+              <Tags className="h-4 w-4 mr-2" />
+              {componentLabelsVisible ? "✓ " : " "}Item labels
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={onToggleMeasurements} data-testid="menu-toggle-measurements">
+              <Ruler className="h-4 w-4 mr-2" />
+              {measurementsVisible ? "✓ " : " "}Measurements
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={onToggleShowAllMeasurements} data-testid="btn-toggle-show-all-measurements">
+              <Ruler className="h-4 w-4 mr-2 opacity-50" />
+              {showAllMeasurements ? "✓ " : " "}All wall sizes (incl. short walls)
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button size="sm" variant="ghost" onClick={onLoadPlan} data-testid="btn-load-plan">
-              <FolderOpen className="h-4 w-4 mr-1" />
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  data-testid="btn-toggle-measure"
+                  className="h-9 rounded-[10px] border border-border bg-background text-muted-foreground hover:bg-muted px-3 text-[13px] font-semibold gap-1.5"
+                >
+                  {measureMode === "full" ? "Full wall" : "Inside faces"}
+                  <span className="text-[9px] opacity-60">▾</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => { if (measureMode !== "inside") onToggleMeasureMode(); }}>
+                  {measureMode === "inside" ? "✓ " : " "}Inside faces — usable room size
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => { if (measureMode !== "full") onToggleMeasureMode(); }}>
+                  {measureMode === "full" ? "✓ " : " "}Full wall — outside length
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>How wall lengths are measured</p>
+          </TooltipContent>
+        </Tooltip>
+        <div
+          className="flex items-center h-9 rounded-[10px] border border-border bg-background overflow-hidden"
+          data-testid="units-toggle"
+          role="group"
+          aria-label="Measurement units"
+        >
+          <DropdownMenu>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    data-testid="btn-units-metric"
+                    className={`h-full text-[13px] font-semibold px-3 rounded-none gap-1 ${units !== "ft" ? "bg-primary/10 text-primary hover:bg-primary/15" : "text-muted-foreground"}`}
+                  >
+                    Metric{units !== "ft" ? ` (${UNIT_SHORT[units]})` : ""}
+                  </Button>
+                </DropdownMenuTrigger>
+              </TooltipTrigger>
+              <TooltipContent><p>Metric units — click again to choose m, cm or mm</p></TooltipContent>
+            </Tooltip>
+            <DropdownMenuContent align="end">
+              {(["m", "cm", "mm"] as UnitSystem[]).map((u) => (
+                <DropdownMenuItem key={u} onClick={() => onSetUnits(u)} className={units === u ? "font-semibold" : ""}>
+                  <span className="font-mono w-8 inline-block">{UNIT_SHORT[u]}</span>
+                  {UNIT_LABELS[u]}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                size="sm"
+                variant="ghost"
+                data-testid="btn-units-imperial"
+                className={`h-full text-[13px] font-semibold px-3 rounded-none ${units === "ft" ? "bg-primary/10 text-primary hover:bg-primary/15" : "text-muted-foreground"}`}
+                onClick={() => onSetUnits("ft")}
+              >
+                Feet &amp; Inches
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent><p>Imperial units — enter sizes like 6'6"</p></TooltipContent>
+          </Tooltip>
+        </div>
+      </div>
+
+      {/* Spacer */}
+      <div className="flex-1" />
+
+      {/* Document actions, right-aligned: Load · Save · overflow */}
+      <div className="flex items-center gap-1.5">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button size="sm" variant="ghost" onClick={onLoadPlan} data-testid="btn-load-plan" className="h-9 rounded-[10px] border border-border bg-background text-muted-foreground hover:bg-muted px-3 text-[13px] font-semibold gap-1.5">
+              <FolderOpen className="h-4 w-4" />
               Load
             </Button>
           </TooltipTrigger>
           <TooltipContent><p>Load Plan (JSON)</p></TooltipContent>
         </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button size="sm" onClick={onShareLink} data-testid="btn-save-plan" className="h-9 rounded-[10px] px-4 text-[13px] font-bold shadow-md shadow-primary/30 gap-1.5">
+              <Download className="h-4 w-4" />
+              Save
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent><p>Save your plan — downloads it and creates a shareable link</p></TooltipContent>
+        </Tooltip>
+        <div className="w-px h-6 bg-border mx-0.5" />
+        {/* Overflow menu holding destructive Clear, moved away from Save */}
+        <DropdownMenu>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <DropdownMenuTrigger asChild>
+                <Button size="icon" variant="ghost" className="h-9 w-9 rounded-[10px] border border-border bg-background text-muted-foreground hover:bg-muted" data-testid="btn-toolbar-overflow">
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+            </TooltipTrigger>
+            <TooltipContent><p>More</p></TooltipContent>
+          </Tooltip>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={onClearAll} className="text-destructive" data-testid="btn-clear">
+              <Trash className="h-4 w-4 mr-2" />
+              Clear canvas…
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </div>
   );
