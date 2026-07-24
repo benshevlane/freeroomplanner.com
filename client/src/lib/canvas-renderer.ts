@@ -2810,6 +2810,7 @@ function drawFurnitureDetail(
       }
       break;
     }
+    case "hob":
     case "cooker":
       // Four burners
       const br = Math.min(w, h) * 0.14;
@@ -4090,6 +4091,7 @@ function drawFurnitureDetail(
       ctx.globalAlpha = 1;
       break;
     }
+    case "oven_housing":
     case "larder_unit": {
       // Tall unit plan convention: inset outline with a single diagonal
       ctx.strokeRect(-w * 0.42, -h * 0.42, w * 0.84, h * 0.84);

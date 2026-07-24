@@ -314,6 +314,8 @@ export const FURNITURE_LIBRARY: FurnitureTemplate[] = [
   { type: "wall_cupboard_double", label: "Wall Cupboard (double)", width: 100, height: 35, category: "Kitchen", icon: "square", isWallCupboard: true, defaultHeightFromFloor: 145 },
   { type: "wall_cupboard_corner", label: "Corner Wall Cupboard", width: 90, height: 90, category: "Kitchen", icon: "square", isWallCupboard: true, defaultHeightFromFloor: 145 },
   { type: "boiler", label: "Boiler", width: 60, height: 60, category: "Kitchen", icon: "flame" },
+  { type: "hob", label: "Hob (sits on worktop)", width: 60, height: 52, category: "Kitchen", icon: "flame" },
+  { type: "oven_housing", label: "Oven Housing (tall)", width: 60, height: 60, category: "Kitchen", icon: "flame" },
   { type: "floor_cupboard", label: "Floor Cupboard", width: 60, height: 60, category: "Kitchen", icon: "square" },
   { type: "drawer_unit_2", label: "2-Drawer Unit", width: 50, height: 60, category: "Kitchen", icon: "square" },
   { type: "drawer_unit_3", label: "3-Drawer Unit", width: 50, height: 60, category: "Kitchen", icon: "square" },
