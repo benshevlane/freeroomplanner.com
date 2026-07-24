@@ -9,7 +9,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { Layout, Pencil, Ruler, Keyboard, Rocket } from "lucide-react";
+import { Box, Layout, Pencil, Ruler, Keyboard, Rocket } from "lucide-react";
 
 const WIZARD_STORAGE_KEY = "freeroomplanner-desktop-wizard-shown";
 
@@ -42,6 +42,12 @@ const steps = [
     title: "Keyboard Shortcuts",
     description:
       "Speed up your workflow: V for Select, W for Walls, L for Label, E for Eraser, H for Pan. Use Ctrl+Z / Ctrl+Y to undo and redo. Scroll to zoom in and out. Press the ? button in the toolbar for the full shortcut list.",
+  },
+  {
+    icon: Box,
+    title: "See Your Room in 3D",
+    description:
+      "Once you've drawn a room, press the 3D View button on the canvas to step into it. Drag to look around and scroll to zoom. Click any item to recolour or rotate it, open Style to choose floors and wall colours, and press Photo to download a picture of your room.",
   },
   {
     icon: Rocket,
