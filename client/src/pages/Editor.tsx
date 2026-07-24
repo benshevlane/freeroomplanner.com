@@ -112,6 +112,9 @@ export default function Editor() {
       const t = setTimeout(() => {
         setShow3DAnnounce(true);
         te("announce_3d_shown");
+        // Re-arm the button glow so the announcement always has something to point at
+        ssi("freeroomplanner-3d-tried", "");
+        window.dispatchEvent(new Event("frp-reglow-3d"));
       }, 1200);
       return () => clearTimeout(t);
     }
