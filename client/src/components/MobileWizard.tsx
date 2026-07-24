@@ -9,7 +9,7 @@ import {
   DrawerTitle,
   DrawerDescription,
 } from "@/components/ui/drawer";
-import { Monitor, Pencil, ZoomIn, HelpCircle } from "lucide-react";
+import { Box, Monitor, Pencil, ZoomIn, HelpCircle } from "lucide-react";
 
 const WIZARD_STORAGE_KEY = "freeroomplanner-mobile-wizard-shown";
 
@@ -36,6 +36,12 @@ const steps = [
     title: "Navigation",
     description:
       "Pinch with two fingers to zoom in and out. Drag with two fingers to pan around the canvas.",
+  },
+  {
+    icon: Box,
+    title: "See It in 3D",
+    description:
+      "Draw a room, then tap 3D View on the canvas to walk around it. One finger drags to look around, pinch to zoom, and tap any item to change its colour.",
   },
   {
     icon: HelpCircle,
