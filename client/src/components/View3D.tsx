@@ -1108,6 +1108,22 @@ function SnapshotEngine({
     busy.current = true;
     let cancelled = false;
 
+    // Yield between samples WITHOUT stalling in background tabs:
+    // requestAnimationFrame never fires while the tab is hidden (the render
+    // would pause until the user came back), and setTimeout gets throttled to
+    // ~1s. A MessageChannel message is neither, so the photo keeps rendering
+    // even if the user switches tab or app while they wait.
+    const yieldChannel = new MessageChannel();
+    const yieldFrame = () =>
+      new Promise<void>((resolve) => {
+        if (typeof document !== "undefined" && document.hidden) {
+          yieldChannel.port1.onmessage = () => resolve();
+          yieldChannel.port2.postMessage(0);
+        } else {
+          requestAnimationFrame(() => resolve());
+        }
+      });
+
     const run = async () => {
       const persp = camera as THREE.PerspectiveCamera;
       const canvas = gl.domElement;
@@ -1173,7 +1189,7 @@ function SnapshotEngine({
               actx.drawImage(canvas, 0, 0, outW, outH);
               break;
             }
-            await new Promise((r) => requestAnimationFrame(r));
+            await yieldFrame();
           }
         } else {
           // --- Fallback: jittered accumulation (works everywhere) ---
@@ -1193,7 +1209,7 @@ function SnapshotEngine({
             actx.globalAlpha = 1 / (i + 1);
             actx.drawImage(canvas, 0, 0, outW, outH);
             onProgress(Math.round(((i + 1) / request.frames) * 100));
-            await new Promise((r) => requestAnimationFrame(r));
+            await yieldFrame();
           }
         }
 
@@ -1401,10 +1417,25 @@ export default function View3D({ state, isDark, onUpdateFurniture, onRemoveFurni
     trackEvent("snapshot_rendered", {
       ms: Math.round(performance.now() - snapshotStartRef.current),
     });
-    const a = document.createElement("a");
-    a.href = dataUrl;
-    a.download = "room-photo.jpg";
-    a.click();
+    const deliver = () => {
+      const a = document.createElement("a");
+      a.href = dataUrl;
+      a.download = "room-photo.jpg";
+      a.click();
+    };
+    if (typeof document !== "undefined" && document.hidden) {
+      // Browsers can silently drop downloads triggered from a hidden tab —
+      // hold the finished photo and save it the moment the user returns.
+      const onVisible = () => {
+        if (!document.hidden) {
+          document.removeEventListener("visibilitychange", onVisible);
+          deliver();
+        }
+      };
+      document.addEventListener("visibilitychange", onVisible);
+    } else {
+      deliver();
+    }
   };
 
   const updateStyle = (patch: Partial<StyleState>) => {
