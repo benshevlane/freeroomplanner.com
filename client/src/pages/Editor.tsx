@@ -108,7 +108,7 @@ export default function Editor() {
   useEffect(() => {
     const isReturning =
       sgi("freeroomplanner-desktop-wizard-shown") || sgi("freeroomplanner-mobile-wizard-shown");
-    if (isReturning && !sgi("freeroomplanner-3d-announce-shown-v3")) {
+    if (isReturning && !sgi("freeroomplanner-3d-announce-shown-v4")) {
       const t = setTimeout(() => {
         setShow3DAnnounce(true);
         te("announce_3d_shown");
@@ -120,7 +120,7 @@ export default function Editor() {
     }
   }, []);
   const close3DAnnounce = (acknowledged: boolean) => {
-    ssi("freeroomplanner-3d-announce-shown-v3", "true");
+    ssi("freeroomplanner-3d-announce-shown-v4", "true");
     setShow3DAnnounce(false);
     te(acknowledged ? "announce_3d_cta" : "announce_3d_dismissed");
     // Deliberately no auto-switch: the glowing 3D View button on the canvas
