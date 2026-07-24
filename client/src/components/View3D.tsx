@@ -1173,20 +1173,9 @@ function SnapshotEngine({
           }
         }
 
-        // Watermark (free tier): faint diagonal marks across the image so a
-        // crop can't remove them, plus the corner tag
+        // Watermark: the scene background/ground already carry the tiled
+        // marks (they sit behind the room, never on it); add the corner tag
         actx.globalAlpha = 1;
-        const dfs = Math.max(28, Math.round(outW / 34));
-        actx.save();
-        actx.translate(outW / 2, outH / 2);
-        actx.rotate(-0.35);
-        actx.font = `600 ${dfs}px 'General Sans', 'DM Sans', sans-serif`;
-        actx.textAlign = "center";
-        actx.fillStyle = "rgba(120, 120, 120, 0.13)";
-        for (let row = -1; row <= 1; row++) {
-          actx.fillText("freeroomplanner.com", 0, row * outH * 0.34);
-        }
-        actx.restore();
         const fs = Math.max(16, Math.round(outW / 90));
         actx.font = `600 ${fs}px 'General Sans', 'DM Sans', sans-serif`;
         actx.textAlign = "right";
@@ -1218,6 +1207,37 @@ function SnapshotEngine({
   }, [request]);
 
   return null;
+}
+
+
+// Free-tier watermark: tiled marks on the scene BACKDROP and the ground
+// around the room — never on the room itself, which naturally occludes them.
+// The premium build sets FREE_WATERMARK to false.
+const FREE_WATERMARK = true;
+
+function makeWatermarkTexture(bg: string, text = "freeroomplanner.com"): THREE.CanvasTexture {
+  const c = document.createElement("canvas");
+  c.width = 1024;
+  c.height = 1024;
+  const ctx = c.getContext("2d")!;
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, 1024, 1024);
+  ctx.save();
+  ctx.translate(512, 512);
+  ctx.rotate(-0.28);
+  ctx.font = "600 46px 'General Sans', 'DM Sans', sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillStyle = "rgba(255,255,255,0.55)";
+  ctx.globalAlpha = 0.16;
+  for (let row = -4; row <= 4; row++) {
+    for (let col = -1; col <= 1; col++) {
+      ctx.fillText(text, col * 620 + (row % 2) * 260, row * 170);
+    }
+  }
+  ctx.restore();
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
 }
 
 interface View3DProps {
@@ -1367,6 +1387,11 @@ export default function View3D({ state, isDark, onUpdateFurniture, onRemoveFurni
     });
   };
 
+  const bgWatermark = useMemo(
+    () => makeWatermarkTexture(style.evening ? "#232830" : isDark ? "#20242a" : "#dfe3e8"),
+    [style.evening, isDark]
+  );
+
   // Shadows are the main mobile GPU cost — leave them to bigger screens.
   const enableShadows = useMemo(
     () => typeof window !== "undefined" && window.matchMedia("(min-width: 768px)").matches,
@@ -1469,6 +1494,26 @@ export default function View3D({ state, isDark, onUpdateFurniture, onRemoveFurni
     return { center: c, radius: Math.max(size.x, size.y, 300) };
   }, [state.walls, state.furniture]);
 
+  // Tile the watermark over the ground plane around the room too
+  useEffect(() => {
+    if (!FREE_WATERMARK) return;
+    const tex = makeWatermarkTexture("#c8ccd0");
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    const tiles = Math.max(3, Math.round((radius * 8) / 900));
+    tex.repeat.set(tiles, tiles);
+    if (MAT.ground.map) MAT.ground.map.dispose();
+    MAT.ground.map = tex;
+    MAT.ground.color.set("#ffffff");
+    MAT.ground.needsUpdate = true;
+    return () => {
+      if (MAT.ground.map) { MAT.ground.map.dispose(); MAT.ground.map = null; }
+      MAT.ground.color.set("#c8ccd0");
+      MAT.ground.needsUpdate = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [radius]);
+
+
   const isEmpty = state.walls.length === 0 && state.furniture.length === 0;
   const camPos: [number, number, number] = [
     center.x + radius * 0.85,
@@ -1486,7 +1531,11 @@ export default function View3D({ state, isDark, onUpdateFurniture, onRemoveFurni
         camera={{ fov: 45, near: 10, far: 50000, position: camPos }}
       >
         <Environment files="/textures/env_interior_1k.hdr" />
-        <color attach="background" args={[style.evening ? "#232830" : isDark ? "#20242a" : "#e9edf2"]} />
+        {FREE_WATERMARK ? (
+          <primitive attach="background" object={bgWatermark} />
+        ) : (
+          <color attach="background" args={[style.evening ? "#232830" : isDark ? "#20242a" : "#e9edf2"]} />
+        )}
         <SceneSettings brightness={style.brightness} evening={style.evening} />
         <hemisphereLight
           intensity={style.evening ? 0.3 : 0.62}
